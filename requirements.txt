@@ -1,0 +1,5 @@
+colorama==0.4.6
+psutil==5.9.4
+pyshark==0.5.3
+requests==2.28.1
+urllib3==1.26.13
