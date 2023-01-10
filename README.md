@@ -9,9 +9,8 @@
 
 | Videogames                | IP Address Search |
 | :------------------------ | :---------------: |
-| Minecraft                 | Yes               |
 | Grand Theft Auto 5        | Yes               |
-
+| Minecraft                 | Yes               |
 
 ## Showcase
 
