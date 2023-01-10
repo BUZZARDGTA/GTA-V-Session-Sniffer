@@ -22,7 +22,7 @@
 
 * [Windows](https://www.microsoft.com/windows) 8 / 8.1 / 10 or 11 (x86/x64)
 * [Wireshark](https://www.wireshark.org/)
-* *optional:* [MaxMind GeoLite2](https://www.maxmind.com/)
+* *optional:* [MaxMind GeoLite2](https://www.maxmind.com/) (IP lookups)
 * [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
 
 ## Credits
