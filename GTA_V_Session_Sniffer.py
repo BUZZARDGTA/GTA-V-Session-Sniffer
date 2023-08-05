@@ -7,7 +7,7 @@
 # - Add a timer limit for disconnected IPs
 #Features I can add later but won't be very useful:
 # - Player port counter
-# - when someone leave and come back, trace it with a newline (list)
+# - when someone leaves and come back, trace it with a newline (list)
 # explain counter and add packets
 # tell ti's for 1080/1920 display
 
