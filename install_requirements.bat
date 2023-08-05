@@ -16,10 +16,12 @@ if exist "requirements.txt" (
 )
 
 for %%A in (
-    pyshark
-    urllib3
-    requests
     colorama
+    psutil
+    pyshark
+    requests
+    scapy
+    urllib3
 ) do (
     pip install %%A
 )

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 #GTA_V_Session_Sniffer.py
 
 #TODO:
@@ -9,7 +11,6 @@
 # explain counter and add packets
 # tell ti's for 1080/1920 display
 
-#!/usr/bin/env python3
 # Standard library imports
 import os
 import re
@@ -34,6 +35,9 @@ import urllib3
 import requests
 import colorama
 from colorama import Fore
+from scapy.sendrecv import srp1
+from scapy.layers.l2 import ARP
+from scapy.layers.inet import Ether
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
@@ -101,9 +105,9 @@ class Msgbox(enum.IntFlag):
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class ThirdPartyServers(enum.Enum):
-    Discord = ["66.22.196.0/22"]
-    GTA5 = ["26.0.0.0/8", "185.56.64.0/22", "192.81.241.0/24"]
-    Minecraft = ["168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
+    Discord = ["66.22.196.0/22", "66.22.244.0/24", "66.22.241.0/24"]
+    GTA5 = ["26.0.0.0/8", "104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24"]
+    Minecraft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
 def title(title):
     print(f"\033]0;{title}\007", end="")
@@ -125,12 +129,6 @@ def is_mac_address(string):
     pattern = re.compile(r"^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")
     return pattern.match(string) is not None
 
-def get_mac_address():
-    mac_address = hex(uuid.getnode()).replace("0x", "").upper()
-    if len(mac_address) % 2:
-        mac_address = "0{}".format(mac_address)
-    return ":".join(mac_address[i:i+2] for i in range(0, len(mac_address), 2))
-
 def get_local_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -142,6 +140,34 @@ def get_local_ip_address():
     finally:
         s.close()
     return ip
+
+def get_mac_by_ip_address(ip_address):
+    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
+    arp = ARP(pdst=ip_address)
+    packet = ether / arp
+    answer = srp1(packet, timeout=1, verbose=0)
+    if answer:
+        print(answer[Ether])
+        return str(answer[Ether].src).upper()
+    else:
+        return None
+
+#def get_internet_connected_mac_addresses():
+#    mac_addresses = []
+#    for interface, addrs in psutil.net_if_addrs().items():
+#        stats = psutil.net_io_counters(pernic=True)[interface]
+#        if stats.bytes_sent > 0 or stats.bytes_recv > 0:
+#            if socket.gethostname() != 'localhost':
+#                for addr in addrs:
+#                    if addr.family == psutil.AF_LINK:
+#                        mac_addresses.append(addr.address)
+#    return mac_addresses
+
+#def get_mac_address():
+#    mac_address = hex(uuid.getnode()).replace("0x", "").upper()
+#    if len(mac_address) % 2:
+#        mac_address = "0{}".format(mac_address)
+#    return ":".join(mac_address[i:i+2] for i in range(0, len(mac_address), 2))
 
 def show_message_box(title, message, style):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
@@ -418,7 +444,7 @@ def stdout_header():
     print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
     print(f"")
     print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-    print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: Mathieu#4291 or Telegram: https://t.me/mathieudummy")
+    print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: mathieudummy or Telegram: https://t.me/mathieudummy")
     print(f"-" * 131)
     print(f"                                          Welcome in {TITLE_VERSION}")
     print(f"              This script aim in getting people's address IP from GTA V under the PC version, WITHOUT MODS.")
@@ -432,7 +458,7 @@ def stdout_scanning_ips_from_your_session(t1):
         print(f"Scanning IPs, refreshing display in {REFRESHING_TIMER - seconds_elapsed} seconds ...\r", end="")
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.0 - 10/01/2023"
+VERSION = "v1.0.1 - 05/08/2023"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 
 cls()
@@ -568,18 +594,13 @@ if IP_AND_MAC_ADDRESS_AUTOMATIC:
 
     try:
         IP_ADDRESS = get_local_ip_address()
-    except:
+        if IP_ADDRESS == "127.0.0.1":
+            raise ValueError("IP address is a loopback address")
+        MAC_ADDRESS = get_mac_by_ip_address(IP_ADDRESS)
+        if not MAC_ADDRESS:
+            raise ValueError("MAC address not found")
+    except ValueError:
         IP_ADDRESS = None
-    try:
-        MAC_ADDRESS = get_mac_address()
-    except:
-        MAC_ADDRESS = None
-
-    if not IP_ADDRESS:
-        IP_ADDRESS = None
-    elif IP_ADDRESS == "127.0.0.1":
-        IP_ADDRESS = None
-    if not MAC_ADDRESS:
         MAC_ADDRESS = None
 
     if (
@@ -644,6 +665,16 @@ elif PROGRAM_PRESET == "Minecraft":
     DISPLAY_FILTER = "frame.len>=49 and frame.len<=1498"
 else:
     DISPLAY_FILTER = None
+
+# If the 'PROGRAM_PRESET' setting is set, automatically block RTCP connections.
+# In case RTCP can be useful to get someone IP, I decided not to block them without using a 'PROGRAM_PRESET'.
+# RTCP is known to be for example the Discord's server IP while you are in a call there.
+# The "not rtcp" Display Filter have been heavily tested and I can confirm that it's indeed working correctly.
+# I know that eventually you will see their corresponding IPs time to time but I can guarantee that it does the job it is supposed to do.
+# It filters RTCP but some connections are STILL made out of it, but those are not RTCP ¯\_(ツ)_/¯.
+# And that's exactly why the "Discord" (`class ThirdPartyServers`) IP ranges Capture Filters are useful for.
+if PROGRAM_PRESET:
+    DISPLAY_FILTER = f"{DISPLAY_FILTER} and not rtcp"
 
 while True:
     try:
@@ -770,11 +801,14 @@ while True:
         #-----------------------------------------------------
         #input()
 
-        # Skip Real-time Control Protocol (RTCP)
-        # RTCP is used together with RTP e.g. for VoIP (see also VOIPProtocolFamily).
-        # Block for example Discord IPs while you're in a voice call.
-        if getattr(packet, "rtcp", False):
-            continue
+        # This piece of code should be useless because the "not rtcp" Display Filter already filter those, and faster.
+        # (I did a test that confirms it is indeed useless to filter them again after the "not rtcp" Display Filter.)
+        # Also, if the 'PROGRAM_PRESET' is set to None, we do NOT want to filter RTCP.
+        ## Skip Real-time Control Protocol (RTCP)
+        ## RTCP is used together with RTP e.g. for VoIP (see also VOIPProtocolFamily).
+        ## Block for example Discord IPs while you're in a voice call.
+        #if getattr(packet, "rtcp", False):
+        #    continue
 
         source_address = packet.ip.src
         source_port = packet[packet.transport_layer].srcport
