@@ -409,7 +409,7 @@ def stdout_header():
     print(f"{UNDERLINE}Tips and Tricks{UNDERLINE_RESET}:")
     print(f"  * When using {TITLE}:")
     print(f"    - By entering story mode (optional) and then joining your friend's session, you can easily get their host IP address.")
-    print(f"    - If somebody leaves the session, you can get their IP from players who've leaved your session")
+    print(f"    - If somebody leaves the session, you can get their IP from players who've left your session")
     print(f"    - One way to get someone's IP address is to save all IP addresses for the current session while they're in your session.")
     print(f"      When you find that person in another session, do the same thing and compare the registered IP addresses, if an IP address matches, it means you have their IP address.")
     print(f"    - The port in [brackets] is the first detected, while the {UNDERLINE}underlined{UNDERLINE_RESET} is the last detected.")
@@ -707,7 +707,7 @@ title(TITLE)
 stdout_header()
 print("\n> Players connected in your session (0):")
 print("None")
-print("\n> Player who've leaved your session (0):")
+print("\n> Player who've left your session (0):")
 print("None")
 print("")
 refreshing_rate_t1 = time.perf_counter()
@@ -751,26 +751,26 @@ while True:
 
             if connection_type == "connected":
                 for player in session_db:
-                    if not player["datetime_leaved"]:
+                    if not player["datetime_left"]:
                         padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
                         padding_country = get_minimum_padding(player["country"], padding_country, 27)
                         padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
             else:
                 for player in session_db:
-                    if player["datetime_leaved"]:
+                    if player["datetime_left"]:
                         padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
                         padding_country = get_minimum_padding(player["country"], padding_country, 27)
                         padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
 
             for player in session_db:
                 if connection_type == "connected":
-                    if not player["datetime_leaved"]:
+                    if not player["datetime_left"]:
                         port_list_creation(Fore.GREEN)
                         session_connected.append((player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
                 else:
-                    if player["datetime_leaved"]:
+                    if player["datetime_left"]:
                         port_list_creation(Fore.RED)
-                        session_disconnected.append((player['datetime_leaved'], player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
+                        session_disconnected.append((player['datetime_left'], player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
 
         stdout_scanning_ips_from_your_session(refreshing_rate_t1)
 
@@ -857,13 +857,13 @@ while True:
                         player["port"].append(target["port"][0])
                     if not player["last_port"] == target["port"][0]:
                         player["last_port"] = target["port"][0]
-                    if player["datetime_leaved"]:
-                        player["datetime_leaved"] = None
+                    if player["datetime_left"]:
+                        player["datetime_left"] = None
                     break
         else:
             target["counter"] = 1
             target["datetime_joined"] = datetime_now()
-            target["datetime_leaved"] =  None
+            target["datetime_left"] =  None
             target["first_port"] = target["port"][0]
             target["last_port"] = target["port"][0]
             target["t1"] = time.perf_counter()
@@ -878,10 +878,10 @@ while True:
         session_disconnected = []
 
         for player in session_db:
-            if not player["datetime_leaved"]:
+            if not player["datetime_left"]:
                 seconds_elapsed = round(t2 - player["t1"])
                 if seconds_elapsed >= 10:
-                    player["datetime_leaved"] = datetime_now()
+                    player["datetime_left"] = datetime_now()
 
         padding("connected")
         padding("disconnected")
@@ -904,7 +904,7 @@ while True:
         else:
             len_session_disconnected = len(session_disconnected)
         print("")
-        print(f"> Player{plural(len(session_disconnected))} who've leaved your session ({len_session_disconnected}):")
+        print(f"> Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected}):")
         if len(session_disconnected) < 1:
             print("None")
             print("")
