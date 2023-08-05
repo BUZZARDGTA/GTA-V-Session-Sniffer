@@ -458,7 +458,7 @@ def stdout_scanning_ips_from_your_session(t1):
         print(f"Scanning IPs, refreshing display in {REFRESHING_TIMER - seconds_elapsed} seconds ...\r", end="")
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.1 - 05/08/2023"
+VERSION = "v1.0.2 - 06/08/2023"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 
 cls()
@@ -481,7 +481,7 @@ try:
     response = s.get("https://raw.githubusercontent.com/Illegal-Services/GTA-V-Session-Sniffer/version/version.txt")
 except:
     error_updating__flag = True
-if not error_updating__flag:
+else:
     if response.status_code == 200:
         current_version = Version(VERSION)
         latest_version = Version(response.text)
@@ -497,6 +497,9 @@ if not error_updating__flag:
             msgbox_style = Msgbox.YesNo | Msgbox.Question
             errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
             if errorlevel == 6:
+                if Path(sys.argv[0]).suffix.lower() == ".exe":
+                    webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
+                    sys.exit(0)
                 try:
                     response = s.get("https://raw.githubusercontent.com/Illegal-Services/GTA-V-Session-Sniffer/main/GTA_V_Session_Sniffer.py")
                 except:
@@ -505,7 +508,7 @@ if not error_updating__flag:
                     if response.status_code == 200:
                         Path(f"{Path(__file__).name}").write_bytes(response.content)
                         subprocess.Popen(["start", "python", f"{Path(__file__).name}"], shell=True)
-                        exit()
+                        exit(0)
                     else:
                         error_updating__flag = True
     else:
@@ -524,7 +527,7 @@ if error_updating__flag:
     errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
     if errorlevel == 6:
         webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-        exit()
+        sys.exit(0)
 
 cls()
 title(f"Checking that 'Npcap' or 'WinpCap' driver is installed on your system - {TITLE}")
@@ -546,7 +549,7 @@ while True:
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
         if errorlevel == 2:
-            exit()
+            sys.exit(0)
 
 cls()
 title(f"Applying your custom settings from 'Settings.ini' - {TITLE}")
@@ -696,7 +699,7 @@ while True:
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
         if errorlevel == 2:
-            exit()
+            sys.exit(0)
     else:
         break
 
