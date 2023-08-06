@@ -42,9 +42,15 @@ from scapy.layers.inet import Ether
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
-    exit()
+    sys.exit(0)
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__)) # os.getcwd()
+def is_pyinstaller_compiled():
+    return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
+
+if is_pyinstaller_compiled():
+    SCRIPT_DIR = Path(sys.executable).parent
+else:
+    SCRIPT_DIR = Path(__file__).resolve().parent
 os.chdir(SCRIPT_DIR)
 
 colorama.init(autoreset=True)
@@ -109,6 +115,7 @@ class ThirdPartyServers(enum.Enum):
     GTA5 = ["26.0.0.0/8", "104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24"]
     Minecraft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
+
 def title(title):
     print(f"\033]0;{title}\007", end="")
 
@@ -117,6 +124,9 @@ def cls():
 
 def plural(variable):
     return "s" if variable > 1 else ""
+
+def is_script_an_executable():
+    return Path(sys.argv[0]).suffix.lower() == ".exe" # Check if the running Python script, command-line argument has a file extension ending with .exe
 
 def is_ip_address(string):
   try:
@@ -185,10 +195,6 @@ def npcap_or_winpcap_installed():
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
-    try:
-        os.remove("file.txt")
-    except FileNotFoundError:
-        pass
     with open(SETTINGS_PATH, "w", encoding="utf-8") as file:
         text = f"""
             ;;-----------------------------------------------------------------------------
@@ -458,7 +464,7 @@ def stdout_scanning_ips_from_your_session(t1):
         print(f"Scanning IPs, refreshing display in {REFRESHING_TIMER - seconds_elapsed} seconds ...\r", end="")
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.2 - 06/08/2023"
+VERSION = "v1.0.3 - 06/08/2023"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 
 cls()
@@ -497,7 +503,7 @@ else:
             msgbox_style = Msgbox.YesNo | Msgbox.Question
             errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
             if errorlevel == 6:
-                if Path(sys.argv[0]).suffix.lower() == ".exe":
+                if is_script_an_executable():
                     webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
                     sys.exit(0)
                 try:
@@ -508,7 +514,7 @@ else:
                     if response.status_code == 200:
                         Path(f"{Path(__file__).name}").write_bytes(response.content)
                         subprocess.Popen(["start", "python", f"{Path(__file__).name}"], shell=True)
-                        exit(0)
+                        sys.exit(0)
                     else:
                         error_updating__flag = True
     else:
