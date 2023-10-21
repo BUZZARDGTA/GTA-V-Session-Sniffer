@@ -2,7 +2,10 @@
 
 ## Description
 
-* Scan people who are trying to connect in, who are already or who've leaved your session.
+* Scan players who:
+  - Are trying to connect.
+  - Are Currently connected.
+  - Have left your session.
 
 **Tested and supported videogames:**
 
