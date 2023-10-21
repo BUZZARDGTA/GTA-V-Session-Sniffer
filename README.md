@@ -4,7 +4,7 @@
 
 * Scan players who:
   - Are trying to connect.
-  - Are Currently connected.
+  - Are currently connected.
   - Have left your session.
 
 **Tested and supported videogames:**
