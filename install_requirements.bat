@@ -17,6 +17,7 @@ if exist "requirements.txt" (
 
 for %%A in (
     colorama
+    geoip2
     psutil
     pyshark
     requests
