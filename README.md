@@ -71,17 +71,18 @@ You must obtain it directly from [MaxMind](https://www.maxmind.com/).
 
 When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ..."`, it typically indicates one of the following situation:
 
-- You are not currently in an online session with a minimum of 2 players.
-  The scanner only updates the script's display when packets are received.
+- You are not currently in an online session with a minimum of 2 players.<br />
+  The scanner only updates the script's display when packets are received.<br />
   I'll try to fix this annoying behavior in a future version.
-- The configuration for the script may not be set up correctly.
+- The configuration for the script may not be set up correctly.<br />
   Please refer to [Manual Configuration](#manual-configuration) for detailed instructions.
 
 ### Players undetected
 
 On GTA V, occasionally, players may go undetected, but it's crucial to emphasize that this is not specific to the script.<br />
 Similar occurrences happen even with mod-menus, affecting the same individuals as those encountered with the script.<br />
-This occurs because players can be connected through dedicated game servers (the exact circumstances of which I am not familiar with). Furthermore, mod menus now have the capability to enforce this connection by providing a feature for IP protection, commonly referred to as "Force Relay Connections".
+This occurs because players can be connected through dedicated game servers (the exact circumstances of which I am not familiar with).<br />
+Furthermore, mod menus now have the capability to enforce this connection by providing a feature for IP protection, commonly referred to as "Force Relay Connections".
 
 ### Unrelated / False Positive IPs detected
 
