@@ -43,7 +43,7 @@ Additionally, make sure you have [Wireshark](https://www.wireshark.org/) install
 Furthermore, for packet sniffing functionality, you'll require either [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/).<br />
 It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npcap/) is already included by default within the [Wireshark](https://www.wireshark.org/) installation.
 
-### Setup / Manual Configuration
+### Manual Configuration
 
 The script is primarily designed for automatic configuration on PCs.<br />
 However, manual configuration is requiered in the following scenarios:
@@ -51,12 +51,12 @@ However, manual configuration is requiered in the following scenarios:
 - You don't get it working on PC (automatic configuration failed).
 - You want to scan for your console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X).
 
-For manual configuration, modify the [Settings.ini](Settings.ini) file as follows:
+For manual configuration, modify the `Settings.ini` file as follows:
 
 - Set `<IP_AND_MAC_ADDRESS_AUTOMATIC>` to `False` value.
 - Set both `<MAC_ADDRESS>` and `<IP_ADDRESS>` to the respective addresses of your PC or console from which you want to scan for players.
 
-_If you are curious about all the other settings that you can manually configure, you can refer to each comments in the [Settings.ini](Settings.ini) file for deeper documentation on each setting._
+_If you are curious about all the other settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
 ### Resolving countrys
 
@@ -67,15 +67,43 @@ You must obtain it directly from [MaxMind](https://www.maxmind.com/).
 
 ## Troubleshooting
 
+### Scanner is stuck
+
+When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ..."`, it typically indicates one of the following situation:
+
+- You are not currently in an online session with a minimum of 2 players.
+  The scanner only updates the script's display when packets are received.
+  I'll try to fix this annoying behavior in a future version.
+- The configuration for the script may not be set up correctly.
+  Please refer to [Manual Configuration](#manual-configuration) for detailed instructions.
+
+### Players undetected
+
+On GTA V, occasionally, players may go undetected, but it's crucial to emphasize that this is not specific to the script.<br />
+Similar occurrences happen even with mod-menus, affecting the same individuals as those encountered with the script.<br />
+This occurs because players can be connected through dedicated game servers (the exact circumstances of which I am not familiar with). Furthermore, mod menus now have the capability to enforce this connection by providing a feature for IP protection, commonly referred to as "Force Relay Connections".
+
+### Unrelated / False Positive IPs detected
+
+The display of unrelated IPs is possible in certain scenarios.<br />
+I have made efforts to minimize this occurrence by optimizing the `BPF_FILTER` and `DISPLAY_FILTER` from the source code.<br />
+If you have other Peer-To-Peer applications running, such as a BitTorrent client, it may contribute to this issue.<br />
+To mitigate this, I recommend closing all other Peer-To-Peer applications while using the script.
+
+Furthermore, you can enhance the filtering process by setting `<BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.
+You can also, adjust `<PROGRAM_PRESET>` to correspond to the program you are scanning.<br />
+These configurations help minimize the display of unrelated IPs.
+
 ### VPN Issues
 
 I've observed that using a VPN on PC renders the script ineffective, as it captures only the VPN traffic itself.<br />
 Unfortunately, I do not have a solution for this issue.
 
-### Players undetected
+### About Screen Refreshing
 
-Occasionally, players may go undetected, but it's crucial to emphasize that this is not specific to the script.<br />
-Similar occurrences happen even with mod-menus, affecting the same individuals as those encountered with the script.
+Refreshing the display of the script positions your terminal's cursor at the very bottom of the script.<br />
+This problem is kind of resolved if you are using Windows Terminal from Windows 10 or 11.<br />
+I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/) for an optimal experience.
 
 ## Contact Support
 
