@@ -1,18 +1,20 @@
-#!/usr/bin/env python3
+# --------------------------------------------
+# 📦 External/Third-party Python Libraries 📦
+# --------------------------------------------
+import psutil
+import pyshark
+import colorama
+import geoip2.errors
+import geoip2.database
+#import maxminddb.errors
+from colorama import Fore
+from scapy.sendrecv import srp1
+from scapy.layers.l2 import ARP
+from scapy.layers.inet import Ether
 
-#GTA_V_Session_Sniffer.py
-
-#TODO:
-# - create an algo before and new session to find duplicated ip players
-# - Add a timer limit for disconnected IPs
-#Features I can add later but won't be very useful:
-# - Player port counter
-# - when someone leaves and come back, trace it with a newline (list)
-# explain counter and add packets
-# tell it's for 1080/1920 display
-# make an online service for username lookup for each platforms
-
-# Standard library imports
+# ------------------------------------------------------
+# 🐍 Standard Python Libraries (Included by Default) 🐍
+# ------------------------------------------------------
 import os
 import re
 import sys
@@ -26,23 +28,9 @@ import textwrap
 import ipaddress
 import subprocess
 import webbrowser
-import geoip2.errors
-import geoip2.database
-#import maxminddb.errors
 from pathlib import Path
 from datetime import datetime
 from ipaddress import IPv4Address, IPv4Network
-
-# Third-party library imports
-import psutil
-import pyshark
-import urllib3
-import requests
-import colorama
-from colorama import Fore
-from scapy.sendrecv import srp1
-from scapy.layers.l2 import ARP
-from scapy.layers.inet import Ether
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
@@ -52,6 +40,54 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
 def is_pyinstaller_compiled():
     return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
+def create_unsafe_https_session():
+    # Standard Python Libraries
+    import ssl
+    from ssl import SSLContext
+
+    # Third-party library imports
+    import requests
+    import requests.adapters
+    import urllib3
+    from urllib3.poolmanager import PoolManager
+    from urllib3.util import create_urllib3_context
+    from urllib3.exceptions import InsecureRequestWarning
+
+
+    # Workaround unsecure request warnings
+    urllib3.disable_warnings(InsecureRequestWarning)
+
+
+    # Allow custom ssl context for adapters
+    class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
+        def __init__(self, ssl_context: SSLContext | None = None, **kwargs):
+            self.ssl_context = ssl_context
+            super().__init__(**kwargs)
+
+        def init_poolmanager(self, connections:int, maxsize:int, block=False):
+            self.poolmanager = PoolManager(
+                num_pools=connections,
+                maxsize=maxsize,
+                block=block,
+                ssl_context=self.ssl_context,
+            )
+
+
+    context = create_urllib3_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    # Work around unsecure ciphers being rejected
+    context.set_ciphers("DEFAULT@SECLEVEL=0")
+    # Work around legacy renegotiation being disabled
+    context.options |= ssl.OP_LEGACY_SERVER_CONNECT
+
+    session = requests.session()
+    session.mount('https://', CustomSSLContextHTTPAdapter(context))
+    session.headers.update(HEADERS)
+    session.verify = False
+
+    return session
+
 if is_pyinstaller_compiled():
     SCRIPT_DIR = Path(sys.executable).parent
 else:
@@ -59,9 +95,10 @@ else:
 os.chdir(SCRIPT_DIR)
 
 colorama.init(autoreset=True)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
-s = requests.Session()
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
+}
+s = create_unsafe_https_session()
 
 #logging.basicConfig(filename='debug.log',
 #                    level=logging.DEBUG,
@@ -502,7 +539,7 @@ def datetime_now():
 def stdout_header():
     if STDOUT_SHOW_HEADER:
         print(f"")
-        print(f"-" * 131)
+        print(f"-" * 110)
         print(f"{UNDERLINE}Tips and Tricks{UNDERLINE_RESET}:")
         print(f"  * When using {TITLE}:")
         print(f"    - By entering story mode (optional) and then joining your friend's session, you can easily get their host IP address.")
@@ -542,10 +579,10 @@ def stdout_header():
         print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
         print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
 
-    print(f"-" * 131)
-    print(f"                                       Welcome in {TITLE_VERSION}")
-    print(f"                            This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-    print(f"-" * 131)
+    print(f"-" * 110)
+    print(f"                             Welcome in {TITLE_VERSION}")
+    print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+    print(f"-" * 110)
 
 def stdout_scanning_ips_from_your_session(t1: float):
     t2 = time.perf_counter()
