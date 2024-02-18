@@ -60,7 +60,8 @@ _If you are curious about all the other settings that you can manually configure
 
 ### Resolving countrys
 
-In order to resolve country information from players within the script, you need to download the MaxMind Database `GeoLite2-Country.mmdb`. Obtain a copy of this database by signing up for GeoLite2 on their website and downloading it from there.
+In order to resolve country information from players within the script, you need to download the MaxMind Database `GeoLite2-Country.mmdb`.<br />
+Obtain a copy of this database by signing up for GeoLite2 on their website and downloading it from there.
 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br />
 You must obtain it directly from [MaxMind](https://www.maxmind.com/).
