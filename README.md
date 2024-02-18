@@ -92,7 +92,7 @@ I have made efforts to minimize this occurrence by optimizing the `BPF_FILTER` a
 If you have other Peer-To-Peer applications running, such as a BitTorrent client, it may contribute to this issue.<br />
 To mitigate this, I recommend closing all other Peer-To-Peer applications while using the script.
 
-Furthermore, you can enhance the filtering process by setting `<BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.
+Furthermore, you can enhance the filtering process by setting `<BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.<br />
 You can also, adjust `<PROGRAM_PRESET>` to correspond to the program you are scanning.<br />
 These configurations help minimize the display of unrelated IPs.
 
