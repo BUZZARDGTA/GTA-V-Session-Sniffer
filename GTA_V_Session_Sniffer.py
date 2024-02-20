@@ -23,8 +23,9 @@ import time
 import enum
 import socket
 import ctypes
-#import logging
+import signal
 import textwrap
+import threading
 import ipaddress
 import subprocess
 import webbrowser
@@ -36,74 +37,6 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
-
-def is_pyinstaller_compiled():
-    return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
-
-def create_unsafe_https_session():
-    # Standard Python Libraries
-    import ssl
-    from ssl import SSLContext
-
-    # Third-party library imports
-    import requests
-    import requests.adapters
-    import urllib3
-    from urllib3.poolmanager import PoolManager
-    from urllib3.util import create_urllib3_context
-    from urllib3.exceptions import InsecureRequestWarning
-
-
-    # Workaround unsecure request warnings
-    urllib3.disable_warnings(InsecureRequestWarning)
-
-
-    # Allow custom ssl context for adapters
-    class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
-        def __init__(self, ssl_context: SSLContext | None = None, **kwargs):
-            self.ssl_context = ssl_context
-            super().__init__(**kwargs)
-
-        def init_poolmanager(self, connections:int, maxsize:int, block=False):
-            self.poolmanager = PoolManager(
-                num_pools=connections,
-                maxsize=maxsize,
-                block=block,
-                ssl_context=self.ssl_context,
-            )
-
-
-    context = create_urllib3_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    # Work around unsecure ciphers being rejected
-    context.set_ciphers("DEFAULT@SECLEVEL=0")
-    # Work around legacy renegotiation being disabled
-    context.options |= ssl.OP_LEGACY_SERVER_CONNECT
-
-    session = requests.session()
-    session.mount('https://', CustomSSLContextHTTPAdapter(context))
-    session.headers.update(HEADERS)
-    session.verify = False
-
-    return session
-
-if is_pyinstaller_compiled():
-    SCRIPT_DIR = Path(sys.executable).parent
-else:
-    SCRIPT_DIR = Path(__file__).resolve().parent
-os.chdir(SCRIPT_DIR)
-
-colorama.init(autoreset=True)
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
-}
-s = create_unsafe_https_session()
-
-#logging.basicConfig(filename='debug.log',
-#                    level=logging.DEBUG,
-#                    format='%(asctime)s - %(levelname)s - %(message)s',
-#                    datefmt='%Y-%m-%d %H:%M:%S')
 
 class Version:
     def __init__(self, version: str):
@@ -164,6 +97,78 @@ class ThirdPartyServers(enum.Enum):
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
     GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16"]
     MinecraftBedrockEdition_PC_and_PS3_Microsoft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
+
+def create_unsafe_https_session():
+    # Standard Python Libraries
+    import ssl
+    from ssl import SSLContext
+
+    # Third-party library imports
+    import requests
+    import requests.adapters
+    import urllib3
+    from urllib3.poolmanager import PoolManager
+    from urllib3.util import create_urllib3_context
+    from urllib3.exceptions import InsecureRequestWarning
+
+
+    # Workaround unsecure request warnings
+    urllib3.disable_warnings(InsecureRequestWarning)
+
+
+    # Allow custom ssl context for adapters
+    class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
+        def __init__(self, ssl_context: SSLContext | None = None, **kwargs):
+            self.ssl_context = ssl_context
+            super().__init__(**kwargs)
+
+        def init_poolmanager(self, connections:int, maxsize:int, block=False):
+            self.poolmanager = PoolManager(
+                num_pools=connections,
+                maxsize=maxsize,
+                block=block,
+                ssl_context=self.ssl_context,
+            )
+
+
+    context = create_urllib3_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    # Work around unsecure ciphers being rejected
+    context.set_ciphers("DEFAULT@SECLEVEL=0")
+    # Work around legacy renegotiation being disabled
+    context.options |= ssl.OP_LEGACY_SERVER_CONNECT
+
+    session = requests.session()
+    session.mount('https://', CustomSSLContextHTTPAdapter(context))
+    session.headers.update(HEADERS)
+    session.verify = False
+
+    return session
+
+def signal_handler(sig, frame):
+    global exit_signal
+
+    if exit_signal.is_set():
+        return
+
+    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
+
+    exit_signal.set()
+
+    try:
+        if (stdout_render_core__thread and stdout_render_core__thread.is_alive()):
+            stdout_render_core__thread.join()  # Wait for the thread to finish
+    except NameError:
+        pass
+
+    sys.exit(0)
+
+def is_pyinstaller_compiled():
+    return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
+
+def datetime_now():
+    return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
 def title(title: str):
     print(f"\033]0;{title}\007", end="")
@@ -257,12 +262,14 @@ def npcap_or_winpcap_installed():
         except subprocess.CalledProcessError:
             return False
 
-def happen_to_display_filter(string_to_happen: str):
-    if DISPLAY_FILTER:
-        return f"{DISPLAY_FILTER} and {string_to_happen}"
+def create_or_happen_to_variable(variable: str, operator: str, string_to_happen: str):
+    if not string_to_happen:
+        return variable
+
+    if variable:
+        return f"{variable}{operator}{string_to_happen}"
     else:
         return string_to_happen
-
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
@@ -278,6 +285,14 @@ def reconstruct_settings():
             ;;
             ;;<STDOUT_SHOW_HEADER>
             ;;Determine if you want or not to show the developper's header in the script's screen.
+            ;;
+            ;;<STDOUT_REFRESHING_TIMER>
+            ;;Time interval between which this will refresh the console display.
+            ;;
+            ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
+            ;;The maximum number of players showing up in disconnected players list.
+            ;;Valid values are any number greater than 0.
+            ;;Setting it to 0 will make it unlimitted.
             ;;
             ;;<MAXMIND_DB_PATH>
             ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
@@ -309,31 +324,27 @@ def reconstruct_settings():
             ;;Please also note that both of these have only been tested on PCs.
             ;;I do not have information regarding their functionality on consoles.
             ;;
-            ;;<REFRESHING_TIMER>
-            ;;Time interval between which this will refresh the console display.
-            ;;
-            ;;<COUNTER_SESSION_DISCONNECTED_PLAYERS>
-            ;;The maximum number of players showing up in disconnected players.
-            ;;
             ;;<PYSHARK_PACKET_COUNT>
-            ;;The chosen number of packet counted in the Python pyshark module.
+            ;;This parameter represents the number of network packets to process in real-time.
             ;;Valid values are any number greater than 0.
-            ;;Setting it to '0' will make it unlimitted.
-            ;;Be aware that this is not recommended because when you are looking for many IPs at the same time,
-            ;;the script will take longer to scan the IPs as the IPs will keep coming in at the same time,
-            ;;which will cause the information provided by the script to be updated later than they should.
+            ;;Setting it to 0 will make it unlimitted.
+            ;;Setting it to 32 is recommended, as there can be a maximum of 32 players in a GTA Online session,
+            ;;or you can choose 1024, which results from 32 multiplied by 32.
+            ;;If you have a less powerful CPU, it is preferable to use 32; for a more capable CPU, consider using 1024.
+            ;;Excessive packet processing can lead to delays in the real-time execution of the script.
             ;;-----------------------------------------------------------------------------
             STDOUT_SHOW_HEADER={STDOUT_SHOW_HEADER}
+            STDOUT_REFRESHING_TIMER={STDOUT_REFRESHING_TIMER}
+            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS={STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}
             MAXMIND_DB_PATH={MAXMIND_DB_PATH}
             INTERFACE_NAME={INTERFACE_NAME}
             IP_AND_MAC_ADDRESS_AUTOMATIC={IP_AND_MAC_ADDRESS_AUTOMATIC}
             IP_ADDRESS={IP_ADDRESS}
             MAC_ADDRESS={MAC_ADDRESS}
-            REFRESHING_TIMER={REFRESHING_TIMER}
-            COUNTER_SESSION_DISCONNECTED_PLAYERS={COUNTER_SESSION_DISCONNECTED_PLAYERS}
             BLOCK_THIRD_PARTY_SERVERS={BLOCK_THIRD_PARTY_SERVERS}
             PROGRAM_PRESET={PROGRAM_PRESET}
             PYSHARK_PACKET_COUNT={PYSHARK_PACKET_COUNT}
+
         """
         text = textwrap.dedent(text).removeprefix("\n")
         file.write(text)
@@ -385,7 +396,7 @@ def apply_settings(settings_list: list):
 
             return None
 
-        global STDOUT_SHOW_HEADER, MAXMIND_DB_PATH, INTERFACE_NAME, IP_AND_MAC_ADDRESS_AUTOMATIC, IP_ADDRESS, MAC_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, REFRESHING_TIMER, COUNTER_SESSION_DISCONNECTED_PLAYERS, PYSHARK_PACKET_COUNT
+        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_AND_MAC_ADDRESS_AUTOMATIC, IP_ADDRESS, MAC_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, PYSHARK_PACKET_COUNT
 
         if setting == "STDOUT_SHOW_HEADER":
             STDOUT_SHOW_HEADER = return_setting(setting)
@@ -396,6 +407,30 @@ def apply_settings(settings_list: list):
             else:
                 rewrite_settings()
                 STDOUT_SHOW_HEADER = True
+        elif setting == "STDOUT_REFRESHING_TIMER":
+            reset_current_setting__flag = False
+            try:
+                STDOUT_REFRESHING_TIMER = int(return_setting(setting))
+            except (ValueError, TypeError):
+                reset_current_setting__flag = True
+            else:
+                if STDOUT_REFRESHING_TIMER < 0:
+                    reset_current_setting__flag = True
+            if reset_current_setting__flag:
+                rewrite_settings()
+                STDOUT_REFRESHING_TIMER = 0
+        elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
+            reset_current_setting__flag = False
+            try:
+                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(return_setting(setting))
+            except (ValueError, TypeError):
+                reset_current_setting__flag = True
+            else:
+                if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
+                    reset_current_setting__flag = True
+            if reset_current_setting__flag:
+                rewrite_settings()
+                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
         elif setting == "MAXMIND_DB_PATH":
             reset_current_setting__flag = False
             MAXMIND_DB_PATH = return_setting(setting)
@@ -493,30 +528,6 @@ def apply_settings(settings_list: list):
             if reset_current_setting__flag:
                 rewrite_settings()
                 PROGRAM_PRESET = None
-        elif setting == "REFRESHING_TIMER":
-            reset_current_setting__flag = False
-            try:
-                REFRESHING_TIMER = int(return_setting(setting))
-            except (ValueError, TypeError):
-                reset_current_setting__flag = True
-            else:
-                if REFRESHING_TIMER < 0:
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                rewrite_settings()
-                REFRESHING_TIMER = 0
-        elif setting == "COUNTER_SESSION_DISCONNECTED_PLAYERS":
-            reset_current_setting__flag = False
-            try:
-                COUNTER_SESSION_DISCONNECTED_PLAYERS = int(return_setting(setting))
-            except (ValueError, TypeError):
-                reset_current_setting__flag = True
-            else:
-                if COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                rewrite_settings()
-                COUNTER_SESSION_DISCONNECTED_PLAYERS = 0
         elif setting == "PYSHARK_PACKET_COUNT":
             reset_current_setting__flag = False
             try:
@@ -528,71 +539,252 @@ def apply_settings(settings_list: list):
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
                 rewrite_settings()
-                PYSHARK_PACKET_COUNT = 30
+                PYSHARK_PACKET_COUNT = 1024
 
     if need_rewrite_settings:
         reconstruct_settings()
 
-def datetime_now():
-    return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+def stdout_render_core():
+    global session_db
 
-def stdout_header():
-    if STDOUT_SHOW_HEADER:
+    def padding(connection_type: str):
+        def get_minimum_padding(var: str | int, max_padding: int, padding: int):
+
+            current_padding = len(str(var))
+            if current_padding <= padding:
+                if current_padding > max_padding:
+                    max_padding = current_padding
+
+            return max_padding
+
+        def port_list_creation(color: str):
+            stdout_port_list = ""
+
+            for port in player["port"]:
+                to_add_in_portlist = None
+
+                if port == player["first_port"] == player["last_port"]:
+                    to_add_in_portlist = f"[{UNDERLINE}{port}{UNDERLINE_RESET}]"
+                elif port == player["first_port"]:
+                    to_add_in_portlist = f"[{port}]"
+                elif port == player["last_port"]:
+                    to_add_in_portlist = f"{UNDERLINE}{port}{UNDERLINE_RESET}"
+                else:
+                    to_add_in_portlist = f"{port}"
+
+                if to_add_in_portlist:
+                    stdout_port_list = create_or_happen_to_variable(stdout_port_list, ", ", f"{color}{to_add_in_portlist}{Fore.RESET}")
+
+            return stdout_port_list
+
+        padding_counter = padding_country = padding_ip = 0
+        session_connected = []
+        session_disconnected = []
+
+        if connection_type == "connected":
+            for player in session_db:
+                if not player["datetime_left"]:
+                    padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
+                    padding_country = get_minimum_padding(player["country"], padding_country, 27)
+                    padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
+        else:
+            for player in session_db:
+                if player["datetime_left"]:
+                    padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
+                    padding_country = get_minimum_padding(player["country"], padding_country, 27)
+                    padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
+
+        for player in session_db:
+            if connection_type == "connected":
+                if not player["datetime_left"]:
+                    stdout_port_list = port_list_creation(Fore.GREEN)
+                    session_connected.append((player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
+            else:
+                if player["datetime_left"]:
+                    stdout_port_list = port_list_creation(Fore.RED)
+                    session_disconnected.append((player['datetime_left'], player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
+
+        return session_connected if connection_type == "connected" else session_disconnected
+
+
+    refreshing_rate_t1 = time.perf_counter()
+
+    while not exit_signal.is_set():
+        for player in session_db:
+            if not player["datetime_left"]:
+                seconds_elapsed = round(time.perf_counter() - player["t1"])
+                if seconds_elapsed >= 10:
+                    player["datetime_left"] = datetime_now()
+
+        session_connected = padding("connected")
+        session_disconnected = padding("disconnected")
+
+        session_connected = sorted(session_connected, key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S"))
+        session_disconnected = sorted(session_disconnected, key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S"))
+
+        if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS > len(session_disconnected):
+            len_session_disconnected_message = len(session_disconnected)
+        else:
+            len_session_disconnected_message = f"showing {STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
+
+        cls()
         print(f"")
+
+        if STDOUT_SHOW_HEADER:
+            print(f"-" * 110)
+            print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
+            print(f"  * https://illegal-services.com/")
+            print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
+            print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
+            print(f"")
+            print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
+            print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+            print(f"")
+
         print(f"-" * 110)
-        print(f"{UNDERLINE}Tips and Tricks{UNDERLINE_RESET}:")
-        print(f"  * When using {TITLE}:")
-        print(f"    - By entering story mode (optional) and then joining your friend's session, you can easily get their host IP address.")
-        print(f"    - If somebody leaves the session, you can get their IP from players who've left your session")
-        print(f"    - One way to get someone's IP address is to save all IP addresses for the current session while they're in your session.")
-        print(f"      When you find that person in another session, do the same thing and compare the registered IP addresses, if an IP address matches, it means you have their IP address.")
-        print(f"    - The port in [brackets] is the first detected, while the {UNDERLINE}underlined{UNDERLINE_RESET} is the last detected.")
-        print(f"  * If the Host of a session suddenly loose it's internet access, it will cause a \"session split\"* which, most of the time result in a mess of the lobby.")
-        print(f"  * The game port is \"6672\", unfortunately I don't have any clue what the other ports mean.")
-        print(f"  * If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the Illegal Services application IP Lookup / Port Scanning.")
-        print(f"    It has a very good IP Lookup that can also find out VPN, Mobile connections etc.")
-        print(f"    You can find Illegal Services website in my advertisements bellow.")
-        print(f"  * Using 'PC Blacklist Sniffer' allows you to detect people you blacklisted from your sessions (link in my advertisements bellow).")
-        print(f"")
-        print(f"{UNDERLINE}Lexicon{UNDERLINE_RESET}:")
-        print(f"  * \"Session Split\":")
-        print(f"      The person hosting the session suddenly loses internet access (Example: DDoS)")
-        print(f"      A new host will be automatically selected from the players who are already in the session.")
-        print(f"      During this new host selection process, some players may be kicked out of the lobby, leaving them alone in their new session.")
-        print(f"")
-        print(f"{UNDERLINE}Common Problems{UNDERLINE_RESET}:")
-        print(f"  * If the scanner is stuck, that either means:")
-        print(f"    - You are not in an online session with at least 2 players.")
-        print(f"    - You didn't set up {TITLE} correctly.")
-        print(f"      Make sure this values are right: [Local IP:{IP_ADDRESS}], [MAC IP:{MAC_ADDRESS}]")
-        print(f"  * {TITLE} does not scan for usernames because I believe it's impossible, let me know if I'm wrong. Contact details below.")
-        print(f"  * It is possible that IPs not related to \"GTAV.exe\" executable be displayed.") # https://stackoverflow.com/questions/1339691/filter-by-process-pid-in-wireshark
-        print(f"    I tried my possible with \"BPF_FILTER\" and \"DISPLAY_FILTER\" to make this scenario rare.")
-        print(f"  * Refreshing (clear screen) the display from \"cmd.exe\" positions your command prompt cursor at the very bottom of the script.")
-        print(f"    This problem is kind of resolved if you are using Windows Terminal from Windows 10 or 11")
-        print(f"")
-        print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-        print(f"  * https://illegal-services.com/")
-        print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
-        print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
-        print(f"")
-        print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-        print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+        print(f"                             Welcome in {TITLE_VERSION}")
+        print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+        print(f"-" * 110)
+        print("")
+        print(f"> Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):")
+        if len(session_connected) < 1:
+            print("None")
+        else:
+            #https://stackoverflow.com/questions/57873530/how-to-sort-a-list-by-datetime-in-python#57873719
+            for item in sorted(session_connected, key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S")):
+                print(f"first seen:{Fore.GREEN}{item[0]}{Fore.RESET} | counter:{Fore.GREEN}{item[1]}{Fore.RESET} | country:{Fore.GREEN}{item[2]}{Fore.RESET} | IP:{Fore.GREEN}{item[3]}{Fore.RESET} | Port(s):{Fore.GREEN}{item[4]}{Fore.RESET}")
+        print("")
+        print(f"> Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):")
+        if len(session_disconnected) < 1:
+            print("None")
+        else:
+            #https://stackoverflow.com/questions/57873530/how-to-sort-a-list-by-datetime-in-python#57873719
+            for item in sorted(session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:], key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S")):
+                print(f"last seen:{Fore.RED}{item[0]}{Fore.RESET} | first seen:{Fore.RED}{item[1]}{Fore.RESET} | counter:{Fore.RED}{item[2]}{Fore.RESET} | country:{Fore.RED}{item[3]}{Fore.RESET} | IP:{Fore.RED}{item[4]}{Fore.RESET} | Port(s):{Fore.RED}{item[5]}{Fore.RESET}")
+        print("")
 
-    print(f"-" * 110)
-    print(f"                             Welcome in {TITLE_VERSION}")
-    print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-    print(f"-" * 110)
+        while not exit_signal.is_set():
+            refreshing_rate_t2 = time.perf_counter()
 
-def stdout_scanning_ips_from_your_session(t1: float):
-    t2 = time.perf_counter()
-    seconds_elapsed = round(t2 - t1)
-    if seconds_elapsed < 5:
-        print(f"Scanning IPs, refreshing display in {REFRESHING_TIMER - seconds_elapsed} seconds ...\r", end="")
+            seconds_elapsed = round(refreshing_rate_t2 - refreshing_rate_t1)
+            if seconds_elapsed <= STDOUT_REFRESHING_TIMER:
+                print(f"Scanning IPs, refreshing display in {max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)} seconds ...\r", end="")
+                time.sleep(1)
+                continue
+
+            refreshing_rate_t1 = refreshing_rate_t2
+            break
+
+def packet_callback(packet):
+    #TODO: ADD packet len
+    #print(packet[packet.transport_layer].field_names)
+    #print(packet[packet.transport_layer].length)
+    #print(packet[packet.transport_layer].checksum)
+    #print(packet[packet.transport_layer].checksum_status)
+    #print(packet[packet.transport_layer].stream)
+    #-----------------------------------------------------
+    #print(packet.ip.field_names)
+    #print(packet.ip.version)
+    #print(packet.ip.hdr_len)
+    #print(packet.ip.dsfield)
+    #print(packet.ip.dsfield_dscp)
+    #print(packet.ip.dsfield_ecn)
+    #print(packet.ip.len)
+    #print(packet.ip.id)
+    #print(packet.ip.flags)
+    #print(packet.ip.flags_rb)
+    #print(packet.ip.flags_df)
+    #print(packet.ip.flags_mf)
+    #print(packet.ip.frag_offset)
+    #print(packet.ip.ttl)
+    #print(packet.ip.proto)
+    #print(packet.ip.checksum)
+    #print(packet.ip.checksum_status)
+    #-----------------------------------------------------
+    #input()
+
+    # This piece of code should be useless because the "not rtcp" Display Filter already filter those, and faster.
+    # (I did a test that confirms it is indeed useless to filter them again after the "not rtcp" Display Filter.)
+    # Also, if the 'PROGRAM_PRESET' is set to None, we do NOT want to filter RTCP.
+    ## Skip Real-time Control Protocol (RTCP)
+    ## RTCP is used together with RTP e.g. for VoIP (see also VOIPProtocolFamily).
+    ## Block for example Discord IPs while you're in a voice call.
+    #if getattr(packet, "rtcp", False):
+    #    continue
+
+    source_address = packet.ip.src
+    source_port = packet[packet.transport_layer].srcport
+    destination_address = packet.ip.dst
+    destination_port = packet[packet.transport_layer].dstport
+    try:
+        source_country = packet.ip.geosrc_country
+        source_country_iso = packet.ip.geosrc_country_iso
+    except AttributeError:
+        source_country, source_country_iso = get_country_info_from_ip(source_address)
+    try:
+        destination_country = packet.ip.geodst_country
+        destination_country_iso = packet.ip.geodst_country_iso
+    except AttributeError:
+        destination_country, destination_country_iso = get_country_info_from_ip(destination_address)
+
+    if source_address == IP_ADDRESS:
+        target = dict(
+            direction = "dst",
+            ip = destination_address,
+            port = [destination_port],
+            country = f"{destination_country} ({destination_country_iso})"
+        )
+    else:
+        target = dict(
+            direction = "src",
+            ip = source_address,
+            port = [source_port],
+            country = f"{source_country} ({source_country_iso})"
+        )
+
+    # Skip local and private IP Ranges.
+    #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
+    if any(IPv4Address(target["ip"]) in IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]):
+        return
+
+    if any(target["ip"] == player["ip"] for player in session_db):
+        for player in session_db:
+            if target["ip"] == player["ip"]:
+                player["counter"] += 1
+                player["t1"] = time.perf_counter()
+                if not target["port"][0] in player["port"]:
+                    player["port"].append(target["port"][0])
+                if not player["last_port"] == target["port"][0]:
+                    player["last_port"] = target["port"][0]
+                if player["datetime_left"]:
+                    player["datetime_left"] = None
+                break
+    else:
+        target["counter"] = 1
+        target["datetime_joined"] = datetime_now()
+        target["datetime_left"] =  None
+        target["first_port"] = target["port"][0]
+        target["last_port"] = target["port"][0]
+        target["t1"] = time.perf_counter()
+        session_db.append(target)
+
+colorama.init(autoreset=True)
+signal.signal(signal.SIGINT, signal_handler)
+exit_signal = threading.Event()
+
+if is_pyinstaller_compiled():
+    SCRIPT_DIR = Path(sys.executable).parent
+else:
+    SCRIPT_DIR = Path(__file__).resolve().parent
+os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.4 - 18/02/2024"
+VERSION = "v1.0.5 - 20/02/2024"
 TITLE_VERSION = f"{TITLE} {VERSION}"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
+}
+s = create_unsafe_https_session()
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -666,7 +858,7 @@ cls()
 title(f"Checking that 'Npcap' or 'WinpCap' driver is installed on your system - {TITLE}")
 print("\nChecking that 'Npcap' or 'WinpCap' driver is installed on your system ...\n")
 
-while True:
+while not exit_signal.is_set():
     if npcap_or_winpcap_installed():
         break
     else:
@@ -690,7 +882,7 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
-apply_settings(["STDOUT_SHOW_HEADER", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_AND_MAC_ADDRESS_AUTOMATIC", "IP_ADDRESS", "MAC_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "REFRESHING_TIMER", "COUNTER_SESSION_DISCONNECTED_PLAYERS", "PYSHARK_PACKET_COUNT"])
+apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_AND_MAC_ADDRESS_AUTOMATIC", "IP_ADDRESS", "MAC_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "PYSHARK_PACKET_COUNT"])
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -705,7 +897,7 @@ else:
     for i, item in enumerate(interfaces):
         print(f"{Fore.YELLOW}{i+1}{Fore.RESET}: {item}")
     print()
-    while True:
+    while not exit_signal.is_set():
         try:
             selection = int(input(f"Select your desired capture network interface ({Fore.YELLOW}1{Fore.RESET}-{Fore.YELLOW}{len(interfaces)}{Fore.RESET}): {Fore.YELLOW}"))
         except ValueError:
@@ -745,7 +937,7 @@ if IP_AND_MAC_ADDRESS_AUTOMATIC:
     ):
         reconstruct_settings()
 
-while True:
+while not exit_signal.is_set():
     if not IP_ADDRESS:
         msgbox_title = TITLE
         msgbox_text = """
@@ -760,7 +952,7 @@ while True:
     else:
         break
 
-while True:
+while not exit_signal.is_set():
     if not MAC_ADDRESS:
         msgbox_title = TITLE
         msgbox_text = """
@@ -780,9 +972,9 @@ DISPLAY_FILTER = None
 
 if PROGRAM_PRESET:
     if PROGRAM_PRESET == "GTA5":
-        DISPLAY_FILTER = happen_to_display_filter("frame.len>=71 and frame.len<=999")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "frame.len>=71 and frame.len<=999")
     elif PROGRAM_PRESET == "Minecraft":
-        DISPLAY_FILTER = happen_to_display_filter("frame.len>=49 and frame.len<=1498")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "frame.len>=49 and frame.len<=1498")
 
     # If the 'PROGRAM_PRESET' setting is set, automatically block RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a 'PROGRAM_PRESET'.
@@ -791,24 +983,18 @@ if PROGRAM_PRESET:
     # I know that eventually you will see their corresponding IPs time to time but I can guarantee that it does the job it is supposed to do.
     # It filters RTCP but some connections are STILL made out of it, but those are not RTCP ¯\_(ツ)_/¯.
     # And that's exactly why the "Discord" (`class ThirdPartyServers`) IP ranges Capture Filters are useful for.
-    DISPLAY_FILTER = happen_to_display_filter("not rtcp")
+    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not rtcp")
 
 if BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    DISPLAY_FILTER = happen_to_display_filter("not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp")
-
-    ip_ranges_blocking_list = []
+    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp")
 
     for server in ThirdPartyServers:
         for ip_range in server.value:
-            if ip_range not in ip_ranges_blocking_list:
-                ip_ranges_blocking_list.append(ip_range)
+            BPF_FILTER += f" and not net {ip_range}"
 
-    if ip_ranges_blocking_list:
-        BPF_FILTER += f" and not net {' and not net '.join(ip_ranges_blocking_list)}"
-
-while True:
+while not exit_signal.is_set():
     try:
         capture = pyshark.LiveCapture(
             interface = iface_name,
@@ -832,220 +1018,13 @@ while True:
     else:
         break
 
-session_db = []
-
 cls()
 title(TITLE)
-stdout_header()
-print("\n> Players connected in your session (0):")
-print("None")
-print("\n> Player who've left your session (0):")
-print("None")
-print("")
-refreshing_rate_t1 = time.perf_counter()
-stdout_scanning_ips_from_your_session(refreshing_rate_t1)
 
-while True:
-    time.sleep(0.1)
-    for packet in capture.sniff_continuously():
-        def padding(connection_type: str):
-            def get_minimum_padding(var: str, max_padding: int, padding: int):
+session_db = []
 
-                current_padding = len(str(var))
-                if current_padding <= padding:
-                    if current_padding > max_padding:
-                        max_padding = current_padding
+stdout_render_core__thread = threading.Thread(target=stdout_render_core)
+stdout_render_core__thread.start()
 
-                return max_padding
-
-            def port_list_creation(color: str):
-                global stdout_port_list
-
-                stdout_port_list = ""
-                for port in player["port"]:
-                    to_add_in_portlist = ""
-                    if port == player["first_port"]:
-                        if port == player["last_port"]:
-                            to_add_in_portlist = f"[{UNDERLINE}{port}{UNDERLINE_RESET}]"
-                        else:
-                            to_add_in_portlist = f"[{port}]"
-                    elif port == player["last_port"]:
-                        to_add_in_portlist = f"{UNDERLINE}{port}{UNDERLINE_RESET}"
-                    else:
-                        to_add_in_portlist = f"{port}"
-
-                    if stdout_port_list:
-                        stdout_port_list += f", {color}{to_add_in_portlist}{Fore.RESET}"
-                    else:
-                        stdout_port_list += f"{color}{to_add_in_portlist}{Fore.RESET}"
-
-            padding_counter = padding_country = padding_ip = 0
-
-            if connection_type == "connected":
-                for player in session_db:
-                    if not player["datetime_left"]:
-                        padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
-                        padding_country = get_minimum_padding(player["country"], padding_country, 27)
-                        padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
-            else:
-                for player in session_db:
-                    if player["datetime_left"]:
-                        padding_counter = get_minimum_padding(player["counter"], padding_counter, 6)
-                        padding_country = get_minimum_padding(player["country"], padding_country, 27)
-                        padding_ip = get_minimum_padding(player["ip"], padding_ip, 16)
-
-            for player in session_db:
-                if connection_type == "connected":
-                    if not player["datetime_left"]:
-                        port_list_creation(Fore.GREEN)
-                        session_connected.append((player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
-                else:
-                    if player["datetime_left"]:
-                        port_list_creation(Fore.RED)
-                        session_disconnected.append((player['datetime_left'], player['datetime_joined'], f"{player['counter']:<{padding_counter}}", f"{player['country']:<{padding_country}}", f"{player['ip']:<{padding_ip}}", stdout_port_list))
-
-        stdout_scanning_ips_from_your_session(refreshing_rate_t1)
-
-        #TODO: ADD packet len
-        #print(packet[packet.transport_layer].field_names)
-        #print(packet[packet.transport_layer].length)
-        #print(packet[packet.transport_layer].checksum)
-        #print(packet[packet.transport_layer].checksum_status)
-        #print(packet[packet.transport_layer].stream)
-        #-----------------------------------------------------
-        #print(packet.ip.field_names)
-        #print(packet.ip.version)
-        #print(packet.ip.hdr_len)
-        #print(packet.ip.dsfield)
-        #print(packet.ip.dsfield_dscp)
-        #print(packet.ip.dsfield_ecn)
-        #print(packet.ip.len)
-        #print(packet.ip.id)
-        #print(packet.ip.flags)
-        #print(packet.ip.flags_rb)
-        #print(packet.ip.flags_df)
-        #print(packet.ip.flags_mf)
-        #print(packet.ip.frag_offset)
-        #print(packet.ip.ttl)
-        #print(packet.ip.proto)
-        #print(packet.ip.checksum)
-        #print(packet.ip.checksum_status)
-        #-----------------------------------------------------
-        #input()
-
-        # This piece of code should be useless because the "not rtcp" Display Filter already filter those, and faster.
-        # (I did a test that confirms it is indeed useless to filter them again after the "not rtcp" Display Filter.)
-        # Also, if the 'PROGRAM_PRESET' is set to None, we do NOT want to filter RTCP.
-        ## Skip Real-time Control Protocol (RTCP)
-        ## RTCP is used together with RTP e.g. for VoIP (see also VOIPProtocolFamily).
-        ## Block for example Discord IPs while you're in a voice call.
-        #if getattr(packet, "rtcp", False):
-        #    continue
-
-        source_address = packet.ip.src
-        source_port = packet[packet.transport_layer].srcport
-        destination_address = packet.ip.dst
-        destination_port = packet[packet.transport_layer].dstport
-        try:
-            source_country = packet.ip.geosrc_country
-            source_country_iso = packet.ip.geosrc_country_iso
-        except AttributeError:
-            source_country, source_country_iso = get_country_info_from_ip(source_address)
-        try:
-            destination_country = packet.ip.geodst_country
-            destination_country_iso = packet.ip.geodst_country_iso
-        except AttributeError:
-            destination_country, destination_country_iso = get_country_info_from_ip(destination_address)
-
-        if source_address == IP_ADDRESS:
-            target = dict(
-                direction = "dst",
-                ip = destination_address,
-                port = [destination_port],
-                country = f"{destination_country} ({destination_country_iso})"
-            )
-        else:
-            target = dict(
-                direction = "src",
-                ip = source_address,
-                port = [source_port],
-                country = f"{source_country} ({source_country_iso})"
-            )
-
-        # Skip local and private IP Ranges.
-        #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
-        if any(IPv4Address(target["ip"]) in IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]):
-            continue
-
-        t2 = time.perf_counter()
-        if any(target["ip"] == player["ip"] for player in session_db):
-            for player in session_db:
-                if target["ip"] == player["ip"]:
-                    player["counter"] += 1
-                    player["t1"] = time.perf_counter()
-                    if not target["port"][0] in player["port"]:
-                        player["port"].append(target["port"][0])
-                    if not player["last_port"] == target["port"][0]:
-                        player["last_port"] = target["port"][0]
-                    if player["datetime_left"]:
-                        player["datetime_left"] = None
-                    break
-        else:
-            target["counter"] = 1
-            target["datetime_joined"] = datetime_now()
-            target["datetime_left"] =  None
-            target["first_port"] = target["port"][0]
-            target["last_port"] = target["port"][0]
-            target["t1"] = time.perf_counter()
-            session_db.append(target)
-
-        seconds_elapsed = round(t2 - refreshing_rate_t1)
-        if seconds_elapsed <= REFRESHING_TIMER:
-            continue
-        refreshing_rate_t1 = time.perf_counter()
-
-        session_connected = []
-        session_disconnected = []
-
-        for player in session_db:
-            if not player["datetime_left"]:
-                seconds_elapsed = round(t2 - player["t1"])
-                if seconds_elapsed >= 10:
-                    player["datetime_left"] = datetime_now()
-
-        padding("connected")
-        padding("disconnected")
-
-        cls()
-        stdout_header()
-        print("")
-        print(f"> Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):")
-        if len(session_connected) < 1:
-            print("None")
-        else:
-            #https://stackoverflow.com/questions/57873530/how-to-sort-a-list-by-datetime-in-python#57873719
-            for item in sorted(session_connected, key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S")):
-                print(f"first seen:{Fore.GREEN}{item[0]}{Fore.RESET} | counter:{Fore.GREEN}{item[1]}{Fore.RESET} | country:{Fore.GREEN}{item[2]}{Fore.RESET} | IP:{Fore.GREEN}{item[3]}{Fore.RESET} | Port(s):{Fore.GREEN}{item[4]}{Fore.RESET}")
-        if COUNTER_SESSION_DISCONNECTED_PLAYERS:
-            if COUNTER_SESSION_DISCONNECTED_PLAYERS > len(session_disconnected):
-                len_session_disconnected = len(session_disconnected)
-            else:
-                len_session_disconnected = f"showing {COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
-        else:
-            len_session_disconnected = len(session_disconnected)
-        print("")
-        print(f"> Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected}):")
-        if len(session_disconnected) < 1:
-            print("None")
-            print("")
-        else:
-            if COUNTER_SESSION_DISCONNECTED_PLAYERS:
-                session_disconnected_players = session_disconnected[-COUNTER_SESSION_DISCONNECTED_PLAYERS:]
-            else:
-                session_disconnected_players = session_disconnected
-            #https://stackoverflow.com/questions/57873530/how-to-sort-a-list-by-datetime-in-python#57873719
-            for item in sorted(session_disconnected_players, key=lambda t: datetime.strptime(t[0], "%Y/%m/%d %H:%M:%S")):
-                print(f"last seen:{Fore.RED}{item[0]}{Fore.RESET} | first seen:{Fore.RED}{item[1]}{Fore.RESET} | counter:{Fore.RED}{item[2]}{Fore.RESET} | country:{Fore.RED}{item[3]}{Fore.RESET} | IP:{Fore.RED}{item[4]}{Fore.RESET} | Port(s):{Fore.RED}{item[5]}{Fore.RESET}")
-            print("")
-
-        stdout_scanning_ips_from_your_session(refreshing_rate_t1)
+while not exit_signal.is_set():
+    capture.apply_on_packets(callback=packet_callback, packet_count=PYSHARK_PACKET_COUNT)
