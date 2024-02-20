@@ -118,10 +118,10 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 
 #### Obtaining / Resolving someones IP address
 
-- If somebody joins the session, you can obtain their IP address from the most recent entry in "connect players" list.
+- If somebody joins the session, you can obtain their IP address from the most recent entry in "connected players" list.
 - If somebody leaves the session, you can obtain their IP address from the most recent entry in "disconnected players" list.
-- One way to obtain someone's IP address is to save all entries from "connect players" list during the current session while they are connected to your session.<br />
-  When you find that person in another session, do the same thing and compare the "connect players" list, if an IP address matches, it likely means you've obtained their IP address.
+- One way to obtain someone's IP address is to save all entries from "connected players" list during the current session while they are connected to your session.<br />
+  When you find that person in another session, do the same thing and compare the "connected players" list, if an IP address matches, it likely means you've obtained their IP address.
 
 #### Other GTA V Tips and Tricks
 
