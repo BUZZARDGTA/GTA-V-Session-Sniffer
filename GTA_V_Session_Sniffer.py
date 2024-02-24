@@ -939,7 +939,6 @@ def packet_callback(packet: Packet):
         destination_port = packet[packet.transport_layer].dstport
         destination_country, destination_country_iso = get_country_info(packet, destination_address)
         target = dict(
-            direction = "dst",
             ip = destination_address,
             port = [destination_port],
             country = f"{destination_country} ({destination_country_iso})",
@@ -949,7 +948,6 @@ def packet_callback(packet: Packet):
         source_port = packet[packet.transport_layer].srcport
         source_country, source_country_iso = get_country_info(packet, source_address)
         target = dict(
-            direction = "src",
             ip = source_address,
             port = [source_port],
             country = f"{source_country} ({source_country_iso})",
