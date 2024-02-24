@@ -860,15 +860,15 @@ def stdout_render_core():
                     'stdout_port_list': stdout_port_list
                 })
 
+        session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
+        session_disconnected = sorted(session_disconnected, key=itemgetter('datetime_left'))
+
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
         for player in session_disconnected__stdout_counter:
             session_disconnected__padding_counter = get_minimum_padding(player["counter"], session_disconnected__padding_counter, 6)
             session_disconnected__padding_country = get_minimum_padding(player["country"], session_disconnected__padding_country, 27)
             session_disconnected__padding_ip = get_minimum_padding(player["ip"], session_disconnected__padding_ip, 16)
-
-        session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
-        session_disconnected = sorted(session_disconnected, key=itemgetter('datetime_left'))
 
         if (
             STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
@@ -879,7 +879,7 @@ def stdout_render_core():
             len_session_disconnected_message = f"showing {STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
 
         cls()
-        print(f"")
+        print("")
 
         if STDOUT_SHOW_HEADER:
             print(f"-" * 110)
@@ -887,10 +887,10 @@ def stdout_render_core():
             print(f"  * https://illegal-services.com/")
             print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
             print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
-            print(f"")
+            print("")
             print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
             print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
-            print(f"")
+            print("")
 
         print(f"-" * 110)
         print(f"                             Welcome in {TITLE_VERSION}")
