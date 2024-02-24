@@ -535,7 +535,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.6 - 24/02/2024"
+VERSION = "v1.0.7 - 24/02/2024"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -916,14 +916,11 @@ def packet_callback(packet: Packet):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     source_address = packet.ip.src
-    source_port = packet[packet.transport_layer].srcport
     destination_address = packet.ip.dst
-    destination_port = packet[packet.transport_layer].dstport
-
-    source_country, source_country_iso = get_country_info(packet, source_address)
-    destination_country, destination_country_iso = get_country_info(packet, destination_address)
 
     if source_address == IP_ADDRESS:
+        destination_port = packet[packet.transport_layer].dstport
+        destination_country, destination_country_iso = get_country_info(packet, destination_address)
         target = dict(
             direction = "dst",
             ip = destination_address,
@@ -931,7 +928,9 @@ def packet_callback(packet: Packet):
             country = f"{destination_country} ({destination_country_iso})",
             t1 = packet_timestamp
         )
-    else:
+    elif destination_address == IP_ADDRESS:
+        source_port = packet[packet.transport_layer].srcport
+        source_country, source_country_iso = get_country_info(packet, source_address)
         target = dict(
             direction = "src",
             ip = source_address,
@@ -939,6 +938,8 @@ def packet_callback(packet: Packet):
             country = f"{source_country} ({source_country_iso})",
             t1 = packet_timestamp
         )
+    else:
+        return
 
     # Skip local and private IP Ranges.
     #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
