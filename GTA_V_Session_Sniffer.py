@@ -830,16 +830,12 @@ def stdout_render_core():
         session_connected = []
         session_disconnected = []
 
-
         for player in session_db:
             if not player["datetime_left"]:
                 if (datetime_now - player["t1"]) > timedelta(seconds=10):
                     player["datetime_left"] = get_formatted_datetime(datetime_now)
 
             if player["datetime_left"]:
-                session_disconnected__padding_counter = get_minimum_padding(player["counter"], session_disconnected__padding_counter, 6)
-                session_disconnected__padding_country = get_minimum_padding(player["country"], session_disconnected__padding_country, 27)
-                session_disconnected__padding_ip = get_minimum_padding(player["ip"], session_disconnected__padding_ip, 16)
                 stdout_port_list = port_list_creation(Fore.RED)
 
                 session_disconnected.append({
@@ -863,6 +859,13 @@ def stdout_render_core():
                     'ip': f"{player['ip']}",
                     'stdout_port_list': stdout_port_list
                 })
+
+        session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
+
+        for player in session_disconnected__stdout_counter:
+            session_disconnected__padding_counter = get_minimum_padding(player["counter"], session_disconnected__padding_counter, 6)
+            session_disconnected__padding_country = get_minimum_padding(player["country"], session_disconnected__padding_country, 27)
+            session_disconnected__padding_ip = get_minimum_padding(player["ip"], session_disconnected__padding_ip, 16)
 
         session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
         session_disconnected = sorted(session_disconnected, key=itemgetter('datetime_left'))
@@ -905,7 +908,7 @@ def stdout_render_core():
         if len(session_disconnected) < 1:
             print("None")
         else:
-            for player in session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]:
+            for player in session_disconnected__stdout_counter:
                 print(f"last seen:{Fore.RED}{player['datetime_left']}{Fore.RESET} | first seen:{Fore.RED}{player['datetime_joined']}{Fore.RESET} | counter:{Fore.RED}{player['counter']:<{session_disconnected__padding_counter}}{Fore.RESET} | country:{Fore.RED}{player['country']:<{session_disconnected__padding_country}}{Fore.RESET} | IP:{Fore.RED}{player['ip']:<{session_disconnected__padding_ip}}{Fore.RESET} | Port(s):{Fore.RED}{player['stdout_port_list']}{Fore.RESET}")
         print("")
 
