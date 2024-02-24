@@ -25,6 +25,7 @@ import enum
 import socket
 import ctypes
 import signal
+import atexit
 #import logging
 import textwrap
 import threading
@@ -170,6 +171,8 @@ def signal_handler(sig, frame):
     except NameError:
         pass
 
+    atexit.register(close_maxmind_reader)
+
     sys.exit(0)
 
 def is_pyinstaller_compiled():
@@ -234,18 +237,17 @@ def get_country_info(packet: Packet, ip_address: str):
     country_name = "N/A"
     country_iso = "N/A"
 
-    if MAXMIND_DB_PATH:
-        with geoip2.database.Reader(f"{MAXMIND_DB_PATH}") as reader:
-            try:
-                response = reader.country(ip_address)
-                country_name = str(response.country.name)
-                country_iso = str(response.country.iso_code)
-            except geoip2.errors.AddressNotFoundError:
-                pass
+    if maxmind_reader:
+        try:
+            response = maxmind_reader.country(ip_address)
+            country_name = str(response.country.name)
+            country_iso = str(response.country.iso_code)
+        except geoip2.errors.AddressNotFoundError:
+            pass
 
     try:
-        country_name = packet.ip.geosrc_country
-        country_iso = packet.ip.geosrc_country_iso
+        country_name = str(packet.ip.geosrc_country)
+        country_iso =  str(packet.ip.geosrc_country_iso)
     except AttributeError:
         pass
 
@@ -273,6 +275,18 @@ def create_or_happen_to_variable(variable: str, operator: str, string_to_happen:
         return f"{variable}{operator}{string_to_happen}"
     else:
         return string_to_happen
+
+def initialize_maxmind_reader():
+    maxmind_reader = None
+
+    if MAXMIND_DB_PATH is not None:
+        maxmind_reader = geoip2.database.Reader(MAXMIND_DB_PATH)
+
+    return maxmind_reader
+
+def close_maxmind_reader():
+    if MAXMIND_DB_PATH and maxmind_reader is not None:
+        maxmind_reader.close()
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
@@ -965,14 +979,16 @@ def packet_callback(packet: Packet):
         target["datetime_left"] = None
         target["first_port"] = target["port"][0]
         target["last_port"] = target["port"][0]
+
         session_db.append(target)
 
+cls()
+title(TITLE)
 
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
-cls()
-title(TITLE)
+maxmind_reader = initialize_maxmind_reader()
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 
