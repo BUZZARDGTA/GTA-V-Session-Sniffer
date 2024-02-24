@@ -230,23 +230,6 @@ def get_mac_by_ip_address(ip_address: str):
     else:
         return None
 
-#def get_internet_connected_mac_addresses():
-#    mac_addresses = []
-#    for interface, addrs in psutil.net_if_addrs().items():
-#        stats = psutil.net_io_counters(pernic=True)[interface]
-#        if stats.bytes_sent > 0 or stats.bytes_recv > 0:
-#            if socket.gethostname() != 'localhost':
-#                for addr in addrs:
-#                    if addr.family == psutil.AF_LINK:
-#                        mac_addresses.append(addr.address)
-#    return mac_addresses
-
-#def get_mac_address():
-#    mac_address = hex(uuid.getnode()).replace("0x", "").upper()
-#    if len(mac_address) % 2:
-#        mac_address = "0{}".format(mac_address)
-#    return ":".join(mac_address[i:i+2] for i in range(0, len(mac_address), 2))
-
 def get_country_info_from_ip(ip_address: str):
     if MAXMIND_DB_PATH is None:
         return "N/A", "N/A"
@@ -831,7 +814,7 @@ def stdout_render_core():
         for player in session_db:
             if not player["datetime_left"]:
                 if (datetime_now - player["t1"]) > timedelta(seconds=10):
-                    player["datetime_left"] = get_formatted_datetime()
+                    player["datetime_left"] = get_formatted_datetime(datetime_now)
 
             if player["datetime_left"]:
                 session_disconnected__padding_counter = get_minimum_padding(player["counter"], session_disconnected__padding_counter, 6)
