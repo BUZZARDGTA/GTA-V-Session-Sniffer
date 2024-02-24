@@ -230,20 +230,26 @@ def get_mac_by_ip_address(ip_address: str):
     else:
         return None
 
-def get_country_info_from_ip(ip_address: str):
-    if MAXMIND_DB_PATH is None:
-        return "N/A", "N/A"
+def get_country_info(packet: Packet, ip_address: str):
+    country_name = "N/A"
+    country_iso = "N/A"
 
-    with geoip2.database.Reader(f"{MAXMIND_DB_PATH}") as reader:
-        try:
-            response = reader.country(ip_address)
-            country_name = response.country.name
-            country_iso = response.country.iso_code
-        except geoip2.errors.AddressNotFoundError:
-            country_name = "N/A"
-            country_iso = "N/A"
+    if MAXMIND_DB_PATH:
+        with geoip2.database.Reader(f"{MAXMIND_DB_PATH}") as reader:
+            try:
+                response = reader.country(ip_address)
+                country_name = str(response.country.name)
+                country_iso = str(response.country.iso_code)
+            except geoip2.errors.AddressNotFoundError:
+                pass
 
-        return country_name, country_iso
+    try:
+        country_name = packet.ip.geosrc_country
+        country_iso = packet.ip.geosrc_country_iso
+    except AttributeError:
+        pass
+
+    return country_name, country_iso
 
 def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
@@ -905,7 +911,8 @@ def stdout_render_core():
 
 def packet_callback(packet: Packet):
     packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
-    if (datetime.now() - packet_timestamp) > timedelta(seconds=3):
+    datetime_now = datetime.now()
+    if (datetime_now - packet_timestamp) > timedelta(seconds=3):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     source_address = packet.ip.src
@@ -913,16 +920,8 @@ def packet_callback(packet: Packet):
     destination_address = packet.ip.dst
     destination_port = packet[packet.transport_layer].dstport
 
-    try:
-        source_country = packet.ip.geosrc_country
-        source_country_iso = packet.ip.geosrc_country_iso
-    except AttributeError:
-        source_country, source_country_iso = get_country_info_from_ip(source_address)
-    try:
-        destination_country = packet.ip.geodst_country
-        destination_country_iso = packet.ip.geodst_country_iso
-    except AttributeError:
-        destination_country, destination_country_iso = get_country_info_from_ip(destination_address)
+    source_country, source_country_iso = get_country_info(packet, source_address)
+    destination_country, destination_country_iso = get_country_info(packet, destination_address)
 
     if source_address == IP_ADDRESS:
         target = dict(
@@ -961,7 +960,7 @@ def packet_callback(packet: Packet):
     else:
         target["counter"] = 1
         target["t1"] = target["t1"]
-        target["datetime_joined"] = get_formatted_datetime()
+        target["datetime_joined"] = get_formatted_datetime(datetime_now)
         target["datetime_left"] = None
         target["first_port"] = target["port"][0]
         target["last_port"] = target["port"][0]
