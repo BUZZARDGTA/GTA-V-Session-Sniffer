@@ -868,8 +868,8 @@ def stdout_render_core():
         session_disconnected = sorted(session_disconnected, key=itemgetter('datetime_left'))
 
         if (
-            len(session_disconnected) == 0
-            or len(session_disconnected) < STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS
+            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
+            or STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
         ):
             len_session_disconnected_message = str(len(session_disconnected))
         else:
