@@ -971,11 +971,12 @@ def packet_callback(packet: Packet):
             counter = 1,
             ip = target__ip,
             ports = [target__port],
+            first_port = target__port,
+            last_port = target__port,
             country = f"{target__country} ({target__country_iso})",
             datetime_joined = get_formatted_datetime(datetime_now),
-            datetime_left = None,
-            first_port = target__port,
-            last_port = target__port
+            datetime_left = None
+
         )
 
         session_db.append(target)
