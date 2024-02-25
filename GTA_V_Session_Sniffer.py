@@ -803,7 +803,7 @@ def stdout_render_core():
     def port_list_creation(color: str):
         stdout_port_list = ""
 
-        for port in player["port"]:
+        for port in player["ports"]:
             to_add_in_portlist = None
 
             if port == player["first_port"] == player["last_port"]:
@@ -836,28 +836,25 @@ def stdout_render_core():
                     player["datetime_left"] = get_formatted_datetime(datetime_now)
 
             if player["datetime_left"]:
-                stdout_port_list = port_list_creation(Fore.RED)
-
                 session_disconnected.append({
                     'datetime_left': player['datetime_left'],
                     'datetime_joined': player['datetime_joined'],
                     'counter': f"{player['counter']}",
                     'country': f"{player['country']}",
                     'ip': f"{player['ip']}",
-                    'stdout_port_list': stdout_port_list
+                    'stdout_port_list': port_list_creation(Fore.RED)
                 })
             else:
                 session_connected__padding_counter = get_minimum_padding(player["counter"], session_connected__padding_counter, 6)
                 session_connected__padding_country = get_minimum_padding(player["country"], session_connected__padding_country, 27)
                 session_connected__padding_ip = get_minimum_padding(player["ip"], session_connected__padding_ip, 16)
-                stdout_port_list = port_list_creation(Fore.GREEN)
 
                 session_connected.append({
                     'datetime_joined': player['datetime_joined'],
                     'counter': f"{player['counter']}",
                     'country': f"{player['country']}",
                     'ip': f"{player['ip']}",
-                    'stdout_port_list': stdout_port_list
+                    'stdout_port_list': port_list_creation(Fore.GREEN)
                 })
 
         session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
@@ -932,54 +929,49 @@ def packet_callback(packet: Packet):
     if (datetime_now - packet_timestamp) > timedelta(seconds=3):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
-    source_address = packet.ip.src
-    destination_address = packet.ip.dst
+    source_address: str = packet.ip.src
+    destination_address: str = packet.ip.dst
 
     if source_address == IP_ADDRESS:
-        destination_port = packet[packet.transport_layer].dstport
-        destination_country, destination_country_iso = get_country_info(packet, destination_address)
-        target = dict(
-            ip = destination_address,
-            port = [destination_port],
-            country = f"{destination_country} ({destination_country_iso})",
-            t1 = packet_timestamp
-        )
+        target__ip = destination_address
+        target__port: int = packet[packet.transport_layer].dstport
+        target__country, target__country_iso = get_country_info(packet, destination_address)
     elif destination_address == IP_ADDRESS:
-        source_port = packet[packet.transport_layer].srcport
-        source_country, source_country_iso = get_country_info(packet, source_address)
-        target = dict(
-            ip = source_address,
-            port = [source_port],
-            country = f"{source_country} ({source_country_iso})",
-            t1 = packet_timestamp
-        )
+        target__ip = source_address
+        target__port: int =  packet[packet.transport_layer].srcport
+        target__country, target__country_iso = get_country_info(packet, source_address)
     else:
         return
 
     # Skip local and private IP Ranges.
     #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
-    if any(IPv4Address(target["ip"]) in IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]):
+    if any(IPv4Address(target__ip) in IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]):
         return
 
     for player in session_db:
-        if player["ip"] == target["ip"]:
+        if player["ip"] == target__ip:
+            player["t1"] = packet_timestamp
             player["counter"] += 1
-            player["t1"] = target["t1"]
             if player["datetime_left"]:
                 player["datetime_left"] = None
-            if target["port"][0] not in player["port"]:
-                player["port"].append(target["port"][0])
-            if player["last_port"] != target["port"][0]:
-                player["last_port"] = target["port"][0]
+            if target__port not in player["ports"]:
+                player["ports"].append(target__port)
+            if player["last_port"] != target__port:
+                player["last_port"] = target__port
 
             break
     else:
-        target["counter"] = 1
-        target["t1"] = target["t1"]
-        target["datetime_joined"] = get_formatted_datetime(datetime_now)
-        target["datetime_left"] = None
-        target["first_port"] = target["port"][0]
-        target["last_port"] = target["port"][0]
+        target = dict(
+            t1 = packet_timestamp,
+            counter = 1,
+            ip = target__ip,
+            ports = [target__port],
+            country = f"{target__country} ({target__country_iso})",
+            datetime_joined = get_formatted_datetime(datetime_now),
+            datetime_left = None,
+            first_port = target__port,
+            last_port = target__port
+        )
 
         session_db.append(target)
 
