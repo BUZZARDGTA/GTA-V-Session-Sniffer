@@ -156,8 +156,6 @@ def create_unsafe_https_session():
     return session
 
 def signal_handler(sig, frame):
-    global exit_signal
-
     if exit_signal.is_set():
         return
 
@@ -285,8 +283,11 @@ def initialize_maxmind_reader():
     return maxmind_reader
 
 def close_maxmind_reader():
-    if MAXMIND_DB_PATH and maxmind_reader is not None:
-        maxmind_reader.close()
+    try:
+        if MAXMIND_DB_PATH and maxmind_reader is not None:
+            maxmind_reader.close()
+    except NameError:
+        pass
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
