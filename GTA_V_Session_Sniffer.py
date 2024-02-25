@@ -207,7 +207,7 @@ def is_ip_address(string: str):
     return False
 
 def is_mac_address(string: str):
-    pattern = re.compile(r"^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")
+    pattern = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
     return pattern.match(string) is not None
 
 def get_local_ip_address():
@@ -329,7 +329,7 @@ def reconstruct_settings():
             ;;<MAC_ADDRESS>
             ;;Your PC MAC address. You can obtain it from your PC:
             ;;https://support.microsoft.com/en-us/windows/find-your-ip-address-in-windows-f21a9bbc-c582-55cd-35e0-73431160a1b9
-            ;;Valid example value:'xx:xx:xx:xx:xx:xx'
+            ;;Valid example value:'xx:xx:xx:xx:xx:xx' or 'xx-xx-xx-xx-xx-xx'
             ;;
             ;;<BLOCK_THIRD_PARTY_SERVERS>
             ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
@@ -507,7 +507,12 @@ def apply_settings(settings_list: list):
             elif MAC_ADDRESS == "None":
                 MAC_ADDRESS = None
             else:
-                if not is_mac_address(MAC_ADDRESS):
+                if is_mac_address(MAC_ADDRESS):
+                    formatted_mac_address = MAC_ADDRESS.replace('-', ':').upper()
+                    if not formatted_mac_address == MAC_ADDRESS:
+                        MAC_ADDRESS = formatted_mac_address
+                        rewrite_settings()
+                else:
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
                 rewrite_settings()
