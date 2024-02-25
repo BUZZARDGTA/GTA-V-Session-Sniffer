@@ -113,6 +113,7 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
   It has a very good IP Lookup that can also find out VPN, Mobile connections etc.<br />
 - Using my other project [PC Blacklist Sniffer](https://github.com/Illegal-Services/PC-Blacklist-Sniffer) allows you to detect people you blacklisted from your sessions.
+- The GTA V game port is `6672`; unfortunately I don't have any clue what the other ports means.
 
 ### GTA V Tips and Tricks
 
@@ -122,12 +123,6 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - If somebody leaves the session, you can obtain their IP address from the most recent entry in "disconnected players" list.
 - One way to obtain someone's IP address is to save all entries from "connected players" list during the current session while they are connected to your session.<br />
   When you find that person in another session, do the same thing and compare the "connected players" list, if an IP address matches, it likely means you've obtained their IP address.
-
-#### Other GTA V Tips and Tricks
-
-- By entering story mode (optional) and then joining your friend's session, you can easily obtain their host IP address from the most recent entry in "connect players" list.
-- If the host of a session suddenly looses their internet access, it will cause a ["session split"](#session-split)\* which, most of the time result in a mess of the lobby.
-- The GTA V game port is `6672`; unfortunately I don't have any clue what the other ports means.
 
 ## Lexicon
 
