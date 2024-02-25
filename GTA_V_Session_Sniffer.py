@@ -941,11 +941,9 @@ def packet_callback(packet: Packet):
     if source_address == IP_ADDRESS:
         target__ip = destination_address
         target__port: int = packet[packet.transport_layer].dstport
-        target__country, target__country_iso = get_country_info(packet, destination_address)
     elif destination_address == IP_ADDRESS:
         target__ip = source_address
         target__port: int =  packet[packet.transport_layer].srcport
-        target__country, target__country_iso = get_country_info(packet, source_address)
     else:
         return
 
@@ -967,6 +965,8 @@ def packet_callback(packet: Packet):
 
             break
     else:
+        target__country, target__country_iso = get_country_info(packet, target__ip)
+
         target = dict(
             t1 = packet_timestamp,
             counter = 1,
