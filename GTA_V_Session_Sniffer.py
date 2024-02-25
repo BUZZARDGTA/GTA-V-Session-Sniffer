@@ -33,6 +33,7 @@ import ipaddress
 import subprocess
 import webbrowser
 from pathlib import Path
+from threading import Timer
 from datetime import datetime, timedelta
 from operator import itemgetter
 from ipaddress import IPv4Address, IPv4Network
@@ -341,6 +342,11 @@ def reconstruct_settings():
             ;;Note that Minecraft only supports Bedrock Edition.
             ;;Please also note that both of these have only been tested on PCs.
             ;;I do not have information regarding their functionality on consoles.
+            ;;
+            ;;<LOW_PERFORMANCE_MODE>
+            ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
+            ;;consider setting this to True. This will reduce the resource usage on your computer.
+            ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
             ;;-----------------------------------------------------------------------------
             STDOUT_SHOW_HEADER={STDOUT_SHOW_HEADER}
             STDOUT_REFRESHING_TIMER={STDOUT_REFRESHING_TIMER}
@@ -352,6 +358,7 @@ def reconstruct_settings():
             MAC_ADDRESS={MAC_ADDRESS}
             BLOCK_THIRD_PARTY_SERVERS={BLOCK_THIRD_PARTY_SERVERS}
             PROGRAM_PRESET={PROGRAM_PRESET}
+            LOW_PERFORMANCE_MODE={LOW_PERFORMANCE_MODE}
         """
         text = textwrap.dedent(text).removeprefix("\n")
         file.write(text)
@@ -403,7 +410,7 @@ def apply_settings(settings_list: list):
 
             return None
 
-        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_AND_MAC_ADDRESS_AUTOMATIC, IP_ADDRESS, MAC_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET
+        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_AND_MAC_ADDRESS_AUTOMATIC, IP_ADDRESS, MAC_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
 
         if setting == "STDOUT_SHOW_HEADER":
             STDOUT_SHOW_HEADER = return_setting(setting)
@@ -540,6 +547,15 @@ def apply_settings(settings_list: list):
             if reset_current_setting__flag:
                 rewrite_settings()
                 PROGRAM_PRESET = None
+        elif setting == "LOW_PERFORMANCE_MODE":
+            LOW_PERFORMANCE_MODE = return_setting(setting)
+            if LOW_PERFORMANCE_MODE == "True":
+                LOW_PERFORMANCE_MODE = True
+            elif LOW_PERFORMANCE_MODE == "False":
+                LOW_PERFORMANCE_MODE = False
+            else:
+                rewrite_settings()
+                LOW_PERFORMANCE_MODE = True
 
     if need_rewrite_settings:
         reconstruct_settings()
@@ -658,7 +674,7 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
-apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_AND_MAC_ADDRESS_AUTOMATIC", "IP_ADDRESS", "MAC_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET"])
+apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_AND_MAC_ADDRESS_AUTOMATIC", "IP_ADDRESS", "MAC_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -929,7 +945,13 @@ def stdout_render_core():
             refreshing_rate_t1 = refreshing_rate_t2
             break
 
+def clear_recently_resolved_ips():
+    recently_resolved_ips.clear()
+    Timer(1, clear_recently_resolved_ips).start()
+
 def packet_callback(packet: Packet):
+    #global recently_resolved_ips__t1
+
     packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     datetime_now = datetime.now()
     if (datetime_now - packet_timestamp) > timedelta(seconds=3):
@@ -946,6 +968,17 @@ def packet_callback(packet: Packet):
         target__port: int =  packet[packet.transport_layer].srcport
     else:
         return
+
+    #recently_resolved_ips__t2 = time.perf_counter()
+    #seconds_elapsed = round(recently_resolved_ips__t2 - recently_resolved_ips__t1)
+    #if seconds_elapsed >= 1:
+    #    recently_resolved_ips.clear()
+    #    recently_resolved_ips__t1 = recently_resolved_ips__t2
+
+    if LOW_PERFORMANCE_MODE:
+        if target__ip in recently_resolved_ips:
+            return
+        recently_resolved_ips.add(target__ip)
 
     # Skip local and private IP Ranges.
     #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
@@ -992,6 +1025,11 @@ maxmind_reader = initialize_maxmind_reader()
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 
 while not exit_signal.is_set():
+    if LOW_PERFORMANCE_MODE:
+        #recently_resolved_ips__t1 = time.perf_counter()
+        recently_resolved_ips = set()
+        clear_recently_resolved_ips()
+
     try:
         capture.apply_on_packets(callback=packet_callback)
     except Exception as e:
