@@ -101,7 +101,8 @@ class Msgbox(enum.IntFlag):
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class ThirdPartyServers(enum.Enum):
-    Discord_PC = ["66.22.196.0/22", "66.22.244.0/24", "66.22.241.0/24"]
+    PC_Discord = ["66.22.196.0/22", "66.22.244.0/24", "66.22.241.0/24"]
+    PC_Valve = ["155.133.248.0/24"] # Valve = Steam
     GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
