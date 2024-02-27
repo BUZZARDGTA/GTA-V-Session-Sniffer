@@ -597,7 +597,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 27/02/2024 (18:13)"
+VERSION = "v1.0.7 - 27/02/2024 (18:14)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -993,10 +993,8 @@ def packet_callback(packet: Packet):
     datetime_now = datetime.now()
     time_elapsed = datetime_now - packet_timestamp
 
-    if time_elapsed >= timedelta(seconds=1):
-        if time_elapsed >= timedelta(seconds=3):
-            raise ValueError(PACKET_CAPTURE_OVERFLOW)
-        return
+    if time_elapsed >= timedelta(seconds=3):
+        raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     # Believe it or not, this happened one time during my testings ...
     # So instead of respawning "tshark.exe" due to a single weird packet, just ignore it.
