@@ -732,8 +732,8 @@ else:
     iface_name = list(interfaces.keys())[selection-1]
 
 cls()
-title(f"Initializing addresses and establishing connection to your PC - {TITLE}")
-print(f"\nInitializing addresses and establishing connection to your PC ...\n")
+title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
+print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 
 if IP_AND_MAC_ADDRESS_AUTOMATIC:
     old_ip_address = IP_ADDRESS
@@ -760,9 +760,9 @@ while not exit_signal.is_set():
     if not IP_ADDRESS:
         msgbox_title = TITLE
         msgbox_text = """
-        ERROR: Unable to establish connection to your computer's local IP Address.
+        ERROR: Unable to establish connection to your computer or console local IP Address.
 
-        Open the file "Settings.ini" and enter your computer's local IP Address in <IP_ADDRESS> setting.
+        Open the file "Settings.ini" and enter your computer or console local IP Address in <IP_ADDRESS> setting.
         """
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
@@ -775,9 +775,9 @@ while not exit_signal.is_set():
     if not MAC_ADDRESS:
         msgbox_title = TITLE
         msgbox_text = """
-        ERROR: Unable to establish connection to your computer's MAC Address.
+        ERROR: Unable to establish connection to your computer or console MAC Address.
 
-        Open the file "Settings.ini" and enter your computer's MAC Address in <MAC_ADDRESS> setting.
+        Open the file "Settings.ini" and enter your computer or console MAC Address in <MAC_ADDRESS> setting.
         """
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
