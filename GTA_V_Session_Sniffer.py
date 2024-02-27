@@ -34,8 +34,8 @@ import subprocess
 import webbrowser
 from pathlib import Path
 from threading import Timer
-from datetime import datetime, timedelta
 from operator import itemgetter
+from datetime import datetime, timedelta
 from ipaddress import IPv4Address, IPv4Network
 
 #logging.basicConfig(filename='debug.log',
@@ -158,12 +158,16 @@ def create_unsafe_https_session():
     return session
 
 def signal_handler(sig, frame):
+    if sig == 2: # means CTRL+C pressed
+        cleanup_before_exit()
+
+def cleanup_before_exit():
     if exit_signal.is_set():
         return
 
-    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
-
     exit_signal.set()
+
+    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
     try:
         if (stdout_render_core__thread and stdout_render_core__thread.is_alive()):
@@ -171,7 +175,16 @@ def signal_handler(sig, frame):
     except NameError:
         pass
 
-    atexit.register(close_maxmind_reader)
+    capture.clear()
+
+    """ I don't know why, but those trows me an error so I'll leave them commented.
+    capture.close_async()
+    capture.close()
+    """
+
+    close_maxmind_reader()
+
+    print(f"{Fore.YELLOW}If it doesn't exit correctly, you may want to press it again.{Fore.RESET}")
 
     sys.exit(0)
 
@@ -563,6 +576,7 @@ def apply_settings(settings_list: list):
 
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
+atexit.register(cleanup_before_exit)
 exit_signal = threading.Event()
 
 if is_pyinstaller_compiled():
@@ -952,15 +966,23 @@ def stdout_render_core():
 
 def clear_recently_resolved_ips():
     recently_resolved_ips.clear()
-    Timer(1, clear_recently_resolved_ips).start()
+
+    if not exit_signal.is_set():
+        try:
+            Timer(1, clear_recently_resolved_ips).start()
+        except Exception as e:
+            if type(e) == ValueError and not exit_signal.is_set():
+                raise
 
 def packet_callback(packet: Packet):
-    #global recently_resolved_ips__t1
-
     packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     datetime_now = datetime.now()
-    if (datetime_now - packet_timestamp) > timedelta(seconds=3):
-        raise ValueError(PACKET_CAPTURE_OVERFLOW)
+    time_elapsed = datetime_now - packet_timestamp
+
+    if time_elapsed >= timedelta(seconds=1):
+        if time_elapsed >= timedelta(seconds=3):
+            raise ValueError(PACKET_CAPTURE_OVERFLOW)
+        return
 
     source_address: str = packet.ip.src
     destination_address: str = packet.ip.dst
@@ -973,12 +995,6 @@ def packet_callback(packet: Packet):
         target__port: int =  packet[packet.transport_layer].srcport
     else:
         return
-
-    #recently_resolved_ips__t2 = time.perf_counter()
-    #seconds_elapsed = round(recently_resolved_ips__t2 - recently_resolved_ips__t1)
-    #if seconds_elapsed >= 1:
-    #    recently_resolved_ips.clear()
-    #    recently_resolved_ips__t1 = recently_resolved_ips__t2
 
     if LOW_PERFORMANCE_MODE:
         if target__ip in recently_resolved_ips:
@@ -1032,12 +1048,14 @@ PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 
 while not exit_signal.is_set():
     if LOW_PERFORMANCE_MODE:
-        #recently_resolved_ips__t1 = time.perf_counter()
         recently_resolved_ips = set()
         clear_recently_resolved_ips()
 
     try:
         capture.apply_on_packets(callback=packet_callback)
     except Exception as e:
-        if not str(e) == PACKET_CAPTURE_OVERFLOW:
+        if (
+            not str(e) == PACKET_CAPTURE_OVERFLOW
+            or type(e) == ValueError and exit_signal.is_set()
+        ):
             raise
