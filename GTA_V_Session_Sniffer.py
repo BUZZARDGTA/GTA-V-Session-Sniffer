@@ -970,7 +970,7 @@ def clear_recently_resolved_ips():
     if not exit_signal.is_set():
         try:
             Timer(1, clear_recently_resolved_ips).start()
-        except Exception as e:
+        except:
             if not exit_signal.is_set():
                 raise
 
