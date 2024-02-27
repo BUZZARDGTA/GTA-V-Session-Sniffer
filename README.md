@@ -3,7 +3,7 @@
 ## Description
 
 Compatible with both PC and all consoles (Playstation and Xbox).<br />
-Thoroughly tested on PC, Xbox One and Playstation 3 ensuring 100% compatibility.
+Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
 
 - Scan players who:
   - Are trying to connect.
