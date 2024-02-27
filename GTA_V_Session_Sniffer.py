@@ -12,7 +12,7 @@ from scapy.sendrecv import srp1
 from scapy.layers.l2 import ARP
 from scapy.layers.inet import Ether
 from pyshark.packet.packet import Packet
-from pyshark.capture.capture import TSharkCrashException
+#from pyshark.capture.capture import TSharkCrashException
 from pyshark.tshark.tshark import TSharkNotFoundException
 
 # ------------------------------------------------------
@@ -987,7 +987,7 @@ def clear_recently_resolved_ips():
 
 def packet_callback(packet: Packet):
     if exit_signal.is_set():
-        return
+        raise ValueError(EXIT_SIGNAL_MESSAGE)
 
     packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     datetime_now = datetime.now()
@@ -1064,6 +1064,7 @@ stdout_render_core__thread.start()
 maxmind_reader = initialize_maxmind_reader()
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
+EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
 
 while not exit_signal.is_set():
     if LOW_PERFORMANCE_MODE:
@@ -1077,6 +1078,7 @@ while not exit_signal.is_set():
     except Exception as e:
         if not (
             str(e) == PACKET_CAPTURE_OVERFLOW
+            or str(e) == EXIT_SIGNAL_MESSAGE
             or exit_signal.is_set()
         ):
             logging.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
