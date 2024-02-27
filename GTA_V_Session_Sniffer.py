@@ -109,6 +109,7 @@ class ThirdPartyServers(enum.Enum):
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
     GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16"]
+    PS5_Amazon = ["52.40.62.0/25"]
     MinecraftBedrockEdition_PC_and_PS3_Microsoft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
 def create_unsafe_https_session():
@@ -597,7 +598,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 27/02/2024 (18:14)"
+VERSION = "v1.0.7 - 27/02/2024 (23:18)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -806,7 +807,7 @@ if PROGRAM_PRESET:
 if BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp")
+    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp and not classicstun and not dhcp")
 
     for server in ThirdPartyServers:
         for ip_range in server.value:
