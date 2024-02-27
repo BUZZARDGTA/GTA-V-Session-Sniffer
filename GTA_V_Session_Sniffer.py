@@ -971,7 +971,7 @@ def clear_recently_resolved_ips():
         try:
             Timer(1, clear_recently_resolved_ips).start()
         except Exception as e:
-            if type(e) == ValueError and not exit_signal.is_set():
+            if not exit_signal.is_set():
                 raise
 
 def packet_callback(packet: Packet):
@@ -1056,6 +1056,6 @@ while not exit_signal.is_set():
     except Exception as e:
         if (
             not str(e) == PACKET_CAPTURE_OVERFLOW
-            or type(e) == ValueError and exit_signal.is_set()
+            or not exit_signal.is_set()
         ):
             raise
