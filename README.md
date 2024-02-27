@@ -161,4 +161,5 @@ You can also contact me privately via:
 
 [@Grub4K](https://github.com/Grub4K) - General help during the source code development.<br />
 [@\_txshia\_](https://instagram.com/_txshia_) - Testings of the script on Xbox One console.<br />
+@anonymous - Testings of the script on PS5 console.<br />
 @Rosalyn - Giving me the force and motivation.<br />
