@@ -126,6 +126,8 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - If somebody leaves the session, you can obtain their IP address from the most recent entry in "disconnected players" list.
 - One way to obtain someone's IP address is to save all entries from "connected players" list during the current session while they are connected to your session.<br />
   When you find that person in another session, do the same thing and compare the "connected players" list, if an IP address matches, it likely means you've obtained their IP address.
+- Another method is to invite them to your private lobby; in this case, the only IP address displayed will be that of your victim.
+- You can also analyze the country information. If you know your victim's country and the script shows only one person hailing from that country, it is highly likely to be them.
 
 ## Lexicon
 
