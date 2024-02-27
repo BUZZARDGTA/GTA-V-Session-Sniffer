@@ -12,6 +12,8 @@ from scapy.sendrecv import srp1
 from scapy.layers.l2 import ARP
 from scapy.layers.inet import Ether
 from pyshark.packet.packet import Packet
+from pyshark.capture.capture import TSharkCrashException
+from pyshark.tshark.tshark import TSharkNotFoundException
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -26,7 +28,7 @@ import socket
 import ctypes
 import signal
 import atexit
-#import logging
+import logging
 import textwrap
 import threading
 import ipaddress
@@ -38,10 +40,10 @@ from operator import itemgetter
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address, IPv4Network
 
-#logging.basicConfig(filename='debug.log',
-#                    level=logging.DEBUG,
-#                    format='%(asctime)s - %(levelname)s - %(message)s',
-#                    datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(filename='debug.log',
+                    level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
@@ -164,25 +166,33 @@ def signal_handler(sig, frame):
 def cleanup_before_exit():
     if exit_signal.is_set():
         return
-
     exit_signal.set()
 
     print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
     try:
         if (stdout_render_core__thread and stdout_render_core__thread.is_alive()):
-            stdout_render_core__thread.join()  # Wait for the thread to finish
-    except NameError:
+            stdout_render_core__thread.join() # Wait for the thread to finish
+    except Exception as e:
+        logging.debug(f"EXCEPTION: cleanup_before_exit() > stdout_render_core__thread [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
         pass
 
-    capture.clear()
+    try:
+        capture.clear()
+    except Exception as e:
+        logging.debug(f"EXCEPTION: cleanup_before_exit() > capture.clear() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
+        pass
 
     """ I don't know why, but those trows me an error so I'll leave them commented.
     capture.close_async()
     capture.close()
     """
 
-    close_maxmind_reader()
+    try:
+        close_maxmind_reader()
+    except Exception as e:
+        logging.debug(f"EXCEPTION: cleanup_before_exit() > close_maxmind_reader() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
+        pass
 
     print(f"{Fore.YELLOW}If it doesn't exit correctly, you may want to press it again.{Fore.RESET}")
 
@@ -250,19 +260,20 @@ def get_country_info(packet: Packet, ip_address: str):
     country_name = "N/A"
     country_iso = "N/A"
 
+    # Try to get country info from MaxMind reader
     if maxmind_reader:
         try:
             response = maxmind_reader.country(ip_address)
-            country_name = str(response.country.name)
-            country_iso = str(response.country.iso_code)
         except geoip2.errors.AddressNotFoundError:
             pass
+        else:
+            country_name = str(response.country.name)
+            country_iso = str(response.country.iso_code)
 
-    try:
+    # Try to get country info from packet attributes
+    elif hasattr(packet, 'ip') and hasattr(packet.ip, 'geosrc_country') and hasattr(packet.ip, 'geosrc_country_iso'):
         country_name = str(packet.ip.geosrc_country)
-        country_iso =  str(packet.ip.geosrc_country_iso)
-    except AttributeError:
-        pass
+        country_iso = str(packet.ip.geosrc_country_iso)
 
     return country_name, country_iso
 
@@ -586,7 +597,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 25/02/2024"
+VERSION = "v1.0.7 - 27/02/2024"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -808,7 +819,7 @@ while not exit_signal.is_set():
             bpf_filter = BPF_FILTER,
             display_filter = DISPLAY_FILTER
         )
-    except pyshark.tshark.tshark.TSharkNotFoundException:
+    except TSharkNotFoundException:
         webbrowser.open("https://www.wireshark.org/download.html")
         msgbox_title = TITLE
         msgbox_text = f"""
@@ -951,13 +962,12 @@ def stdout_render_core():
         print("")
 
         while not exit_signal.is_set():
-            time.sleep(0.1)
-
             refreshing_rate_t2 = time.perf_counter()
 
             seconds_elapsed = round(refreshing_rate_t2 - refreshing_rate_t1)
             if seconds_elapsed <= STDOUT_REFRESHING_TIMER:
-                print(f"Scanning IPs, refreshing display in {max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)} seconds ...\r", end="")
+                seconds_left = max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
+                print(f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...\r", end="")
                 time.sleep(1)
                 continue
 
@@ -970,11 +980,15 @@ def clear_recently_resolved_ips():
     if not exit_signal.is_set():
         try:
             Timer(1, clear_recently_resolved_ips).start()
-        except:
+        except Exception as e:
             if not exit_signal.is_set():
+                logging.debug(f"EXCEPTION: clear_recently_resolved_ips() [{exit_signal.is_set()}], [{type(str(e))}], [{type(e).__name__}]")
                 raise
 
 def packet_callback(packet: Packet):
+    if exit_signal.is_set():
+        return
+
     packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     datetime_now = datetime.now()
     time_elapsed = datetime_now - packet_timestamp
@@ -982,6 +996,11 @@ def packet_callback(packet: Packet):
     if time_elapsed >= timedelta(seconds=1):
         if time_elapsed >= timedelta(seconds=3):
             raise ValueError(PACKET_CAPTURE_OVERFLOW)
+        return
+
+    # Believe it or not, this happened one time during my testings ...
+    # So instead of respawning "tshark.exe" due to a single weird packet, just ignore it.
+    if not hasattr(packet, 'ip'):
         return
 
     source_address: str = packet.ip.src
@@ -1053,9 +1072,15 @@ while not exit_signal.is_set():
 
     try:
         capture.apply_on_packets(callback=packet_callback)
+    #except TSharkCrashException:
+    #    pass
     except Exception as e:
-        if (
-            not str(e) == PACKET_CAPTURE_OVERFLOW
-            or not exit_signal.is_set()
+        if not (
+            str(e) == PACKET_CAPTURE_OVERFLOW
+            or exit_signal.is_set()
         ):
+            logging.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
+            print("An uncatched error raised:")
             raise
+
+    time.sleep(0.1)
