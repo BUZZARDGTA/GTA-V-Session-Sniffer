@@ -1062,7 +1062,7 @@ stdout_render_core__thread.start()
 
 maxmind_reader = initialize_maxmind_reader()
 
-private_ip_ranges = [IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]]
+private_ip_ranges = [IPv4Network(ip_range) for ip_range in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]]
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
