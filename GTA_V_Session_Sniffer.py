@@ -38,7 +38,7 @@ from pathlib import Path
 from threading import Timer
 from operator import itemgetter
 from datetime import datetime, timedelta
-from ipaddress import IPv4Address, IPv4Network
+from ipaddress import IPv4Network, IPv4Address
 
 logging.basicConfig(filename='debug.log',
                     level=logging.DEBUG,
