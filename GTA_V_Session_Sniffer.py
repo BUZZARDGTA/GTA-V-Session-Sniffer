@@ -1004,13 +1004,14 @@ def packet_callback(packet: Packet):
 
     source_address: str = packet.ip.src
     destination_address: str = packet.ip.dst
+    transport_layer = packet.transport_layer
 
     if source_address == IP_ADDRESS:
         target__ip = destination_address
-        target__port: int = packet[packet.transport_layer].dstport
+        target__port: int = packet[transport_layer].dstport
     elif destination_address == IP_ADDRESS:
         target__ip = source_address
-        target__port: int =  packet[packet.transport_layer].srcport
+        target__port: int = packet[transport_layer].srcport
     else:
         return
 
