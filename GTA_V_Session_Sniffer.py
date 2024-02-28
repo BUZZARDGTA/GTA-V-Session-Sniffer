@@ -990,8 +990,8 @@ def packet_callback(packet: Packet):
     if exit_signal.is_set():
         raise ValueError(EXIT_SIGNAL_MESSAGE)
 
-    packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     datetime_now = datetime.now()
+    packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
     time_elapsed = datetime_now - packet_timestamp
 
     if time_elapsed >= timedelta(seconds=3):
@@ -1021,7 +1021,7 @@ def packet_callback(packet: Packet):
 
     # Skip local and private IP Ranges.
     #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
-    if any(IPv4Address(target__ip) in IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]):
+    if any(IPv4Address(target__ip) in ip_range for ip_range in private_ip_ranges):
         return
 
     for player in session_db:
@@ -1061,6 +1061,8 @@ stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
 maxmind_reader = initialize_maxmind_reader()
+
+private_ip_ranges = [IPv4Network(ip) for ip in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]]
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
