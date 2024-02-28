@@ -1081,7 +1081,7 @@ while not exit_signal.is_set():
             or exit_signal.is_set()
         ):
             logging.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
-            print("An uncatched error raised:")
+            print("An unexcepted error raised:")
             raise
 
     time.sleep(0.1)
