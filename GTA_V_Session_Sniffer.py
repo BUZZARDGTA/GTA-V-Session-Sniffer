@@ -282,15 +282,16 @@ def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
 def npcap_or_winpcap_installed():
-    try:
-        subprocess.check_output(["sc", "query", "npcap"], stderr=subprocess.DEVNULL)
-        return True
-    except subprocess.CalledProcessError:
+    service_names = ["npcap", "npf"]
+
+    for service in service_names:
         try:
-            subprocess.check_output(["sc", "query", "npf"], stderr=subprocess.DEVNULL)
+            subprocess.check_output(["sc", "query", service], stderr=subprocess.DEVNULL)
             return True
         except subprocess.CalledProcessError:
-            return False
+            continue
+
+    return False
 
 def create_or_happen_to_variable(variable: str, operator: str, string_to_happen: str):
     if not string_to_happen:
@@ -598,7 +599,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 28/02/2024 (02:29)"
+VERSION = "v1.0.7 - 29/02/2024 (01:00)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
