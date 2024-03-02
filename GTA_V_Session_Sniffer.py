@@ -906,7 +906,7 @@ def stdout_render_core():
             seconds_elapsed = round(refreshing_rate_t2 - refreshing_rate_t1)
             if seconds_elapsed <= STDOUT_REFRESHING_TIMER:
                 seconds_left = max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
-                print(f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...\r", end="")
+                print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
                 time.sleep(1)
                 continue
 
