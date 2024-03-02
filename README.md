@@ -56,8 +56,10 @@ However, manual configuration is requiered in the following scenarios:
 
 For manual configuration, modify the `Settings.ini` file as follows:
 
-- Set `<IP_AND_MAC_ADDRESS_AUTOMATIC>` to `False` value.
-- Set both `<MAC_ADDRESS>` and `<IP_ADDRESS>` to the respective addresses of your PC or console from which you want to scan for players.
+- Set `<IP_ADDRESS_AUTOMATIC>` to `False` value.
+- Set `<IP_ADDRESS>` to the local IP address of the network adapter through which your PC is connected to the internet.<br />
+  If you are using a VPN, ensure that the local IP address corresponds to the adapter used by the VPN.<br />
+  And if you are scanning from a console, configure it with its local IP address.
 
 _If you are curious about all the other settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
@@ -96,11 +98,6 @@ To mitigate this, I recommend closing all other Peer-To-Peer applications while 
 Furthermore, you can enhance the filtering process by setting `<BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.<br />
 You can also, adjust `<PROGRAM_PRESET>` to correspond to the program you are scanning.<br />
 These configurations help minimize the display of unrelated IPs.
-
-### VPN Issues
-
-I've observed that using a VPN on PC renders the script ineffective, as it captures only the VPN traffic itself.<br />
-Unfortunately, I do not have a solution for this issue.
 
 ### About Screen Refreshing
 

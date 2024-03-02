@@ -8,9 +8,6 @@ import geoip2.errors
 import geoip2.database
 #import maxminddb.errors
 from colorama import Fore
-from scapy.sendrecv import srp1
-from scapy.layers.l2 import ARP
-from scapy.layers.inet import Ether
 from pyshark.packet.packet import Packet
 #from pyshark.capture.capture import TSharkCrashException
 from pyshark.tshark.tshark import TSharkNotFoundException
@@ -230,10 +227,6 @@ def is_ip_address(string: str):
   except ValueError:
     return False
 
-def is_mac_address(string: str):
-    pattern = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
-    return pattern.match(string) is not None
-
 def get_local_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -245,17 +238,6 @@ def get_local_ip_address():
     finally:
         s.close()
     return ip
-
-def get_mac_by_ip_address(ip_address: str):
-    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
-    arp = ARP(pdst=ip_address)
-    packet = ether / arp
-    answer = srp1(packet, timeout=1, verbose=0)
-    if answer:
-        print(answer[Ether])
-        return str(answer[Ether].src).upper()
-    else:
-        return None
 
 def get_country_info(packet: Packet, ip_address: str):
     country_name = "N/A"
@@ -347,18 +329,13 @@ def reconstruct_settings():
             ;;<INTERFACE_NAME>
             ;;Automatically select this network adapter where the packets are going to be captured from.
             ;;
-            ;;<IP_AND_MAC_ADDRESS_AUTOMATIC>
-            ;;Determine if you want or not to automaticly detect your <IP_ADDRESS> and <MAC_ADDRESS> addresses.
+            ;;<IP_ADDRESS_AUTOMATIC>
+            ;;Determine if you want or not to automaticly detect your <IP_ADDRESS>.
             ;;
             ;;<IP_ADDRESS>
             ;;Your PC local IP address. You can obtain it like that:
             ;;https://support.microsoft.com/en-us/windows/find-your-ip-address-in-windows-f21a9bbc-c582-55cd-35e0-73431160a1b9
             ;;Valid example value: 'x.x.x.x'
-            ;;
-            ;;<MAC_ADDRESS>
-            ;;Your PC MAC address. You can obtain it from your PC:
-            ;;https://support.microsoft.com/en-us/windows/find-your-ip-address-in-windows-f21a9bbc-c582-55cd-35e0-73431160a1b9
-            ;;Valid example value:'xx:xx:xx:xx:xx:xx' or 'xx-xx-xx-xx-xx-xx'
             ;;
             ;;<BLOCK_THIRD_PARTY_SERVERS>
             ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
@@ -380,9 +357,8 @@ def reconstruct_settings():
             STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS={STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}
             MAXMIND_DB_PATH={MAXMIND_DB_PATH}
             INTERFACE_NAME={INTERFACE_NAME}
-            IP_AND_MAC_ADDRESS_AUTOMATIC={IP_AND_MAC_ADDRESS_AUTOMATIC}
+            IP_ADDRESS_AUTOMATIC={IP_ADDRESS_AUTOMATIC}
             IP_ADDRESS={IP_ADDRESS}
-            MAC_ADDRESS={MAC_ADDRESS}
             BLOCK_THIRD_PARTY_SERVERS={BLOCK_THIRD_PARTY_SERVERS}
             PROGRAM_PRESET={PROGRAM_PRESET}
             LOW_PERFORMANCE_MODE={LOW_PERFORMANCE_MODE}
@@ -437,7 +413,7 @@ def apply_settings(settings_list: list):
 
             return None
 
-        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_AND_MAC_ADDRESS_AUTOMATIC, IP_ADDRESS, MAC_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
+        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS_AUTOMATIC, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
 
         if setting == "STDOUT_SHOW_HEADER":
             STDOUT_SHOW_HEADER = return_setting(setting)
@@ -512,15 +488,15 @@ def apply_settings(settings_list: list):
                 rewrite_settings()
             elif INTERFACE_NAME == "None":
                 INTERFACE_NAME = None
-        elif setting == "IP_AND_MAC_ADDRESS_AUTOMATIC":
-            IP_AND_MAC_ADDRESS_AUTOMATIC = return_setting(setting)
-            if IP_AND_MAC_ADDRESS_AUTOMATIC == "True":
-                IP_AND_MAC_ADDRESS_AUTOMATIC = True
-            elif IP_AND_MAC_ADDRESS_AUTOMATIC == "False":
-                IP_AND_MAC_ADDRESS_AUTOMATIC = False
+        elif setting == "IP_ADDRESS_AUTOMATIC":
+            IP_ADDRESS_AUTOMATIC = return_setting(setting)
+            if IP_ADDRESS_AUTOMATIC == "True":
+                IP_ADDRESS_AUTOMATIC = True
+            elif IP_ADDRESS_AUTOMATIC == "False":
+                IP_ADDRESS_AUTOMATIC = False
             else:
                 rewrite_settings()
-                IP_AND_MAC_ADDRESS_AUTOMATIC = True
+                IP_ADDRESS_AUTOMATIC = True
         elif setting == "IP_ADDRESS":
             reset_current_setting__flag = False
             IP_ADDRESS = return_setting(setting)
@@ -534,24 +510,6 @@ def apply_settings(settings_list: list):
             if reset_current_setting__flag:
                 rewrite_settings()
                 IP_ADDRESS = None
-        elif setting == "MAC_ADDRESS":
-            reset_current_setting__flag = False
-            MAC_ADDRESS = return_setting(setting)
-            if MAC_ADDRESS is None:
-                reset_current_setting__flag = True
-            elif MAC_ADDRESS == "None":
-                MAC_ADDRESS = None
-            else:
-                if is_mac_address(MAC_ADDRESS):
-                    formatted_mac_address = MAC_ADDRESS.replace('-', ':').upper()
-                    if not formatted_mac_address == MAC_ADDRESS:
-                        MAC_ADDRESS = formatted_mac_address
-                        rewrite_settings()
-                else:
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                rewrite_settings()
-                MAC_ADDRESS = None
         elif setting == "BLOCK_THIRD_PARTY_SERVERS":
             BLOCK_THIRD_PARTY_SERVERS = return_setting(setting)
             if BLOCK_THIRD_PARTY_SERVERS == "True":
@@ -599,7 +557,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 29/02/2024 (01:00)"
+VERSION = "v1.0.7 - 02/03/2024 (14:40)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -702,7 +660,7 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
-apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_AND_MAC_ADDRESS_AUTOMATIC", "IP_ADDRESS", "MAC_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
+apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_ADDRESS_AUTOMATIC", "IP_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -736,24 +694,18 @@ cls()
 title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
 print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 
-if IP_AND_MAC_ADDRESS_AUTOMATIC:
+if IP_ADDRESS_AUTOMATIC:
     old_ip_address = IP_ADDRESS
-    old_mac_address = MAC_ADDRESS
 
     try:
         IP_ADDRESS = get_local_ip_address()
         if IP_ADDRESS == "127.0.0.1":
             raise ValueError("IP address is a loopback address")
-        MAC_ADDRESS = get_mac_by_ip_address(IP_ADDRESS)
-        if not MAC_ADDRESS:
-            raise ValueError("MAC address not found")
     except ValueError:
         IP_ADDRESS = None
-        MAC_ADDRESS = None
 
     if (
         not old_ip_address == IP_ADDRESS
-        or not old_mac_address == MAC_ADDRESS
     ):
         reconstruct_settings()
 
@@ -768,26 +720,11 @@ while not exit_signal.is_set():
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         show_message_box(msgbox_title, msgbox_text, msgbox_style)
-        apply_settings(["IP_ADDRESS", "MAC_ADDRESS"])
+        apply_settings(["IP_ADDRESS"])
     else:
         break
 
-while not exit_signal.is_set():
-    if not MAC_ADDRESS:
-        msgbox_title = TITLE
-        msgbox_text = """
-        ERROR: Unable to establish connection to your computer or console MAC Address.
-
-        Open the file "Settings.ini" and enter your computer or console MAC Address in <MAC_ADDRESS> setting.
-        """
-        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
-        msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
-        show_message_box(msgbox_title, msgbox_text, msgbox_style)
-        apply_settings(["IP_ADDRESS", "MAC_ADDRESS"])
-    else:
-        break
-
-BPF_FILTER = f"dst or src host {IP_ADDRESS} and ether dst or src {MAC_ADDRESS} and ip and udp and not broadcast and not multicast and not port 53 and not port 80 and not port 443"
+BPF_FILTER = f"dst or src host {IP_ADDRESS} and ip and udp and not port 53 and not port 80 and not port 443 and not port 5353"
 DISPLAY_FILTER = None
 
 if PROGRAM_PRESET:
@@ -808,7 +745,7 @@ if PROGRAM_PRESET:
 if BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp and not classicstun and not dhcp")
+    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp and not classicstun and not dhcp and not mdns")
 
     for server in ThirdPartyServers:
         for ip_range in server.value:
