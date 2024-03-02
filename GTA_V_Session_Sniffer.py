@@ -322,6 +322,9 @@ def reconstruct_settings():
             ;;Valid values are any number greater than 0.
             ;;Setting it to 0 will make it unlimitted.
             ;;
+            ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
+            ;;Resets and recalculates each fields for players who were previously disconnected.
+            ;;
             ;;<MAXMIND_DB_PATH>
             ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
             ;;This is used to resolve countrys from the players.
@@ -355,6 +358,7 @@ def reconstruct_settings():
             STDOUT_SHOW_HEADER={STDOUT_SHOW_HEADER}
             STDOUT_REFRESHING_TIMER={STDOUT_REFRESHING_TIMER}
             STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS={STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}
+            STDOUT_RESET_INFOS_ON_CONNECTED={STDOUT_RESET_INFOS_ON_CONNECTED}
             MAXMIND_DB_PATH={MAXMIND_DB_PATH}
             INTERFACE_NAME={INTERFACE_NAME}
             IP_ADDRESS_AUTOMATIC={IP_ADDRESS_AUTOMATIC}
@@ -413,7 +417,7 @@ def apply_settings(settings_list: list):
 
             return None
 
-        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS_AUTOMATIC, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
+        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS_AUTOMATIC, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
 
         if setting == "STDOUT_SHOW_HEADER":
             STDOUT_SHOW_HEADER = return_setting(setting)
@@ -448,6 +452,15 @@ def apply_settings(settings_list: list):
             if reset_current_setting__flag:
                 rewrite_settings()
                 STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
+        elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
+            STDOUT_RESET_INFOS_ON_CONNECTED = return_setting(setting)
+            if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
+                STDOUT_RESET_INFOS_ON_CONNECTED = True
+            elif STDOUT_RESET_INFOS_ON_CONNECTED == "False":
+                STDOUT_RESET_INFOS_ON_CONNECTED = False
+            else:
+                rewrite_settings()
+                STDOUT_RESET_INFOS_ON_CONNECTED = True
         elif setting == "MAXMIND_DB_PATH":
             reset_current_setting__flag = False
             MAXMIND_DB_PATH = return_setting(setting)
@@ -557,7 +570,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 02/03/2024 (14:40)"
+VERSION = "v1.0.7 - 02/03/2024 (21:25)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -660,7 +673,7 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
-apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_ADDRESS_AUTOMATIC", "IP_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
+apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "STDOUT_RESET_INFOS_ON_CONNECTED", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_ADDRESS_AUTOMATIC", "IP_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -965,33 +978,36 @@ def packet_callback(packet: Packet):
 
     for player in session_db:
         if player["ip"] == target__ip:
+            if player["datetime_left"]:
+                if STDOUT_RESET_INFOS_ON_CONNECTED:
+                    session_db.remove(player)
+                    break
+                player["datetime_left"] = None
             player["t1"] = packet_timestamp
             player["packets"] += 1
-            if player["datetime_left"]:
-                player["datetime_left"] = None
             if target__port not in player["ports"]:
                 player["ports"].append(target__port)
             if player["last_port"] != target__port:
                 player["last_port"] = target__port
 
-            break
-    else:
-        target__country_name, target__country_iso = get_country_info(packet, target__ip)
+            return
 
-        target = dict(
-            t1 = packet_timestamp,
-            packets = 1,
-            ip = target__ip,
-            ports = [target__port],
-            first_port = target__port,
-            last_port = target__port,
-            country_name = target__country_name,
-            country_iso = target__country_iso,
-            datetime_joined = get_formatted_datetime(datetime_now),
-            datetime_left = None
-        )
+    target__country_name, target__country_iso = get_country_info(packet, target__ip)
 
-        session_db.append(target)
+    target = dict(
+        t1 = packet_timestamp,
+        packets = 1,
+        ip = target__ip,
+        ports = [target__port],
+        first_port = target__port,
+        last_port = target__port,
+        country_name = target__country_name,
+        country_iso = target__country_iso,
+        datetime_joined = get_formatted_datetime(datetime_now),
+        datetime_left = None
+    )
+
+    session_db.append(target)
 
 cls()
 title(TITLE)
