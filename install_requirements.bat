@@ -18,10 +18,10 @@ if exist "requirements.txt" (
 for %%A in (
     colorama
     geoip2
+    prettytable
     psutil
     pyshark
     requests
-    scapy
     urllib3
 ) do (
     pip install %%A
