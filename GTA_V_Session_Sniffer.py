@@ -8,15 +8,15 @@ import geoip2.errors
 import geoip2.database
 #import maxminddb.errors
 from colorama import Fore
+from prettytable import PrettyTable
 from pyshark.packet.packet import Packet
-#from pyshark.capture.capture import TSharkCrashException
+from pyshark.capture.capture import TSharkCrashException
 from pyshark.tshark.tshark import TSharkNotFoundException
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
 # ------------------------------------------------------
 import os
-import re
 import sys
 #import uuid
 import time
@@ -220,24 +220,14 @@ def plural(variable: int):
 def is_script_an_executable():
     return Path(sys.argv[0]).suffix.lower() == ".exe" # Check if the running Python script, command-line argument has a file extension ending with .exe
 
-def is_ip_address(string: str):
-  try:
-    ipaddress.ip_address(string)
-    return True
-  except ValueError:
-    return False
-
-def get_local_ip_address():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def is_ipv4_address(ip_address: str):
     try:
-        # doesn't even have to be reachable
-        s.connect(("10.255.255.255", 1))
-        ip = s.getsockname()[0]
+        return ipaddress.IPv4Address(ip_address).version == 4
     except:
-        ip = "127.0.0.1"
-    finally:
-        s.close()
-    return ip
+        return False
+
+def align_ip_address_segments(ip_address: str):
+    return ".".join(f"{segment:<3}" for segment in ip_address.split("."))
 
 def get_country_info(packet: Packet, ip_address: str):
     country_name = "N/A"
@@ -301,77 +291,103 @@ def close_maxmind_reader():
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
+    text = f"""
+        ;;-----------------------------------------------------------------------------
+        ;;Lines starting with ";;" symbols are commented lines.
+        ;;
+        ;;This is the settings file for 'GTA V Session Sniffer' configuration.
+        ;;
+        ;;If you don't know what value to choose for a specifc setting, set it's value to None.
+        ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
+        ;;
+        ;;<STDOUT_SHOW_HEADER>
+        ;;Determine if you want or not to show the developper's header in the script's screen.
+        ;;
+        ;;<STDOUT_REFRESHING_TIMER>
+        ;;Time interval between which this will refresh the console display.
+        ;;
+        ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
+        ;;The maximum number of players showing up in disconnected players list.
+        ;;Valid values are any number greater than 0.
+        ;;Setting it to 0 will make it unlimitted.
+        ;;
+        ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
+        ;;Resets and recalculates each fields for players who were previously disconnected.
+        ;;
+        ;;<MAXMIND_DB_PATH>
+        ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
+        ;;This is used to resolve countrys from the players.
+        ;;
+        ;;<INTERFACE_NAME>
+        ;;Automatically select this network adapter where the packets are going to be captured from.
+        ;;
+        ;;<IP_ADDRESS>
+        ;;Your PC local IP address. You can obtain it like that:
+        ;;https://support.microsoft.com/en-us/windows/find-your-ip-address-in-windows-f21a9bbc-c582-55cd-35e0-73431160a1b9
+        ;;Valid example value: 'x.x.x.x'
+        ;;
+        ;;<BLOCK_THIRD_PARTY_SERVERS>
+        ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
+        ;;
+        ;;<PROGRAM_PRESET>
+        ;;A program preset that will help capturing the right packets for your program.
+        ;;Supported program presets are only 'GTA5' and 'Minecraft'.
+        ;;Note that Minecraft only supports Bedrock Edition.
+        ;;Please also note that both of these have only been tested on PCs.
+        ;;I do not have information regarding their functionality on consoles.
+        ;;
+        ;;<LOW_PERFORMANCE_MODE>
+        ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
+        ;;consider setting this to True. This will reduce the resource usage on your computer.
+        ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
+        ;;-----------------------------------------------------------------------------
+    """
+    text = textwrap.dedent(text.removeprefix("\n"))
+    for setting in SETTINGS_LIST:
+        text += f"{setting}={globals().get(setting)}\n"
     with open(SETTINGS_PATH, "w", encoding="utf-8") as file:
-        text = f"""
-            ;;-----------------------------------------------------------------------------
-            ;;Lines starting with ";;" symbols are commented lines.
-            ;;
-            ;;This is the settings file for 'GTA V Session Sniffer' configuration.
-            ;;
-            ;;If you don't know what value to choose for a specifc setting, set it's value to None.
-            ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
-            ;;
-            ;;<STDOUT_SHOW_HEADER>
-            ;;Determine if you want or not to show the developper's header in the script's screen.
-            ;;
-            ;;<STDOUT_REFRESHING_TIMER>
-            ;;Time interval between which this will refresh the console display.
-            ;;
-            ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
-            ;;The maximum number of players showing up in disconnected players list.
-            ;;Valid values are any number greater than 0.
-            ;;Setting it to 0 will make it unlimitted.
-            ;;
-            ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
-            ;;Resets and recalculates each fields for players who were previously disconnected.
-            ;;
-            ;;<MAXMIND_DB_PATH>
-            ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
-            ;;This is used to resolve countrys from the players.
-            ;;
-            ;;<INTERFACE_NAME>
-            ;;Automatically select this network adapter where the packets are going to be captured from.
-            ;;
-            ;;<IP_ADDRESS_AUTOMATIC>
-            ;;Determine if you want or not to automaticly detect your <IP_ADDRESS>.
-            ;;
-            ;;<IP_ADDRESS>
-            ;;Your PC local IP address. You can obtain it like that:
-            ;;https://support.microsoft.com/en-us/windows/find-your-ip-address-in-windows-f21a9bbc-c582-55cd-35e0-73431160a1b9
-            ;;Valid example value: 'x.x.x.x'
-            ;;
-            ;;<BLOCK_THIRD_PARTY_SERVERS>
-            ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
-            ;;
-            ;;<PROGRAM_PRESET>
-            ;;A program preset that will help capturing the right packets for your program.
-            ;;Supported program presets are only 'GTA5' and 'Minecraft'.
-            ;;Note that Minecraft only supports Bedrock Edition.
-            ;;Please also note that both of these have only been tested on PCs.
-            ;;I do not have information regarding their functionality on consoles.
-            ;;
-            ;;<LOW_PERFORMANCE_MODE>
-            ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
-            ;;consider setting this to True. This will reduce the resource usage on your computer.
-            ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
-            ;;-----------------------------------------------------------------------------
-            STDOUT_SHOW_HEADER={STDOUT_SHOW_HEADER}
-            STDOUT_REFRESHING_TIMER={STDOUT_REFRESHING_TIMER}
-            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS={STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}
-            STDOUT_RESET_INFOS_ON_CONNECTED={STDOUT_RESET_INFOS_ON_CONNECTED}
-            MAXMIND_DB_PATH={MAXMIND_DB_PATH}
-            INTERFACE_NAME={INTERFACE_NAME}
-            IP_ADDRESS_AUTOMATIC={IP_ADDRESS_AUTOMATIC}
-            IP_ADDRESS={IP_ADDRESS}
-            BLOCK_THIRD_PARTY_SERVERS={BLOCK_THIRD_PARTY_SERVERS}
-            PROGRAM_PRESET={PROGRAM_PRESET}
-            LOW_PERFORMANCE_MODE={LOW_PERFORMANCE_MODE}
-        """
-        text = textwrap.dedent(text).removeprefix("\n")
         file.write(text)
 
-def apply_settings(settings_list: list):
-    global need_rewrite_settings, settings_file_not_found
+def apply_settings():
+    global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
+
+    def return_setting(setting: str, need_rewrite_settings: bool):
+        setting_value = None
+
+        if settings_file_not_found:
+            need_rewrite_settings = True
+        else:
+            for line in SETTINGS:
+                line: str = line.rstrip("\n")
+                corrected__line = line.strip()
+
+                if corrected__line.startswith(";;"):
+                    continue
+
+                if not line == corrected__line:
+                    need_rewrite_settings = True
+
+                parts = corrected__line.split(sep="=", maxsplit=1)
+                try:
+                    setting_name = parts[0]
+                    setting_value = parts[1]
+                except IndexError:
+                    need_rewrite_settings = True
+                    continue
+
+                if setting_name == setting:
+                    if setting_value == "":
+                        setting_value = None
+                        need_rewrite_settings = True
+                    else:
+                        corrected__setting_value = setting_value.strip()
+                        if not setting_value == corrected__setting_value:
+                            need_rewrite_settings = True
+                            setting_value = corrected__setting_value
+
+                    break
+
+        return setting_value, need_rewrite_settings
 
     settings_file_not_found = False
     need_rewrite_settings = False
@@ -382,88 +398,54 @@ def apply_settings(settings_list: list):
         settings_file_not_found = True
         need_rewrite_settings = True
 
-    for setting in (settings_list):
-        def rewrite_settings():
-            global need_rewrite_settings
-
-            if need_rewrite_settings is False:
-                need_rewrite_settings = True
-
-        def return_setting(setting: str):
-            if settings_file_not_found:
-                return None
-
-            for line in SETTINGS:
-                line: str
-                line = line.rstrip("\n")
-                corrected_line = line.strip()
-
-                if corrected_line.startswith(";;"):
-                    continue
-
-                parts = corrected_line.split("=")
-                try:
-                    setting_name = parts[0]
-                    setting_value = parts[1]
-                except IndexError:
-                    rewrite_settings()
-                    continue
-
-                if not line == corrected_line:
-                    rewrite_settings()
-
-                if setting_name == setting:
-                    return setting_value
-
-            return None
-
-        global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS_AUTOMATIC, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
-
+    for setting in SETTINGS_LIST:
         if setting == "STDOUT_SHOW_HEADER":
-            STDOUT_SHOW_HEADER = return_setting(setting)
+            STDOUT_SHOW_HEADER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if STDOUT_SHOW_HEADER == "True":
                 STDOUT_SHOW_HEADER = True
             elif STDOUT_SHOW_HEADER == "False":
                 STDOUT_SHOW_HEADER = False
             else:
-                rewrite_settings()
+                need_rewrite_settings = True
                 STDOUT_SHOW_HEADER = True
         elif setting == "STDOUT_REFRESHING_TIMER":
             reset_current_setting__flag = False
             try:
-                STDOUT_REFRESHING_TIMER = int(return_setting(setting))
+                STDOUT_REFRESHING_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+                STDOUT_REFRESHING_TIMER = int(STDOUT_REFRESHING_TIMER)
             except (ValueError, TypeError):
                 reset_current_setting__flag = True
             else:
                 if STDOUT_REFRESHING_TIMER < 0:
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
-                rewrite_settings()
+                need_rewrite_settings = True
                 STDOUT_REFRESHING_TIMER = 0
         elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
             reset_current_setting__flag = False
             try:
-                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(return_setting(setting))
+                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
             except (ValueError, TypeError):
                 reset_current_setting__flag = True
             else:
                 if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
-                rewrite_settings()
+                need_rewrite_settings = True
                 STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
         elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
-            STDOUT_RESET_INFOS_ON_CONNECTED = return_setting(setting)
+            STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
                 STDOUT_RESET_INFOS_ON_CONNECTED = True
             elif STDOUT_RESET_INFOS_ON_CONNECTED == "False":
                 STDOUT_RESET_INFOS_ON_CONNECTED = False
             else:
-                rewrite_settings()
+                need_rewrite_settings = True
                 STDOUT_RESET_INFOS_ON_CONNECTED = True
         elif setting == "MAXMIND_DB_PATH":
             reset_current_setting__flag = False
-            MAXMIND_DB_PATH = return_setting(setting)
+            MAXMIND_DB_PATH, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if MAXMIND_DB_PATH is None:
                 reset_current_setting__flag = True
             elif MAXMIND_DB_PATH == "None":
@@ -493,48 +475,39 @@ def apply_settings(settings_list: list):
                     show_message_box(msgbox_title, msgbox_text, msgbox_style)
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
-                rewrite_settings()
+                need_rewrite_settings = True
                 MAXMIND_DB_PATH = None
         elif setting == "INTERFACE_NAME":
-            INTERFACE_NAME = return_setting(setting)
+            INTERFACE_NAME, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if INTERFACE_NAME is None:
-                rewrite_settings()
+                need_rewrite_settings = True
             elif INTERFACE_NAME == "None":
                 INTERFACE_NAME = None
-        elif setting == "IP_ADDRESS_AUTOMATIC":
-            IP_ADDRESS_AUTOMATIC = return_setting(setting)
-            if IP_ADDRESS_AUTOMATIC == "True":
-                IP_ADDRESS_AUTOMATIC = True
-            elif IP_ADDRESS_AUTOMATIC == "False":
-                IP_ADDRESS_AUTOMATIC = False
-            else:
-                rewrite_settings()
-                IP_ADDRESS_AUTOMATIC = True
         elif setting == "IP_ADDRESS":
             reset_current_setting__flag = False
-            IP_ADDRESS = return_setting(setting)
+            IP_ADDRESS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if IP_ADDRESS is None:
                 reset_current_setting__flag = True
             elif IP_ADDRESS == "None":
                 IP_ADDRESS = None
             else:
-                if not is_ip_address(IP_ADDRESS):
+                if not is_ipv4_address(IP_ADDRESS):
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
-                rewrite_settings()
+                need_rewrite_settings = True
                 IP_ADDRESS = None
         elif setting == "BLOCK_THIRD_PARTY_SERVERS":
-            BLOCK_THIRD_PARTY_SERVERS = return_setting(setting)
+            BLOCK_THIRD_PARTY_SERVERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if BLOCK_THIRD_PARTY_SERVERS == "True":
                 BLOCK_THIRD_PARTY_SERVERS = True
             elif BLOCK_THIRD_PARTY_SERVERS == "False":
                 BLOCK_THIRD_PARTY_SERVERS = False
             else:
-                rewrite_settings()
+                need_rewrite_settings = True
                 BLOCK_THIRD_PARTY_SERVERS = True
         elif setting == "PROGRAM_PRESET":
             reset_current_setting__flag = False
-            PROGRAM_PRESET = return_setting(setting)
+            PROGRAM_PRESET, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if PROGRAM_PRESET is None:
                 reset_current_setting__flag = True
             elif PROGRAM_PRESET == "None":
@@ -543,16 +516,16 @@ def apply_settings(settings_list: list):
                 if not PROGRAM_PRESET in ["GTA5", "Minecraft"]:
                     reset_current_setting__flag = True
             if reset_current_setting__flag:
-                rewrite_settings()
+                need_rewrite_settings = True
                 PROGRAM_PRESET = None
         elif setting == "LOW_PERFORMANCE_MODE":
-            LOW_PERFORMANCE_MODE = return_setting(setting)
+            LOW_PERFORMANCE_MODE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if LOW_PERFORMANCE_MODE == "True":
                 LOW_PERFORMANCE_MODE = True
             elif LOW_PERFORMANCE_MODE == "False":
                 LOW_PERFORMANCE_MODE = False
             else:
-                rewrite_settings()
+                need_rewrite_settings = True
                 LOW_PERFORMANCE_MODE = True
 
     if need_rewrite_settings:
@@ -570,11 +543,23 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 02/03/2024 (21:25)"
+VERSION = "v1.0.7 - 03/03/2024 (15:38)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
 }
+SETTINGS_LIST = [
+    "STDOUT_SHOW_HEADER",
+    "STDOUT_REFRESHING_TIMER",
+    "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
+    "STDOUT_RESET_INFOS_ON_CONNECTED",
+    "MAXMIND_DB_PATH",
+    "INTERFACE_NAME",
+    "IP_ADDRESS",
+    "BLOCK_THIRD_PARTY_SERVERS",
+    "PROGRAM_PRESET",
+    "LOW_PERFORMANCE_MODE"
+]
 s = create_unsafe_https_session()
 
 cls()
@@ -649,7 +634,7 @@ cls()
 title(f"Checking that 'Npcap' or 'WinpCap' driver is installed on your system - {TITLE}")
 print("\nChecking that 'Npcap' or 'WinpCap' driver is installed on your system ...\n")
 
-while not exit_signal.is_set():
+while True:
     if npcap_or_winpcap_installed():
         break
     else:
@@ -673,56 +658,99 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
-apply_settings(["STDOUT_SHOW_HEADER", "STDOUT_REFRESHING_TIMER", "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS", "STDOUT_RESET_INFOS_ON_CONNECTED", "MAXMIND_DB_PATH", "INTERFACE_NAME", "IP_ADDRESS_AUTOMATIC", "IP_ADDRESS", "BLOCK_THIRD_PARTY_SERVERS", "PROGRAM_PRESET", "LOW_PERFORMANCE_MODE"])
+apply_settings()
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
 print(f"\nCapture network interface selection ...\n")
-interfaces = psutil.net_io_counters(pernic=True)
 
-if INTERFACE_NAME in interfaces:
-    iface_name = INTERFACE_NAME
-else:
-    cls()
-    print()
-    for i, interface_name in enumerate(interfaces):
-        print(f"{Fore.YELLOW}{i+1}{Fore.RESET}: {interface_name}")
-    print()
-    while not exit_signal.is_set():
+table = PrettyTable()
+table.field_names = ["#", "Interface", "IP Address", "Packets Sent", "Packets Received"]
+table.align["#"] = "c"
+table.align["Interface"] = "l"
+table.align["IP Address"] = "c"
+table.align["Packets Sent"] = "c"
+table.align["Packets Received"] = "c"
+
+counter = 0
+interfaces_info = []
+user_network_interface_name = None
+user_network_interface_ip_address = None
+
+net_io_stats = psutil.net_io_counters(pernic=True)
+net_if_addrs = psutil.net_if_addrs()
+
+for interface, stats in net_io_stats.items():
+    if interface in net_if_addrs:
+        counter += 1
+
+        for addr in net_if_addrs[interface]:
+            if addr.family == socket.AF_INET:
+                ip_address = addr.address
+                break
+        else:
+            ip_address = None
+
+        interface_info = {
+            "Interface": interface,
+            "IP Address": ip_address,
+            "Packets Sent": stats.packets_sent,
+            "Packets Received": stats.packets_recv
+        }
+        interfaces_info.append(interface_info)
+
+        table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface, align_ip_address_segments(ip_address), stats.packets_sent, stats.packets_recv])
+
+if INTERFACE_NAME is not None:
+    for interface in interfaces_info:
+        if interface["Interface"].lower() == INTERFACE_NAME.lower():
+            if not interface["Interface"] == INTERFACE_NAME:
+                INTERFACE_NAME = interface["Interface"]
+                reconstruct_settings()
+
+            user_network_interface_name: str = interface["Interface"]
+            user_network_interface_ip_address: str = interface["IP Address"]
+            break
+    else:
+        INTERFACE_NAME = None
+
+if INTERFACE_NAME is None:
+    print(table)
+
+    while True:
         try:
-            selection = int(input(f"Select your desired capture network interface ({Fore.YELLOW}1{Fore.RESET}-{Fore.YELLOW}{len(interfaces)}{Fore.RESET}): {Fore.YELLOW}"))
+            selection = int(input(f"\nSelect your desired capture network interface ({Fore.YELLOW}1{Fore.RESET}-{Fore.YELLOW}{len(interfaces_info)}{Fore.RESET}): {Fore.YELLOW}"))
         except ValueError:
             print(f"{Fore.RED}ERROR{Fore.RESET}: You didn't provide a number.")
-            continue
-        if (
-            selection >= 1
-            and selection <= len(interfaces)
-        ):
-            break
-        print(f"{Fore.RED}ERROR{Fore.RESET}: The number you provided is not matching with the available network interfaces.")
-        continue
-    iface_name = list(interfaces.keys())[selection-1]
+        else:
+            if (
+                selection >= 1
+                and selection <= len(interfaces_info)
+            ):
+                print(end=Fore.RESET)
+                break
+            print(f"{Fore.RED}ERROR{Fore.RESET}: The number you provided is not matching with the available network interfaces.")
+    user_network_interface_name: str = interfaces_info[selection-1]["Interface"]
+    user_network_interface_ip_address: str = interfaces_info[selection-1]["IP Address"]
 
 cls()
 title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
 print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 
-if IP_ADDRESS_AUTOMATIC:
-    old_ip_address = IP_ADDRESS
+need_rewrite_settings = False
 
-    try:
-        IP_ADDRESS = get_local_ip_address()
-        if IP_ADDRESS == "127.0.0.1":
-            raise ValueError("IP address is a loopback address")
-    except ValueError:
-        IP_ADDRESS = None
+if not user_network_interface_name == INTERFACE_NAME:
+    INTERFACE_NAME = user_network_interface_name
+    need_rewrite_settings = True
 
-    if (
-        not old_ip_address == IP_ADDRESS
-    ):
-        reconstruct_settings()
+if not IP_ADDRESS:
+    IP_ADDRESS = user_network_interface_ip_address
+    need_rewrite_settings = True
 
-while not exit_signal.is_set():
+if need_rewrite_settings:
+    reconstruct_settings()
+
+while True:
     if not IP_ADDRESS:
         msgbox_title = TITLE
         msgbox_text = """
@@ -733,7 +761,7 @@ while not exit_signal.is_set():
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         show_message_box(msgbox_title, msgbox_text, msgbox_style)
-        apply_settings(["IP_ADDRESS"])
+        IP_ADDRESS = apply_settings(["IP_ADDRESS"])
     else:
         break
 
@@ -764,10 +792,10 @@ if BLOCK_THIRD_PARTY_SERVERS:
         for ip_range in server.value:
             BPF_FILTER += f" and not net {ip_range}"
 
-while not exit_signal.is_set():
+while True:
     try:
         capture = pyshark.LiveCapture(
-            interface = iface_name,
+            interface = INTERFACE_NAME,
             bpf_filter = BPF_FILTER,
             display_filter = DISPLAY_FILTER
         )
@@ -1022,15 +1050,17 @@ private_ip_ranges = [IPv4Network(ip_range) for ip_range in ["10.0.0.0/8", "100.6
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
 
-while not exit_signal.is_set():
+while True:
     if LOW_PERFORMANCE_MODE:
         recently_resolved_ips = set()
         clear_recently_resolved_ips()
 
     try:
         capture.apply_on_packets(callback=packet_callback)
-    #except TSharkCrashException:
-    #    pass
+    except TSharkCrashException:
+        if exit_signal.is_set():
+            pass
+        raise
     except Exception as e:
         if not (
             str(e) == PACKET_CAPTURE_OVERFLOW
