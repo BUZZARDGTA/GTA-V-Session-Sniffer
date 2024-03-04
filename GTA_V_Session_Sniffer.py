@@ -552,7 +552,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 04/03/2024 (22:26)"
+VERSION = "v1.0.7 - 04/03/2024 (22:57)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -929,17 +929,17 @@ def stdout_render_core():
         else:
             len_session_disconnected_message = f"showing {STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
 
-        printer.cache_print("\n")
+        printer.cache_print("")
 
         if STDOUT_SHOW_HEADER:
-            printer.cache_print(f"-" * 110)
+            printer.cache_print("-" * 110)
             printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-            printer.cache_print(f"  * https://illegal-services.com/")
-            printer.cache_print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
-            printer.cache_print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
+            printer.cache_print("  * https://illegal-services.com/")
+            printer.cache_print("  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
+            printer.cache_print("  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
             printer.cache_print("")
             printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-            printer.cache_print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+            printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
             printer.cache_print("")
 
         printer.cache_print(f"-" * 110)
@@ -980,7 +980,10 @@ def stdout_render_core():
             for player in session_disconnected__stdout_counter
         )
 
-        printer.cache_print(f"\n\n{connected_players_table}\n{disconnected_players_table}\n\n")
+        printer.cache_print("")
+        printer.cache_print(connected_players_table.get_string())
+        printer.cache_print(disconnected_players_table.get_string())
+        printer.cache_print("")
 
         cls()
         printer.flush_cache()
