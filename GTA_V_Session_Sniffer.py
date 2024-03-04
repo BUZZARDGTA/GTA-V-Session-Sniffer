@@ -8,7 +8,7 @@ import geoip2.errors
 import geoip2.database
 #import maxminddb.errors
 from colorama import Fore
-from prettytable import PrettyTable
+from prettytable import PrettyTable, SINGLE_BORDER
 from pyshark.packet.packet import Packet
 from pyshark.capture.capture import TSharkCrashException
 from pyshark.tshark.tshark import TSharkNotFoundException
@@ -199,14 +199,8 @@ def cleanup_before_exit():
 def is_pyinstaller_compiled():
     return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
-def get_formatted_datetime(base_datetime: datetime | str = None):
-    if base_datetime is None:
-        base_datetime = datetime.now()
-
-    # Format the datetime object as a string
-    formatted_datetime = base_datetime.strftime("%Y/%m/%d %H:%M:%S")
-
-    return str(formatted_datetime)
+def converts_pyshark_packet_timestamp_to_datetime_object(sniff_timestamp: str):
+    return datetime.fromtimestamp(timestamp=float(sniff_timestamp))
 
 def title(title: str):
     print(f"\033]0;{title}\007", end="")
@@ -303,6 +297,9 @@ def reconstruct_settings():
         ;;<STDOUT_SHOW_HEADER>
         ;;Determine if you want or not to show the developper's header in the script's screen.
         ;;
+        ;;<STDOUT_SHOW_DATE>
+        ;;Shows or not the date from which a player has been captured in "First Seen" and "Last Seen" fields.
+        ;;
         ;;<STDOUT_REFRESHING_TIMER>
         ;;Time interval between which this will refresh the console display.
         ;;
@@ -349,14 +346,12 @@ def reconstruct_settings():
         file.write(text)
 
 def apply_settings():
-    global STDOUT_SHOW_HEADER, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
+    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
-        setting_value = None
+        return_setting_value = None
 
-        if settings_file_not_found:
-            need_rewrite_settings = True
-        else:
+        if not settings_file_not_found:
             for line in SETTINGS:
                 line: str = line.rstrip("\n")
                 corrected__line = line.strip()
@@ -376,20 +371,23 @@ def apply_settings():
                     continue
 
                 if setting_name == setting:
-                    if setting_value == "":
-                        setting_value = None
+                    corrected__setting_value = setting_value.strip()
+                    if corrected__setting_value == "":
+                        return_setting_value = None
                         need_rewrite_settings = True
-                    else:
-                        corrected__setting_value = setting_value.strip()
-                        if not setting_value == corrected__setting_value:
-                            need_rewrite_settings = True
-                            setting_value = corrected__setting_value
+
+                        continue
+                    if not corrected__setting_value == setting_value:
+                        need_rewrite_settings = True
+                    return_setting_value = corrected__setting_value
 
                     break
 
-        return setting_value, need_rewrite_settings
+        if return_setting_value is None:
+            need_rewrite_settings = True
 
-    settings_file_not_found = False
+        return return_setting_value, need_rewrite_settings
+
     need_rewrite_settings = False
 
     try:
@@ -397,6 +395,8 @@ def apply_settings():
     except FileNotFoundError:
         settings_file_not_found = True
         need_rewrite_settings = True
+    else:
+        settings_file_not_found = False
 
     for setting in SETTINGS_LIST:
         if setting == "STDOUT_SHOW_HEADER":
@@ -408,6 +408,15 @@ def apply_settings():
             else:
                 need_rewrite_settings = True
                 STDOUT_SHOW_HEADER = True
+        elif setting == "STDOUT_SHOW_DATE":
+            STDOUT_SHOW_DATE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_SHOW_DATE == "True":
+                STDOUT_SHOW_DATE = True
+            elif STDOUT_SHOW_DATE == "False":
+                STDOUT_SHOW_DATE = False
+            else:
+                need_rewrite_settings = True
+                STDOUT_SHOW_DATE = False
         elif setting == "STDOUT_REFRESHING_TIMER":
             reset_current_setting__flag = False
             try:
@@ -543,13 +552,14 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 03/03/2024 (15:38)"
+VERSION = "v1.0.7 - 04/03/2024 (22:26)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
 }
 SETTINGS_LIST = [
     "STDOUT_SHOW_HEADER",
+    "STDOUT_SHOW_DATE",
     "STDOUT_REFRESHING_TIMER",
     "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
     "STDOUT_RESET_INFOS_ON_CONNECTED",
@@ -819,6 +829,17 @@ while True:
 session_db = []
 
 def stdout_render_core():
+    class PrintCacher:
+        def __init__(self):
+            self.cache = []
+
+        def cache_print(self, statement: str):
+            self.cache.append(statement)
+
+        def flush_cache(self):
+            print("\n".join(self.cache))
+            self.cache = []
+
     def get_minimum_padding(var: str | int, max_padding: int, padding: int):
 
         current_padding = len(str(var))
@@ -848,20 +869,27 @@ def stdout_render_core():
 
         return stdout_port_list
 
+    def extract_datetime_from_timestamp(datetime_object: datetime):
+        if STDOUT_SHOW_DATE:
+            formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S")
+        else:
+            formatted_datetime = datetime_object.strftime("%H:%M:%S")
+
+        return formatted_datetime
+
+    printer = PrintCacher()
     refreshing_rate_t1 = time.perf_counter()
 
     while not exit_signal.is_set():
-        datetime_now = datetime.now()
-
-        session_connected__padding_packets = session_connected__padding_country_name = session_connected__padding_country_iso = session_connected__padding_ip = 0
-        session_disconnected__padding_packets = session_disconnected__padding_country_name = session_disconnected__padding_country_iso = session_disconnected__padding_ip = 0
+        session_connected__padding_country_name = 0
+        session_disconnected__padding_country_name = 0
         session_connected = []
         session_disconnected = []
 
         for player in session_db:
             if not player["datetime_left"]:
-                if (datetime_now - player["t1"]) > timedelta(seconds=10):
-                    player["datetime_left"] = get_formatted_datetime(datetime_now)
+                if (datetime.now() - player["t1"]) > timedelta(seconds=10):
+                    player["datetime_left"] = player["t1"]
 
             if player["datetime_left"]:
                 session_disconnected.append({
@@ -874,10 +902,7 @@ def stdout_render_core():
                     'stdout_port_list': port_list_creation(Fore.RED)
                 })
             else:
-                session_connected__padding_packets = get_minimum_padding(player["packets"], session_connected__padding_packets, 6)
                 session_connected__padding_country_name = get_minimum_padding(player["country_name"], session_connected__padding_country_name, 27)
-                session_connected__padding_country_iso = get_minimum_padding(player["country_iso"], session_connected__padding_country_iso, 3)
-                session_connected__padding_ip = get_minimum_padding(player["ip"], session_connected__padding_ip, 16)
 
                 session_connected.append({
                     'datetime_joined': player['datetime_joined'],
@@ -894,10 +919,7 @@ def stdout_render_core():
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
         for player in session_disconnected__stdout_counter:
-            session_disconnected__padding_packets = get_minimum_padding(player["packets"], session_disconnected__padding_packets, 6)
             session_disconnected__padding_country_name = get_minimum_padding(player["country_name"], session_disconnected__padding_country_name, 27)
-            session_disconnected__padding_country_iso = get_minimum_padding(player["country_iso"], session_disconnected__padding_country_iso, 3)
-            session_disconnected__padding_ip = get_minimum_padding(player["ip"], session_disconnected__padding_ip, 16)
 
         if (
             STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
@@ -907,39 +929,61 @@ def stdout_render_core():
         else:
             len_session_disconnected_message = f"showing {STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
 
-        cls()
-        print("")
+        printer.cache_print("\n")
 
         if STDOUT_SHOW_HEADER:
-            print(f"-" * 110)
-            print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-            print(f"  * https://illegal-services.com/")
-            print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
-            print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
-            print("")
-            print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-            print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
-            print("")
+            printer.cache_print(f"-" * 110)
+            printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
+            printer.cache_print(f"  * https://illegal-services.com/")
+            printer.cache_print(f"  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
+            printer.cache_print(f"  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
+            printer.cache_print("")
+            printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
+            printer.cache_print(f"    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+            printer.cache_print("")
 
-        print(f"-" * 110)
-        print(f"                             Welcome in {TITLE_VERSION}")
-        print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-        print(f"-" * 110)
-        print("")
-        print(f"> Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):")
-        if len(session_connected) < 1:
-            print("None")
-        else:
-            for player in session_connected:
-                print(f"first seen:{Fore.GREEN}{player['datetime_joined']}{Fore.RESET} | packets:{Fore.GREEN}{player['packets']:<{session_connected__padding_packets}}{Fore.RESET} | country:{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']:<{session_connected__padding_country_iso}}){Fore.RESET} | IP:{Fore.GREEN}{player['ip']:<{session_connected__padding_ip}}{Fore.RESET} | Port(s):{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}")
-        print("")
-        print(f"> Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):")
-        if len(session_disconnected) < 1:
-            print("None")
-        else:
-            for player in session_disconnected__stdout_counter:
-                print(f"last seen:{Fore.RED}{player['datetime_left']}{Fore.RESET} | first seen:{Fore.RED}{player['datetime_joined']}{Fore.RESET} | packets:{Fore.RED}{player['packets']:<{session_disconnected__padding_packets}}{Fore.RESET} | country:{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']:<{session_disconnected__padding_country_iso}}){Fore.RESET} | IP:{Fore.RED}{player['ip']:<{session_disconnected__padding_ip}}{Fore.RESET} | Port(s):{Fore.RED}{player['stdout_port_list']}{Fore.RESET}")
-        print("")
+        printer.cache_print(f"-" * 110)
+        printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
+        printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+        printer.cache_print(f"-" * 110)
+
+        connected_players_table = PrettyTable()
+        connected_players_table.set_style(SINGLE_BORDER)
+        connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
+        connected_players_table.field_names = ["First Seen", "Packets", "Country", "IP Address", "Ports"]
+        connected_players_table.align = "l"
+        connected_players_table.add_rows(
+            [
+                f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
+                f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
+                f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+                f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
+                f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}"
+            ]
+            for player in session_connected
+        )
+
+        disconnected_players_table = PrettyTable()
+        disconnected_players_table.set_style(SINGLE_BORDER)
+        disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
+        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "Country", "IP Address", "Ports"]
+        disconnected_players_table.align = "l"
+        disconnected_players_table.add_rows(
+            [
+                f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_left'])}{Fore.RESET}",
+                f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
+                f"{Fore.RED}{player['packets']}{Fore.RESET}",
+                f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+                f"{Fore.RED}{player['ip']}{Fore.RESET}",
+                f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}"
+            ]
+            for player in session_disconnected__stdout_counter
+        )
+
+        printer.cache_print(f"\n\n{connected_players_table}\n{disconnected_players_table}\n\n")
+
+        cls()
+        printer.flush_cache()
 
         while not exit_signal.is_set():
             refreshing_rate_t2 = time.perf_counter()
@@ -969,11 +1013,9 @@ def packet_callback(packet: Packet):
     if exit_signal.is_set():
         raise ValueError(EXIT_SIGNAL_MESSAGE)
 
-    datetime_now = datetime.now()
-    packet_timestamp = datetime.fromtimestamp(timestamp=float(packet.sniff_timestamp))
-    time_elapsed = datetime_now - packet_timestamp
+    packet_timestamp = converts_pyshark_packet_timestamp_to_datetime_object(packet.sniff_timestamp)
 
-    if time_elapsed >= timedelta(seconds=3):
+    if (datetime.now() - packet_timestamp) >= timedelta(seconds=3):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     # Believe it or not, this happened one time during my testings ...
@@ -1031,7 +1073,7 @@ def packet_callback(packet: Packet):
         last_port = target__port,
         country_name = target__country_name,
         country_iso = target__country_iso,
-        datetime_joined = get_formatted_datetime(datetime_now),
+        datetime_joined = packet_timestamp,
         datetime_left = None
     )
 
