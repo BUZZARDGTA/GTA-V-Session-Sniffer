@@ -587,7 +587,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 05/03/2024 (22:58)"
+VERSION = "v1.0.7 - 05/03/2024 (23:05)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -832,7 +832,7 @@ if PROGRAM_PRESET:
 if BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "r-goose", "llmnr"])
+    display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "llmnr"])
 
     ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
     BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not net ({' or '.join(ip_ranges)})")
