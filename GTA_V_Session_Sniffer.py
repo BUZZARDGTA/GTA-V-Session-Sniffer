@@ -236,25 +236,27 @@ def get_country_info(ip_address: str):
     country_name = "N/A"
     country_iso = "N/A"
 
-    try:
-        response = maxmind_country_reader.country(ip_address)
-    except geoip2.errors.AddressNotFoundError:
-        pass
-    else:
-        country_name = str(response.country.name)
-        country_iso = str(response.country.iso_code)
+    if MAXMIND_DB_PATH:
+        try:
+            response = maxmind_country_reader.country(ip_address)
+        except geoip2.errors.AddressNotFoundError:
+            pass
+        else:
+            country_name = str(response.country.name)
+            country_iso = str(response.country.iso_code)
 
     return country_name, country_iso
 
 def get_asn_info(ip_address: str):
     asn = "N/A"
 
-    try:
-        response = maxmind_asn_reader.asn(ip_address)
-    except geoip2.errors.AddressNotFoundError:
-        pass
-    else:
-        asn = str(response.autonomous_system_organization)
+    if MAXMIND_DB_PATH:
+        try:
+            response = maxmind_asn_reader.asn(ip_address)
+        except geoip2.errors.AddressNotFoundError:
+            pass
+        else:
+            asn = str(response.autonomous_system_organization)
 
     return asn
 
