@@ -587,7 +587,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 05/03/2024 (18:23)"
+VERSION = "v1.0.7 - 05/03/2024 (22:58)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -810,14 +810,15 @@ while True:
     else:
         break
 
-BPF_FILTER = f"dst or src host {IP_ADDRESS} and ip and udp and not udp portrange 0-1023 and not port 5353"
+BPF_FILTER = f"dst or src host {IP_ADDRESS} and ip and udp and not portrange 0-1023 and not port 5353"
 DISPLAY_FILTER = None
+display_filter_protocols_to_exclude = []
 
 if PROGRAM_PRESET:
     if PROGRAM_PRESET == "GTA5":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "frame.len>=71 and frame.len<=999")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=71 && frame.len<=999)")
     elif PROGRAM_PRESET == "Minecraft":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "frame.len>=49 and frame.len<=1498")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=49 && frame.len<=1498)")
 
     # If the 'PROGRAM_PRESET' setting is set, automatically block RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a 'PROGRAM_PRESET'.
@@ -826,16 +827,18 @@ if PROGRAM_PRESET:
     # I know that eventually you will see their corresponding IPs time to time but I can guarantee that it does the job it is supposed to do.
     # It filters RTCP but some connections are STILL made out of it, but those are not RTCP ¯\_(ツ)_/¯.
     # And that's exactly why the "Discord" (`class ThirdPartyServers`) IP ranges Capture Filters are useful for.
-    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not rtcp")
+    display_filter_protocols_to_exclude.append("rtcp")
 
 if BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "not ssdp and not raknet and not dtls and not nbns and not pcp and not bt-dht and not uaudp and not classicstun and not dhcp and not mdns")
+    display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "r-goose", "llmnr"])
 
-    for server in ThirdPartyServers:
-        for ip_range in server.value:
-            BPF_FILTER += f" and not net {ip_range}"
+    ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
+    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not net ({' or '.join(ip_ranges)})")
+
+if display_filter_protocols_to_exclude:
+    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", f"not ({' or '.join(display_filter_protocols_to_exclude)})")
 
 while True:
     try:
