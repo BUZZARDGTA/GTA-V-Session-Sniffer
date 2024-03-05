@@ -99,6 +99,15 @@ class Msgbox(enum.IntFlag):
     MsgBoxRight = 524288  # Text is right-aligned.
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
+class PrintCacher:
+    def __init__(self):
+        self.cache = []
+    def cache_print(self, statement: str):
+        self.cache.append(statement)
+    def flush_cache(self):
+        print("\n".join(self.cache))
+        self.cache = []
+
 class ThirdPartyServers(enum.Enum):
     PC_Discord = ["66.22.196.0/22", "66.22.244.0/24", "66.22.241.0/24"]
     PC_Valve = ["155.133.248.0/24", "162.254.197.0/24"] # Valve = Steam
@@ -852,17 +861,6 @@ while True:
 session_db = []
 
 def stdout_render_core():
-    class PrintCacher:
-        def __init__(self):
-            self.cache = []
-
-        def cache_print(self, statement: str):
-            self.cache.append(statement)
-
-        def flush_cache(self):
-            print("\n".join(self.cache))
-            self.cache = []
-
     def get_minimum_padding(var: str | int, max_padding: int, padding: int):
 
         current_padding = len(str(var))
@@ -1018,6 +1016,9 @@ def stdout_render_core():
         printer.cache_print(disconnected_players_table.get_string())
         printer.cache_print("")
 
+        if exit_signal.is_set():
+            return
+
         cls()
         printer.flush_cache()
 
@@ -1029,9 +1030,13 @@ def stdout_render_core():
                 seconds_left = max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
                 if isinstance(STDOUT_REFRESHING_TIMER, float):
                     seconds_left = round(seconds_left, 1)
+                    sleep = 0.1
                 else:
                     seconds_left = round(seconds_left)
+                    sleep = 1
                 print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
+
+                time.sleep(sleep)
                 continue
 
             refreshing_rate_t1 = refreshing_rate_t2
@@ -1135,6 +1140,7 @@ while True:
     try:
         capture.apply_on_packets(callback=packet_callback)
     except TSharkCrashException:
+        print(exit_signal)
         if exit_signal.is_set():
             pass
         raise
