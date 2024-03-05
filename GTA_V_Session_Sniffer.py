@@ -101,7 +101,7 @@ class Msgbox(enum.IntFlag):
 
 class ThirdPartyServers(enum.Enum):
     PC_Discord = ["66.22.196.0/22", "66.22.244.0/24", "66.22.241.0/24"]
-    PC_Valve = ["155.133.248.0/24"] # Valve = Steam
+    PC_Valve = ["155.133.248.0/24", "162.254.197.0/24"] # Valve = Steam
     GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
@@ -192,7 +192,7 @@ def cleanup_before_exit():
         logging.debug(f"EXCEPTION: cleanup_before_exit() > close_maxmind_reader() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
         pass
 
-    print(f"{Fore.YELLOW}If it doesn't exit correctly, you may want to press it again.{Fore.RESET}")
+    print(f"{Fore.YELLOW}If it doesn't exit correctly, you may need to press it again.{Fore.RESET}")
 
     sys.exit(0)
 
@@ -223,26 +223,31 @@ def is_ipv4_address(ip_address: str):
 def align_ip_address_segments(ip_address: str):
     return ".".join(f"{segment:<3}" for segment in ip_address.split("."))
 
-def get_country_info(packet: Packet, ip_address: str):
+def get_country_info(ip_address: str):
     country_name = "N/A"
     country_iso = "N/A"
 
-    # Try to get country info from MaxMind reader
-    if maxmind_reader:
-        try:
-            response = maxmind_reader.country(ip_address)
-        except geoip2.errors.AddressNotFoundError:
-            pass
-        else:
-            country_name = str(response.country.name)
-            country_iso = str(response.country.iso_code)
-
-    # Try to get country info from packet attributes
-    elif hasattr(packet, 'ip') and hasattr(packet.ip, 'geosrc_country') and hasattr(packet.ip, 'geosrc_country_iso'):
-        country_name = str(packet.ip.geosrc_country)
-        country_iso = str(packet.ip.geosrc_country_iso)
+    try:
+        response = maxmind_country_reader.country(ip_address)
+    except geoip2.errors.AddressNotFoundError:
+        pass
+    else:
+        country_name = str(response.country.name)
+        country_iso = str(response.country.iso_code)
 
     return country_name, country_iso
+
+def get_asn_info(ip_address: str):
+    asn = "N/A"
+
+    try:
+        response = maxmind_asn_reader.asn(ip_address)
+    except geoip2.errors.AddressNotFoundError:
+        pass
+    else:
+        asn = str(response.autonomous_system_organization)
+
+    return asn
 
 def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
@@ -269,17 +274,28 @@ def create_or_happen_to_variable(variable: str, operator: str, string_to_happen:
         return string_to_happen
 
 def initialize_maxmind_reader():
-    maxmind_reader = None
+    if MAXMIND_DB_PATH is None:
+        maxmind_asn_reader = None
+        maxmind_city_reader = None
+        maxmind_country_reader = None
+    else:
+        maxmind_asn_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-ASN.mmdb")
+        maxmind_city_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-City.mmdb")
+        maxmind_country_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-Country.mmdb")
 
-    if MAXMIND_DB_PATH is not None:
-        maxmind_reader = geoip2.database.Reader(MAXMIND_DB_PATH)
-
-    return maxmind_reader
+    return maxmind_asn_reader, maxmind_city_reader, maxmind_country_reader
 
 def close_maxmind_reader():
     try:
-        if MAXMIND_DB_PATH and maxmind_reader is not None:
-            maxmind_reader.close()
+        if not MAXMIND_DB_PATH:
+            return
+
+        if maxmind_asn_reader is not None:
+            maxmind_asn_reader.close()
+        if maxmind_city_reader is not None:
+            maxmind_city_reader.close()
+        if maxmind_country_reader is not None:
+            maxmind_country_reader.close()
     except NameError:
         pass
 
@@ -419,27 +435,36 @@ def apply_settings():
                 STDOUT_SHOW_DATE = False
         elif setting == "STDOUT_REFRESHING_TIMER":
             reset_current_setting__flag = False
-            try:
-                STDOUT_REFRESHING_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-                STDOUT_REFRESHING_TIMER = int(STDOUT_REFRESHING_TIMER)
-            except (ValueError, TypeError):
+            STDOUT_REFRESHING_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_REFRESHING_TIMER is None:
                 reset_current_setting__flag = True
             else:
-                if STDOUT_REFRESHING_TIMER < 0:
+                try:
+                    if "." in STDOUT_REFRESHING_TIMER:
+                        STDOUT_REFRESHING_TIMER = float(STDOUT_REFRESHING_TIMER)
+                    else:
+                        STDOUT_REFRESHING_TIMER = int(STDOUT_REFRESHING_TIMER)
+                except (ValueError, TypeError):
                     reset_current_setting__flag = True
+                else:
+                    if STDOUT_REFRESHING_TIMER < 0:
+                        reset_current_setting__flag = True
             if reset_current_setting__flag:
                 need_rewrite_settings = True
-                STDOUT_REFRESHING_TIMER = 0
+                STDOUT_REFRESHING_TIMER = 3
         elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
             reset_current_setting__flag = False
-            try:
-                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
-            except (ValueError, TypeError):
+            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS is None:
                 reset_current_setting__flag = True
             else:
-                if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
+                try:
+                    STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
+                except (ValueError, TypeError):
                     reset_current_setting__flag = True
+                else:
+                    if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
+                        reset_current_setting__flag = True
             if reset_current_setting__flag:
                 need_rewrite_settings = True
                 STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
@@ -461,16 +486,14 @@ def apply_settings():
                 MAXMIND_DB_PATH = None
             else:
                 MAXMIND_DB_PATH = Path(MAXMIND_DB_PATH)
-                if MAXMIND_DB_PATH.is_file():
-                    pass
-                elif MAXMIND_DB_PATH.is_dir():
-                    MAXMIND_DB_PATH /= "GeoLite2-Country.mmdb"
-                    if not MAXMIND_DB_PATH.is_file():
-                        reset_current_setting__flag = True
-                else:
+                if not MAXMIND_DB_PATH.is_dir():
                     reset_current_setting__flag = True
                 try:
-                    with geoip2.database.Reader(f"{MAXMIND_DB_PATH}") as reader:
+                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-ASN.mmdb") as reader:
+                        reader.asn("1.1.1.1")
+                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-City.mmdb") as reader:
+                        reader.city("1.1.1.1")
+                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-Country.mmdb") as reader:
                         reader.country("1.1.1.1")
                 except Exception as e:
                     msgbox_title = TITLE
@@ -891,15 +914,23 @@ def stdout_render_core():
                 if (datetime.now() - player["t1"]) > timedelta(seconds=10):
                     player["datetime_left"] = player["t1"]
 
+            if not "asn" in player:
+                player["asn"] = get_asn_info(player["ip"])
+
+            if not "country_name" in player:
+                player["country_name"], player["country_iso"] = get_country_info(player["ip"])
+
             if player["datetime_left"]:
                 session_disconnected.append({
                     'datetime_left': player['datetime_left'],
                     'datetime_joined': player['datetime_joined'],
                     'packets': f"{player['packets']}",
+                    'ip': f"{player['ip']}",
+                    'stdout_port_list': port_list_creation(Fore.RED),
                     'country_name': f"{player['country_name']}",
                     'country_iso': f"{player['country_iso']}",
-                    'ip': f"{player['ip']}",
-                    'stdout_port_list': port_list_creation(Fore.RED)
+                    'asn': f"{player['asn']}"
+
                 })
             else:
                 session_connected__padding_country_name = get_minimum_padding(player["country_name"], session_connected__padding_country_name, 27)
@@ -907,10 +938,11 @@ def stdout_render_core():
                 session_connected.append({
                     'datetime_joined': player['datetime_joined'],
                     'packets': f"{player['packets']}",
+                    'ip': f"{player['ip']}",
+                    'stdout_port_list': port_list_creation(Fore.GREEN),
                     'country_name': f"{player['country_name']}",
                     'country_iso': f"{player['country_iso']}",
-                    'ip': f"{player['ip']}",
-                    'stdout_port_list': port_list_creation(Fore.GREEN)
+                    'asn': f"{player['asn']}"
                 })
 
         session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
@@ -946,19 +978,19 @@ def stdout_render_core():
         printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
         printer.cache_print(f"-" * 110)
-
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-        connected_players_table.field_names = ["First Seen", "Packets", "Country", "IP Address", "Ports"]
+        connected_players_table.field_names = ["First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
         connected_players_table.align = "l"
         connected_players_table.add_rows(
             [
                 f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
                 f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
-                f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
                 f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
-                f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}"
+                f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}",
+                f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+                f"{Fore.GREEN}{player['asn']}{Fore.RESET}"
             ]
             for player in session_connected
         )
@@ -966,16 +998,17 @@ def stdout_render_core():
         disconnected_players_table = PrettyTable()
         disconnected_players_table.set_style(SINGLE_BORDER)
         disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "Country", "IP Address", "Ports"]
+        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
         disconnected_players_table.align = "l"
         disconnected_players_table.add_rows(
             [
                 f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_left'])}{Fore.RESET}",
                 f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
                 f"{Fore.RED}{player['packets']}{Fore.RESET}",
-                f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
                 f"{Fore.RED}{player['ip']}{Fore.RESET}",
-                f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}"
+                f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}",
+                f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+                f"{Fore.RED}{player['asn']}{Fore.RESET}"
             ]
             for player in session_disconnected__stdout_counter
         )
@@ -991,11 +1024,14 @@ def stdout_render_core():
         while not exit_signal.is_set():
             refreshing_rate_t2 = time.perf_counter()
 
-            seconds_elapsed = round(refreshing_rate_t2 - refreshing_rate_t1)
+            seconds_elapsed = refreshing_rate_t2 - refreshing_rate_t1
             if seconds_elapsed <= STDOUT_REFRESHING_TIMER:
                 seconds_left = max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
+                if isinstance(STDOUT_REFRESHING_TIMER, float):
+                    seconds_left = round(seconds_left, 1)
+                else:
+                    seconds_left = round(seconds_left)
                 print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
-                time.sleep(1)
                 continue
 
             refreshing_rate_t1 = refreshing_rate_t2
@@ -1065,8 +1101,6 @@ def packet_callback(packet: Packet):
 
             return
 
-    target__country_name, target__country_iso = get_country_info(packet, target__ip)
-
     target = dict(
         t1 = packet_timestamp,
         packets = 1,
@@ -1074,8 +1108,6 @@ def packet_callback(packet: Packet):
         ports = [target__port],
         first_port = target__port,
         last_port = target__port,
-        country_name = target__country_name,
-        country_iso = target__country_iso,
         datetime_joined = packet_timestamp,
         datetime_left = None
     )
@@ -1088,7 +1120,7 @@ title(TITLE)
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
-maxmind_reader = initialize_maxmind_reader()
+maxmind_asn_reader, maxmind_city_reader, maxmind_country_reader = initialize_maxmind_reader()
 
 private_ip_ranges = [IPv4Network(ip_range) for ip_range in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]]
 
