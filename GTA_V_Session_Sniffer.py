@@ -361,6 +361,10 @@ def reconstruct_settings():
         ;;Please also note that both of these have only been tested on PCs.
         ;;I do not have information regarding their functionality on consoles.
         ;;
+        ;;<VPN_MODE>
+        ;;Setting this to False will add filters to exclude unrelated IPs from the output.
+        ;;However, if you are scanning trough a VPN <INTERFACE_NAME>, you have to set it to True.
+        ;;
         ;;<LOW_PERFORMANCE_MODE>
         ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
         ;;consider setting this to True. This will reduce the resource usage on your computer.
@@ -374,7 +378,7 @@ def reconstruct_settings():
         file.write(text)
 
 def apply_settings():
-    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, LOW_PERFORMANCE_MODE
+    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, INTERFACE_NAME, IP_ADDRESS, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -562,6 +566,15 @@ def apply_settings():
             if reset_current_setting__flag:
                 need_rewrite_settings = True
                 PROGRAM_PRESET = None
+        elif setting == "VPN_MODE":
+            VPN_MODE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if VPN_MODE == "True":
+                VPN_MODE = True
+            elif VPN_MODE == "False":
+                VPN_MODE = False
+            else:
+                need_rewrite_settings = True
+                VPN_MODE = False
         elif setting == "LOW_PERFORMANCE_MODE":
             LOW_PERFORMANCE_MODE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if LOW_PERFORMANCE_MODE == "True":
@@ -603,6 +616,7 @@ SETTINGS_LIST = [
     "IP_ADDRESS",
     "BLOCK_THIRD_PARTY_SERVERS",
     "PROGRAM_PRESET",
+    "VPN_MODE",
     "LOW_PERFORMANCE_MODE"
 ]
 s = create_unsafe_https_session()
@@ -810,9 +824,14 @@ while True:
     else:
         break
 
-BPF_FILTER = f"dst or src host {IP_ADDRESS} and ip and udp and not portrange 0-1023 and not port 5353"
+BPF_FILTER = None
 DISPLAY_FILTER = None
 display_filter_protocols_to_exclude = []
+
+BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"(dst or src host {IP_ADDRESS}) and ip and udp")
+if VPN_MODE is False:
+    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not broadcast and not multicast")
+BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "not portrange 0-1023 and not port 5353")
 
 if PROGRAM_PRESET:
     if PROGRAM_PRESET == "GTA5":
