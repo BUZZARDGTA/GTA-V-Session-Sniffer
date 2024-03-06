@@ -600,7 +600,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 05/03/2024 (23:05)"
+VERSION = "v1.0.7 - 06/03/2024 (18:43)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
@@ -828,16 +828,17 @@ BPF_FILTER = None
 DISPLAY_FILTER = None
 display_filter_protocols_to_exclude = []
 
-BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"(dst or src host {IP_ADDRESS}) and ip and udp")
-if VPN_MODE is False:
-    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not broadcast and not multicast")
-BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "not portrange 0-1023 and not port 5353")
+BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"((src host {IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))")
+BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "udp")
+if not VPN_MODE:
+    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not (broadcast or multicast)")
+BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "not (portrange 0-1023 or port 5353)")
 
 if PROGRAM_PRESET:
     if PROGRAM_PRESET == "GTA5":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=71 && frame.len<=999)")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=71 and frame.len<=999)")
     elif PROGRAM_PRESET == "Minecraft":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=49 && frame.len<=1498)")
+        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=49 and frame.len<=1498)")
 
     # If the 'PROGRAM_PRESET' setting is set, automatically block RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a 'PROGRAM_PRESET'.
@@ -854,7 +855,7 @@ if BLOCK_THIRD_PARTY_SERVERS:
     display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "llmnr"])
 
     ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
-    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not net ({' or '.join(ip_ranges)})")
+    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not (net {' or '.join(ip_ranges)})")
 
 if display_filter_protocols_to_exclude:
     DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", f"not ({' or '.join(display_filter_protocols_to_exclude)})")
@@ -1110,11 +1111,6 @@ def packet_callback(packet: Packet):
             return
         recently_resolved_ips.add(target__ip)
 
-    # Skip local and private IP Ranges.
-    #https://stackoverflow.com/questions/45365482/python-ip-range-to-ip-range-match
-    if any(IPv4Address(target__ip) in ip_range for ip_range in private_ip_ranges):
-        return
-
     for player in session_db:
         if player["ip"] == target__ip:
             if player["datetime_left"]:
@@ -1151,8 +1147,6 @@ stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
 maxmind_asn_reader, maxmind_city_reader, maxmind_country_reader = initialize_maxmind_reader()
-
-private_ip_ranges = [IPv4Network(ip_range) for ip_range in ["10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"]]
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
