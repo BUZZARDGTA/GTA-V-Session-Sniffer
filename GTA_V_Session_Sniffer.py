@@ -1123,8 +1123,6 @@ cls()
 title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
 print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 
-IP_ADDRESS = interfaces_options[user_interface_selection]["IP Address"]
-
 need_rewrite_settings = False
 
 if not INTERFACE_NAME == interfaces_options[user_interface_selection]["Interface"]:
