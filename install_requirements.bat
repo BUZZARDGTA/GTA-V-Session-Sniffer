@@ -18,11 +18,13 @@ if exist "requirements.txt" (
 for %%A in (
     colorama
     geoip2
+    mac-vendor-lookup
     prettytable
     psutil
     pyshark
     requests
     urllib3
+    WMI
 ) do (
     pip install %%A
 )
