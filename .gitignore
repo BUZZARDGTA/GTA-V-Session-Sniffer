@@ -1,3 +1,4 @@
-.devfolder
+/.devfolder
+/MaxMind Database
 Settings.ini
 debug.log
