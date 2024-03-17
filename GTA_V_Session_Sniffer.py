@@ -514,16 +514,25 @@ def reconstruct_settings():
         ;;<STDOUT_SHOW_DATE>
         ;;Shows or not the date from which a player has been captured in "First Seen" and "Last Seen" fields.
         ;;
-        ;;<STDOUT_REFRESHING_TIMER>
-        ;;Time interval between which this will refresh the console display.
+        ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
+        ;;Resets and recalculates each fields for players who were previously disconnected.
         ;;
         ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
         ;;The maximum number of players showing up in disconnected players list.
-        ;;Valid values are any number greater than 0.
+        ;;Valid values include any number greater than or equal to 0.
         ;;Setting it to 0 will make it unlimitted.
         ;;
-        ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
-        ;;Resets and recalculates each fields for players who were previously disconnected.
+        ;;<STDOUT_REFRESHING_TIMER>
+        ;;Time interval between which this will refresh the console display.
+        ;;
+        ;;<PLAYER_DISCONNECTED_TIMER>
+        ;;The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
+        ;;Valid values include any number greater than or equal to 3.
+        ;;
+        ;;<PACKET_CAPTURE_OVERFLOW_TIMER>
+        ;;This timer represents the duration between the timestamp of a captured packet and the current time.
+        ;;When this timer is reached, the tshark process will be restarted.
+        ;;Valid values include any number greater than or equal to 3.
         ;;
         ;;<MAXMIND_DB_PATH>
         ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
@@ -576,7 +585,7 @@ def reconstruct_settings():
         file.write(text)
 
 def apply_settings():
-    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_REFRESHING_TIMER, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_RESET_INFOS_ON_CONNECTED, MAXMIND_DB_PATH, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
+    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, MAXMIND_DB_PATH, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -647,6 +656,31 @@ def apply_settings():
             else:
                 need_rewrite_settings = True
                 STDOUT_SHOW_DATE = False
+        elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
+            STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
+                STDOUT_RESET_INFOS_ON_CONNECTED = True
+            elif STDOUT_RESET_INFOS_ON_CONNECTED == "False":
+                STDOUT_RESET_INFOS_ON_CONNECTED = False
+            else:
+                need_rewrite_settings = True
+                STDOUT_RESET_INFOS_ON_CONNECTED = True
+        elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
+            reset_current_setting__flag = False
+            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS is None:
+                reset_current_setting__flag = True
+            else:
+                try:
+                    STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
+                except (ValueError, TypeError):
+                    reset_current_setting__flag = True
+                else:
+                    if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
+                        reset_current_setting__flag = True
+            if reset_current_setting__flag:
+                need_rewrite_settings = True
+                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
         elif setting == "STDOUT_REFRESHING_TIMER":
             reset_current_setting__flag = False
             STDOUT_REFRESHING_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
@@ -666,31 +700,38 @@ def apply_settings():
             if reset_current_setting__flag:
                 need_rewrite_settings = True
                 STDOUT_REFRESHING_TIMER = 3
-        elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
+        elif setting == "PLAYER_DISCONNECTED_TIMER":
             reset_current_setting__flag = False
-            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS is None:
+            PLAYER_DISCONNECTED_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if PLAYER_DISCONNECTED_TIMER is None:
                 reset_current_setting__flag = True
             else:
                 try:
-                    STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
+                    PLAYER_DISCONNECTED_TIMER = float(PLAYER_DISCONNECTED_TIMER)
                 except (ValueError, TypeError):
                     reset_current_setting__flag = True
                 else:
-                    if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
+                    if PLAYER_DISCONNECTED_TIMER < 3.0:
                         reset_current_setting__flag = True
             if reset_current_setting__flag:
                 need_rewrite_settings = True
-                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
-        elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
-            STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
-                STDOUT_RESET_INFOS_ON_CONNECTED = True
-            elif STDOUT_RESET_INFOS_ON_CONNECTED == "False":
-                STDOUT_RESET_INFOS_ON_CONNECTED = False
+                PLAYER_DISCONNECTED_TIMER = 10
+        elif setting == "PACKET_CAPTURE_OVERFLOW_TIMER":
+            reset_current_setting__flag = False
+            PACKET_CAPTURE_OVERFLOW_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if PACKET_CAPTURE_OVERFLOW_TIMER is None:
+                reset_current_setting__flag = True
             else:
+                try:
+                    PACKET_CAPTURE_OVERFLOW_TIMER = float(PACKET_CAPTURE_OVERFLOW_TIMER)
+                except (ValueError, TypeError):
+                    reset_current_setting__flag = True
+                else:
+                    if PACKET_CAPTURE_OVERFLOW_TIMER < 1:
+                        reset_current_setting__flag = True
+            if reset_current_setting__flag:
                 need_rewrite_settings = True
-                STDOUT_RESET_INFOS_ON_CONNECTED = True
+                PACKET_CAPTURE_OVERFLOW_TIMER = 3
         elif setting == "MAXMIND_DB_PATH":
             reset_current_setting__flag = False
             MAXMIND_DB_PATH, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
@@ -842,9 +883,11 @@ HEADERS = {
 SETTINGS_LIST = [
     "STDOUT_SHOW_HEADER",
     "STDOUT_SHOW_DATE",
-    "STDOUT_REFRESHING_TIMER",
-    "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
     "STDOUT_RESET_INFOS_ON_CONNECTED",
+    "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
+    "STDOUT_REFRESHING_TIMER",
+    "PLAYER_DISCONNECTED_TIMER",
+    "PACKET_CAPTURE_OVERFLOW_TIMER",
     "MAXMIND_DB_PATH",
     "NETWORK_INTERFACE_CONNECTION_PROMPT",
     "INTERFACE_NAME",
@@ -1240,11 +1283,6 @@ def stdout_render_core():
 
         return formatted_datetime
 
-    def stdout_is_arp_enabled():
-        if interfaces_options[user_interface_selection]['is_arp']:
-            return "Enabled"
-        else:
-            return "Disabled"
 
     printer = PrintCacher()
     refreshing_rate_t1 = time.perf_counter()
@@ -1257,7 +1295,7 @@ def stdout_render_core():
 
         for player in session_db:
             if not player["datetime_left"]:
-                if (datetime.now() - player["t1"]) > timedelta(seconds=10):
+                if (datetime.now() - player["t1"]) > timedelta(seconds=PLAYER_DISCONNECTED_TIMER):
                     player["datetime_left"] = player["t1"]
 
             if not "asn" in player:
@@ -1324,7 +1362,7 @@ def stdout_render_core():
         printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
         printer.cache_print(f"-" * 110)
-        is_arp_enabled = stdout_is_arp_enabled()
+        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]['is_arp'] else "Disabled"
         padding_width = max(0, (110 - (44 + len(IP_ADDRESS) + len(INTERFACE_NAME) + len(is_arp_enabled))) // 2)
         printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET}){' ' * padding_width}")
         printer.cache_print(f"-" * 110)
@@ -1411,7 +1449,7 @@ def packet_callback(packet: Packet):
 
     packet_timestamp = converts_pyshark_packet_timestamp_to_datetime_object(packet.sniff_timestamp)
 
-    if (datetime.now() - packet_timestamp) >= timedelta(seconds=3):
+    if (datetime.now() - packet_timestamp) >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     # Believe it or not, this happened one time during my testings ...
