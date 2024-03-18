@@ -12,7 +12,6 @@ from colorama import Fore
 from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from prettytable import PrettyTable, SINGLE_BORDER
 from pyshark.packet.packet import Packet
-from pyshark.capture.capture import TSharkCrashException
 from pyshark.tshark.tshark import TSharkNotFoundException
 
 # ------------------------------------------------------
@@ -22,6 +21,7 @@ import os
 import re
 import sys
 #import uuid
+import json
 import time
 import enum
 import socket
@@ -39,6 +39,7 @@ from operator import itemgetter
 from ipaddress import IPv4Address
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from json.decoder import JSONDecodeError
 
 logging.basicConfig(filename='debug.log',
                     level=logging.DEBUG,
@@ -279,9 +280,9 @@ def cleanup_before_exit():
     """
 
     try:
-        close_maxmind_reader()
+        close_geolite2_readers()
     except Exception as e:
-        logging.debug(f"EXCEPTION: cleanup_before_exit() > close_maxmind_reader() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
+        logging.debug(f"EXCEPTION: cleanup_before_exit() > close_geolite2_readers() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
         pass
 
     print(f"{Fore.YELLOW}If it doesn't exit correctly, you may need to press it again.{Fore.RESET}")
@@ -423,9 +424,9 @@ def get_country_info(ip_address: str):
     country_name = "N/A"
     country_iso = "N/A"
 
-    if MAXMIND_DB_PATH:
+    if geoip2_enabled:
         try:
-            response = maxmind_country_reader.country(ip_address)
+            response = geolite2_country_reader.country(ip_address)
         except geoip2.errors.AddressNotFoundError:
             pass
         else:
@@ -437,9 +438,9 @@ def get_country_info(ip_address: str):
 def get_asn_info(ip_address: str):
     asn = "N/A"
 
-    if MAXMIND_DB_PATH:
+    if geoip2_enabled:
         try:
-            response = maxmind_asn_reader.asn(ip_address)
+            response = geolite2_asn_reader.asn(ip_address)
         except geoip2.errors.AddressNotFoundError:
             pass
         else:
@@ -471,29 +472,114 @@ def create_or_happen_to_variable(variable: str, operator: str, string_to_happen:
     else:
         return string_to_happen
 
-def initialize_maxmind_reader():
-    if MAXMIND_DB_PATH is None:
-        maxmind_asn_reader = None
-        maxmind_city_reader = None
-        maxmind_country_reader = None
-    else:
-        maxmind_asn_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-ASN.mmdb")
-        maxmind_city_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-City.mmdb")
-        maxmind_country_reader = geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-Country.mmdb")
+def update_and_initialize_geolite2_readers():
+    def update_geolite2_databases():
+        geolite2_version_file_path = geolite2_databases_folder_path / "version.json"
+        geolite2_databases: dict[str, dict[str, None | str]] = {
+            f"GeoLite2-{db}.mmdb": {
+                "current_version": None,
+                "last_version": None,
+                "download_url": None
+            }
+            for db in ["ASN", "Country"]
+        }
 
-    return maxmind_asn_reader, maxmind_city_reader, maxmind_country_reader
+        try:
+            with geolite2_version_file_path.open("r") as f:
+                loaded_data = json.load(f)
+        except (FileNotFoundError, JSONDecodeError):
+            pass
+        else:
+            if isinstance(loaded_data, dict):
+                for database_name, database_info in loaded_data.items():
+                    if not isinstance(database_info, dict):
+                        continue
 
-def close_maxmind_reader():
-    try:
-        if not MAXMIND_DB_PATH:
+                    if database_name in geolite2_databases:
+                        geolite2_databases[database_name]["current_version"] = database_info.get("version", None)
+
+        try:
+            response = s.get(f"https://api.github.com/repos/PrxyHunter/GeoLite2/releases/latest")
+        except:
             return
 
-        if maxmind_asn_reader is not None:
-            maxmind_asn_reader.close()
-        if maxmind_city_reader is not None:
-            maxmind_city_reader.close()
-        if maxmind_country_reader is not None:
-            maxmind_country_reader.close()
+        release_data = response.json()
+        for asset in release_data["assets"]:
+            asset_name = asset["name"]
+            if asset_name in geolite2_databases:
+                geolite2_databases[asset_name].update(
+                    {
+                        "last_version": asset["updated_at"],
+                        "download_url": asset["browser_download_url"]
+                    }
+                )
+
+        for database_name, database_info in geolite2_databases.items():
+            if not database_info["current_version"] == database_info["last_version"]:
+                try:
+                    response = s.get(database_info["download_url"])
+                except:
+                    return None
+
+                if not response.status_code == 200:
+                    return None
+
+                geolite2_databases_folder_path.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
+                file_path = geolite2_databases_folder_path / database_name
+                file_path.write_bytes(response.content)
+
+                geolite2_databases[database_name]["current_version"] = database_info["last_version"]
+
+        with geolite2_version_file_path.open("w") as f:
+            json.dump(
+                {
+                    name: {"version": info["current_version"]}
+                    for name, info in geolite2_databases.items()
+                }, f, indent=4
+            )
+
+    def initialize_geolite2_readers():
+        try:
+            geolite2_asn_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-ASN.mmdb")
+            geolite2_country_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-Country.mmdb")
+
+            geolite2_asn_reader.asn("1.1.1.1")
+            geolite2_country_reader.country("1.1.1.1")
+        except Exception as e:
+            msgbox_title = TITLE
+            msgbox_text = f"""
+            Error: {e}
+            Now disabling MaxMind's GeoLite2 IP-to-Country and ASN resolutions feature.
+            Countrys and ASN from players won't shows up from the players fields.
+            """
+            msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+            msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
+            show_message_box(msgbox_title, msgbox_text, msgbox_style)
+
+            geoip2_enabled = False
+
+            geolite2_asn_reader = None
+            geolite2_country_reader = None
+        else:
+            geoip2_enabled = True
+
+        return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
+
+    geolite2_databases_folder_path = Path("GeoLite2 Databases")
+
+    update_geolite2_databases()
+    return initialize_geolite2_readers()
+
+
+def close_geolite2_readers():
+    try:
+        if not geoip2_enabled:
+            return
+
+        if geolite2_asn_reader is not None:
+            geolite2_asn_reader.close()
+        if geolite2_country_reader is not None:
+            geolite2_country_reader.close()
     except NameError:
         pass
 
@@ -533,10 +619,6 @@ def reconstruct_settings():
         ;;This timer represents the duration between the timestamp of a captured packet and the current time.
         ;;When this timer is reached, the tshark process will be restarted.
         ;;Valid values include any number greater than or equal to 3.
-        ;;
-        ;;<MAXMIND_DB_PATH>
-        ;;The Windows directory (full path) where you store the MaxMind DB *.mmdb files. (optional)
-        ;;This is used to resolve countrys from the players.
         ;;
         ;;<NETWORK_INTERFACE_CONNECTION_PROMPT>
         ;;Allows you to skip the network interface selection by automatically
@@ -581,11 +663,10 @@ def reconstruct_settings():
     text = textwrap.dedent(text.removeprefix("\n"))
     for setting in SETTINGS_LIST:
         text += f"{setting}={globals().get(setting)}\n"
-    with open(SETTINGS_PATH, "w", encoding="utf-8") as file:
-        file.write(text)
+    SETTINGS_PATH.write_text(text, encoding="utf-8")
 
 def apply_settings():
-    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, MAXMIND_DB_PATH, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
+    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -732,38 +813,6 @@ def apply_settings():
             if reset_current_setting__flag:
                 need_rewrite_settings = True
                 PACKET_CAPTURE_OVERFLOW_TIMER = 3
-        elif setting == "MAXMIND_DB_PATH":
-            reset_current_setting__flag = False
-            MAXMIND_DB_PATH, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if MAXMIND_DB_PATH is None:
-                reset_current_setting__flag = True
-            elif MAXMIND_DB_PATH == "None":
-                MAXMIND_DB_PATH = None
-            else:
-                MAXMIND_DB_PATH = Path(MAXMIND_DB_PATH)
-                if not MAXMIND_DB_PATH.is_dir():
-                    reset_current_setting__flag = True
-                try:
-                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-ASN.mmdb") as reader:
-                        reader.asn("1.1.1.1")
-                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-City.mmdb") as reader:
-                        reader.city("1.1.1.1")
-                    with geoip2.database.Reader(MAXMIND_DB_PATH / R"GeoLite2-Country.mmdb") as reader:
-                        reader.country("1.1.1.1")
-                except Exception as e:
-                    msgbox_title = TITLE
-                    msgbox_text = f"""
-                    Error: {e}
-
-                    Now disabling the setting <MAXMIND_DB_PATH> [...]
-                    """
-                    msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
-                    msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
-                    show_message_box(msgbox_title, msgbox_text, msgbox_style)
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                MAXMIND_DB_PATH = None
         elif setting == "NETWORK_INTERFACE_CONNECTION_PROMPT":
             NETWORK_INTERFACE_CONNECTION_PROMPT, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if NETWORK_INTERFACE_CONNECTION_PROMPT == "True":
@@ -875,10 +924,10 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 17/03/2024 (00:38)"
+VERSION = "v1.0.7 - 18/03/2024 (21:39)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
 }
 SETTINGS_LIST = [
     "STDOUT_SHOW_HEADER",
@@ -888,7 +937,6 @@ SETTINGS_LIST = [
     "STDOUT_REFRESHING_TIMER",
     "PLAYER_DISCONNECTED_TIMER",
     "PACKET_CAPTURE_OVERFLOW_TIMER",
-    "MAXMIND_DB_PATH",
     "NETWORK_INTERFACE_CONNECTION_PROMPT",
     "INTERFACE_NAME",
     "IP_ADDRESS",
@@ -916,13 +964,12 @@ cls()
 title(f"Searching for a new update - {TITLE}")
 print("\nSearching for a new update ...\n")
 
-error_updating__flag = False
-
 try:
     response = s.get("https://raw.githubusercontent.com/Illegal-Services/GTA-V-Session-Sniffer/version/version.txt")
 except:
     error_updating__flag = True
 else:
+    error_updating__flag = False
     if response.status_code == 200:
         current_version = Version(VERSION)
         latest_version = Version(response.text)
@@ -999,6 +1046,12 @@ print("\nApplying your custom settings from 'Settings.ini' ...\n")
 SETTINGS_PATH = Path("Settings.ini")
 
 apply_settings()
+
+cls()
+title(f"Initializing and updating MaxMind's GeoLite2 Country, and ASN databases - {TITLE}")
+print("\nInitializing and updating MaxMind's GeoLite2 Country, and ASN databases ...\n")
+
+geoip2_enabled, geolite2_asn_reader, geolite2_country_reader = update_and_initialize_geolite2_readers()
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -1510,8 +1563,6 @@ title(TITLE)
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
-maxmind_asn_reader, maxmind_city_reader, maxmind_country_reader = initialize_maxmind_reader()
-
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
 
@@ -1522,17 +1573,11 @@ while True:
 
     try:
         capture.apply_on_packets(callback=packet_callback)
-    except TSharkCrashException:
-        print(exit_signal)
-        if exit_signal.is_set():
-            pass
-        raise
+    except ValueError as e:
+        if not str(e) in {PACKET_CAPTURE_OVERFLOW, EXIT_SIGNAL_MESSAGE}:
+            raise
     except Exception as e:
-        if not (
-            str(e) == PACKET_CAPTURE_OVERFLOW
-            or str(e) == EXIT_SIGNAL_MESSAGE
-            or exit_signal.is_set()
-        ):
+        if not exit_signal.is_set():
             logging.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
             print("An unexcepted error raised:")
             raise
