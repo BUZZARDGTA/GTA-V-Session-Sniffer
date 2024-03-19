@@ -498,10 +498,21 @@ def update_and_initialize_geolite2_readers():
                     if database_name in geolite2_databases:
                         geolite2_databases[database_name]["current_version"] = database_info.get("version", None)
 
+        github_release_api__geolite2 = "https://api.github.com/repos/PrxyHunter/GeoLite2/releases/latest"
         try:
-            response = s.get(f"https://api.github.com/repos/PrxyHunter/GeoLite2/releases/latest")
-        except:
-            return
+            response = s.get(github_release_api__geolite2)
+        except Exception as e:
+            return {
+                "exception": e,
+                "url": github_release_api__geolite2,
+                "http_code": None
+            }
+        if not response.status_code == 200:
+            return {
+                "exception": None,
+                "url": github_release_api__geolite2,
+                "http_code": response.status_code
+            }
 
         release_data = response.json()
         for asset in release_data["assets"]:
@@ -518,11 +529,18 @@ def update_and_initialize_geolite2_readers():
             if not database_info["current_version"] == database_info["last_version"]:
                 try:
                     response = s.get(database_info["download_url"])
-                except:
-                    return None
-
+                except Exception as e:
+                    return {
+                        "exception": e,
+                        "url": database_info["download_url"],
+                        "http_code": None
+                    }
                 if not response.status_code == 200:
-                    return None
+                    return {
+                        "exception": None,
+                        "url": database_info["download_url"],
+                        "http_code": response.status_code
+                    }
 
                 geolite2_databases_folder_path.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
                 file_path = geolite2_databases_folder_path / database_name
@@ -538,6 +556,12 @@ def update_and_initialize_geolite2_readers():
                 }, f, indent=4
             )
 
+        return {
+            "exception": None,
+            "url": None,
+            "http_code": None
+        }
+
     def initialize_geolite2_readers():
         try:
             geolite2_asn_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-ASN.mmdb")
@@ -545,31 +569,50 @@ def update_and_initialize_geolite2_readers():
 
             geolite2_asn_reader.asn("1.1.1.1")
             geolite2_country_reader.country("1.1.1.1")
+
+            exception = None
         except Exception as e:
-            msgbox_title = TITLE
-            msgbox_text = f"""
-            Error: {e}
-            Now disabling MaxMind's GeoLite2 IP-to-Country and ASN resolutions feature.
-            Countrys and ASN from players won't shows up from the players fields.
-            """
-            msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
-            msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
-            show_message_box(msgbox_title, msgbox_text, msgbox_style)
-
-            geoip2_enabled = False
-
             geolite2_asn_reader = None
             geolite2_country_reader = None
-        else:
-            geoip2_enabled = True
 
-        return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
+            exception = e
+
+        return exception, geolite2_asn_reader, geolite2_country_reader
 
     geolite2_databases_folder_path = Path("GeoLite2 Databases")
 
-    update_geolite2_databases()
-    return initialize_geolite2_readers()
+    update_geolite2_databases__dict = update_geolite2_databases()
+    exception__initialize_geolite2_readers, geolite2_asn_reader, geolite2_country_reader = initialize_geolite2_readers()
 
+    show_error = False
+    msgbox_text = ""
+
+    if update_geolite2_databases__dict["exception"]:
+        msgbox_text += f"Exception Error: {update_geolite2_databases__dict["exception"]}\n\n"
+        show_error = True
+    if update_geolite2_databases__dict["url"]:
+        http_code_msgbox_error_text = f" (http_code: {update_geolite2_databases__dict["http_code"]})" if update_geolite2_databases__dict["http_code"] else ""
+        msgbox_text += f'Error: Failed fetching url: "{update_geolite2_databases__dict["url"]}"{http_code_msgbox_error_text}.\n'
+        msgbox_text += "Impossible to keep Maxmind's GeoLite2 IP-to-Country and ASN resolutions feature up-to-date.\n\n"
+        show_error = True
+
+    if exception__initialize_geolite2_readers:
+        msgbox_text += f"Exception Error: {exception__initialize_geolite2_readers}\n\n"
+
+        msgbox_text += "Now disabling MaxMind's GeoLite2 IP-to-Country and ASN resolutions feature.\n"
+        msgbox_text += "Countrys and ASN from players won't shows up from the players fields."
+        geoip2_enabled = False
+        show_error = True
+    else:
+        geoip2_enabled = True
+
+    if show_error:
+        msgbox_title = TITLE
+        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+        msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
+        show_message_box(msgbox_title, msgbox_text, msgbox_style)
+
+    return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
 
 def close_geolite2_readers():
     try:
@@ -924,7 +967,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 18/03/2024 (21:39)"
+VERSION = "v1.0.7 - 19/03/2024 (21:49)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
