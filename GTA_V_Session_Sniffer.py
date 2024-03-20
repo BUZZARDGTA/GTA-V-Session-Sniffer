@@ -967,7 +967,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 20/03/2024 (17:43)"
+VERSION = "v1.0.7 - 20/03/2024 (21:04)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1344,6 +1344,8 @@ while True:
         break
 
 session_db = []
+pyshark_latency = []
+pyshark_restarted_times = 0
 
 def stdout_render_core():
     def get_minimum_padding(var: str | int, max_padding: int, padding: int):
@@ -1375,6 +1377,25 @@ def stdout_render_core():
 
         return stdout_port_list
 
+    def calculate_padding_width(total_width: int, *lengths: int):
+        """
+        Calculate the padding width based on the total width and the lengths of provided strings.
+
+        Args:
+        - total_width (int): Total width available for padding
+        - *args (int): Integrers for which lengths are used to calculate padding width
+
+        Returns:
+        - padding_width (int): Calculated padding width
+        """
+        # Calculate the total length of all strings
+        total_length = sum(length for length in lengths)
+
+        # Calculate the padding width
+        padding_width = max(0, (total_width - total_length) // 2)
+
+        return padding_width
+
     def extract_datetime_from_timestamp(datetime_object: datetime):
         if STDOUT_SHOW_DATE:
             formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S")
@@ -1383,6 +1404,7 @@ def stdout_render_core():
 
         return formatted_datetime
 
+    global pyshark_latency
 
     printer = PrintCacher()
     refreshing_rate_t1 = time.perf_counter()
@@ -1448,7 +1470,7 @@ def stdout_render_core():
         printer.cache_print("")
 
         if STDOUT_SHOW_HEADER:
-            printer.cache_print("-" * 110)
+            printer.cache_print("-" * 109)
             printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
             printer.cache_print("  * https://illegal-services.com/")
             printer.cache_print("  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
@@ -1458,14 +1480,32 @@ def stdout_render_core():
             printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
             printer.cache_print("")
 
-        printer.cache_print(f"-" * 110)
+        printer.cache_print(f"-" * 109)
         printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-        printer.cache_print(f"-" * 110)
+        printer.cache_print(f"-   " * 28)
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]['is_arp'] else "Disabled"
-        padding_width = max(0, (110 - (44 + len(IP_ADDRESS) + len(INTERFACE_NAME) + len(is_arp_enabled))) // 2)
-        printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET}){' ' * padding_width}")
-        printer.cache_print(f"-" * 110)
+        padding_width = calculate_padding_width(109, 44, len(str(IP_ADDRESS)), len(str(INTERFACE_NAME)), len(str(is_arp_enabled)))
+        printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
+        pyshark_average_latency = sum(pyshark_latency, timedelta(0)) / len(pyshark_latency) if pyshark_latency else timedelta(0)
+        pyshark_latency = []
+
+        # Convert the average latency to seconds and round it to 1 decimal place
+        average_latency_seconds = pyshark_average_latency.total_seconds()
+        average_latency_rounded = round(average_latency_seconds, 1)
+
+        # Display the average latency rounded to 1 decimal place
+        if pyshark_average_latency >= timedelta(seconds=0.90 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
+            color = Fore.RED
+        elif pyshark_average_latency >= timedelta(seconds=0.75 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
+            color = Fore.YELLOW
+        else:
+            color = Fore.GREEN
+
+        color_restarted_time = Fore.GREEN if pyshark_restarted_times == 0 else Fore.RED
+        padding_width = calculate_padding_width(109, 67, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(pyshark_restarted_times))), len(str(pyshark_restarted_times)))
+        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (pyshark restarted time{plural(pyshark_restarted_times)}:{color_restarted_time}{pyshark_restarted_times}{Fore.RESET})")
+        printer.cache_print(f"-" * 109)
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
@@ -1544,12 +1584,16 @@ def clear_recently_resolved_ips():
                 raise
 
 def packet_callback(packet: Packet):
+    global pyshark_restarted_times
+
     if exit_signal.is_set():
         raise ValueError(EXIT_SIGNAL_MESSAGE)
 
     packet_timestamp = converts_pyshark_packet_timestamp_to_datetime_object(packet.sniff_timestamp)
-
-    if (datetime.now() - packet_timestamp) >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
+    packet_latency = (datetime.now() - packet_timestamp)
+    pyshark_latency.append(packet_latency)
+    if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
+        pyshark_restarted_times += 1
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     # Believe it or not, this happened one time during my testings ...
