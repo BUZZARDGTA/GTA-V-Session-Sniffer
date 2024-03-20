@@ -967,7 +967,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 20/03/2024 (04:38)"
+VERSION = "v1.0.7 - 20/03/2024 (17:43)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1181,7 +1181,7 @@ table.align["IP Address"] = "l"
 table.align["MAC Address"] = "c"
 table.align["Organization or Vendor Name"] = "c"
 
-interfaces_options = {}
+interfaces_options: dict[int, dict[str, str | None]] = {}
 counter = 0
 
 for interface in Interface.get_all_interfaces():
@@ -1223,24 +1223,27 @@ for interface in Interface.get_all_interfaces():
 
 user_interface_selection = None
 
-if not NETWORK_INTERFACE_CONNECTION_PROMPT:
+if (
+    not NETWORK_INTERFACE_CONNECTION_PROMPT
+    and any(setting is not None for setting in [INTERFACE_NAME, MAC_ADDRESS, IP_ADDRESS])
+):
     max_priority = 0
 
-    for counter in interfaces_options:
+    for interface_counter, interface_options in interfaces_options.items():
         priority = 0
 
-        if INTERFACE_NAME == interfaces_options[counter]["Interface"]:
+        if INTERFACE_NAME == interface_options["Interface"]:
             priority += 1
-        if MAC_ADDRESS == interfaces_options[counter]["MAC Address"]:
+        if MAC_ADDRESS == interface_options["MAC Address"]:
             priority += 1
-        if IP_ADDRESS == interfaces_options[counter]["IP Address"]:
+        if IP_ADDRESS == interface_options["IP Address"]:
             priority += 1
 
         if priority == max_priority: # If multiple matches on the same priority are found we search for the next bigger priority else we prompt the user.
             user_interface_selection = None
         elif priority > max_priority:
             max_priority = priority
-            user_interface_selection = counter
+            user_interface_selection = interface_counter
 
 if not user_interface_selection:
     print(table)
