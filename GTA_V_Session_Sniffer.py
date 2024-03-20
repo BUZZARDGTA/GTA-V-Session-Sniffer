@@ -637,8 +637,8 @@ def reconstruct_settings():
         ;;If you don't know what value to choose for a specifc setting, set it's value to None.
         ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
         ;;
-        ;;<STDOUT_SHOW_HEADER>
-        ;;Determine if you want or not to show the developper's header in the script's screen.
+        ;;<STDOUT_SHOW_ADVERTISING>
+        ;;Determine if you want or not to show the developper's advertisements in the script's display.
         ;;
         ;;<STDOUT_SHOW_DATE>
         ;;Shows or not the date from which a player has been captured in "First Seen" and "Last Seen" fields.
@@ -709,7 +709,7 @@ def reconstruct_settings():
     SETTINGS_PATH.write_text(text, encoding="utf-8")
 
 def apply_settings():
-    global STDOUT_SHOW_HEADER, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
+    global STDOUT_SHOW_ADVERTISING, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -762,15 +762,15 @@ def apply_settings():
         settings_file_not_found = False
 
     for setting in SETTINGS_LIST:
-        if setting == "STDOUT_SHOW_HEADER":
-            STDOUT_SHOW_HEADER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_SHOW_HEADER == "True":
-                STDOUT_SHOW_HEADER = True
-            elif STDOUT_SHOW_HEADER == "False":
-                STDOUT_SHOW_HEADER = False
+        if setting == "STDOUT_SHOW_ADVERTISING":
+            STDOUT_SHOW_ADVERTISING, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_SHOW_ADVERTISING == "True":
+                STDOUT_SHOW_ADVERTISING = True
+            elif STDOUT_SHOW_ADVERTISING == "False":
+                STDOUT_SHOW_ADVERTISING = False
             else:
                 need_rewrite_settings = True
-                STDOUT_SHOW_HEADER = True
+                STDOUT_SHOW_ADVERTISING = True
         elif setting == "STDOUT_SHOW_DATE":
             STDOUT_SHOW_DATE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if STDOUT_SHOW_DATE == "True":
@@ -967,13 +967,13 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 20/03/2024 (21:04)"
+VERSION = "v1.0.7 - 20/03/2024 (21:24)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
 }
 SETTINGS_LIST = [
-    "STDOUT_SHOW_HEADER",
+    "STDOUT_SHOW_ADVERTISING",
     "STDOUT_SHOW_DATE",
     "STDOUT_RESET_INFOS_ON_CONNECTED",
     "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
@@ -1469,7 +1469,7 @@ def stdout_render_core():
 
         printer.cache_print("")
 
-        if STDOUT_SHOW_HEADER:
+        if STDOUT_SHOW_ADVERTISING:
             printer.cache_print("-" * 109)
             printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
             printer.cache_print("  * https://illegal-services.com/")
