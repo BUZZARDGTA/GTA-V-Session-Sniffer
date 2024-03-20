@@ -967,7 +967,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 19/03/2024 (21:49)"
+VERSION = "v1.0.7 - 20/03/2024 (04:38)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1128,13 +1128,14 @@ for interface, stats in net_io_stats.items():
     ):
         raise ValueError(f"ERROR: Developper didn't expect some scenario to be possible.\nDEBUG: interface:{interface}, ip_address:{ip_addresses}, mac_address:{mac_addresses}")
 
-    if mac_addresses:
-        mac_address = mac_addresses[0].replace("-", ":").upper()
-
     ip_addresses = [ip for ip in ip_addresses if is_private_device_ipv4(ip)]
-
     if not ip_addresses:
         continue
+
+    if mac_addresses:
+        mac_address = mac_addresses[0].replace("-", ":").upper()
+    else:
+        mac_address = None
 
     vendor_name = (
         get_vendor_name(mac_address)
