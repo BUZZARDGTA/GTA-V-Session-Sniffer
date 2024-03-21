@@ -13,6 +13,7 @@ from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from prettytable import PrettyTable, SINGLE_BORDER
 from pyshark.packet.packet import Packet
 from pyshark.tshark.tshark import TSharkNotFoundException
+from pyshark.capture.live_capture import LiveCapture
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -41,15 +42,19 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
 
-logging.basicConfig(filename='debug.log',
-                    level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
+
+logging.basicConfig(filename='debug.log',
+                    level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 class Version:
     def __init__(self, version: str):
@@ -261,34 +266,29 @@ def cleanup_before_exit():
 
     print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
-    try:
-        if (stdout_render_core__thread and stdout_render_core__thread.is_alive()):
-            stdout_render_core__thread.join() # Wait for the thread to finish
-    except Exception as e:
-        logging.debug(f"EXCEPTION: cleanup_before_exit() > stdout_render_core__thread [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
-        pass
+    if (
+        "stdout_render_core__thread" in globals()
+        and stdout_render_core__thread.is_alive()
+    ):
+        stdout_render_core__thread.join()
 
-    try:
-        capture.clear()
-    except Exception as e:
-        logging.debug(f"EXCEPTION: cleanup_before_exit() > capture.clear() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
-        pass
-
-    """ I don't know why, but those trows me an error so I'll leave them commented.
-    capture.close_async()
-    capture.close()
     """
+    capture.close()
 
-    try:
-        close_geolite2_readers()
-    except Exception as e:
-        logging.debug(f"EXCEPTION: cleanup_before_exit() > close_geolite2_readers() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
-        pass
+    I don't know why, but this trows me an error so I'll leave it commented until a fix is found.
 
-    print(f"{Fore.YELLOW}If it doesn't exit correctly, you may need to press it again.{Fore.RESET}")
+    The downside is that not gracefully closing the pyshark's capture can sometimes leaves stderr output
+    in the console if asyncio was currently working on something and we forces the script exiting.
+
+    For now I'm doing that, I think it helps a little bit:
+    """
+    if (
+        "capture" in globals()
+        and isinstance(capture, LiveCapture)
+    ):
+        time.sleep(1)
 
     sys.exit(0)
-
 
 def is_pyinstaller_compiled():
     return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
@@ -613,18 +613,6 @@ def update_and_initialize_geolite2_readers():
         show_message_box(msgbox_title, msgbox_text, msgbox_style)
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
-
-def close_geolite2_readers():
-    try:
-        if not geoip2_enabled:
-            return
-
-        if geolite2_asn_reader is not None:
-            geolite2_asn_reader.close()
-        if geolite2_country_reader is not None:
-            geolite2_country_reader.close()
-    except NameError:
-        pass
 
 def reconstruct_settings():
     print("\nCorrect reconstruction of 'Settings.ini' ...")
@@ -967,7 +955,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 20/03/2024 (21:24)"
+VERSION = "v1.0.7 - 21/03/2024 (21:16)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1546,9 +1534,6 @@ def stdout_render_core():
         printer.cache_print(disconnected_players_table.get_string())
         printer.cache_print("")
 
-        if exit_signal.is_set():
-            return
-
         cls()
         printer.flush_cache()
 
@@ -1580,17 +1565,14 @@ def clear_recently_resolved_ips():
             Timer(1, clear_recently_resolved_ips).start()
         except Exception as e:
             if not exit_signal.is_set():
-                logging.debug(f"EXCEPTION: clear_recently_resolved_ips() [{exit_signal.is_set()}], [{type(str(e))}], [{type(e).__name__}]")
+                logger.debug(f"EXCEPTION: clear_recently_resolved_ips() [{exit_signal}], [{type(str(e))}], [{type(e).__name__}]")
                 raise
 
 def packet_callback(packet: Packet):
     global pyshark_restarted_times
 
-    if exit_signal.is_set():
-        raise ValueError(EXIT_SIGNAL_MESSAGE)
-
     packet_timestamp = converts_pyshark_packet_timestamp_to_datetime_object(packet.sniff_timestamp)
-    packet_latency = (datetime.now() - packet_timestamp)
+    packet_latency = datetime.now() - packet_timestamp
     pyshark_latency.append(packet_latency)
     if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
         pyshark_restarted_times += 1
@@ -1598,7 +1580,7 @@ def packet_callback(packet: Packet):
 
     # Believe it or not, this happened one time during my testings ...
     # So instead of respawning "tshark.exe" due to a single weird packet, just ignore it.
-    if not hasattr(packet, 'ip'):
+    if not "ip" in packet:
         return
 
     source_address: str = packet.ip.src
@@ -1655,7 +1637,6 @@ stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
-EXIT_SIGNAL_MESSAGE = "Script aborted by user interruption."
 
 while True:
     if LOW_PERFORMANCE_MODE:
@@ -1665,12 +1646,14 @@ while True:
     try:
         capture.apply_on_packets(callback=packet_callback)
     except ValueError as e:
-        if not str(e) in {PACKET_CAPTURE_OVERFLOW, EXIT_SIGNAL_MESSAGE}:
-            raise
+        if str(e) == PACKET_CAPTURE_OVERFLOW:
+            capture.clear()
+            capture.close()
+
+            time.sleep(0.1)
+
+            continue
     except Exception as e:
         if not exit_signal.is_set():
-            logging.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal.is_set()}], [{str(e)}], [{type(e).__name__}]")
-            print("An unexcepted error raised:")
+            logger.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal}], [{str(e)}], [{type(e).__name__}]")
             raise
-
-    time.sleep(0.1)
