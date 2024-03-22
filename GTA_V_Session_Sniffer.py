@@ -7,13 +7,12 @@ import pyshark
 import colorama
 import geoip2.errors
 import geoip2.database
-#import maxminddb.errors
 from colorama import Fore
 from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from prettytable import PrettyTable, SINGLE_BORDER
 from pyshark.packet.packet import Packet
-from pyshark.tshark.tshark import TSharkNotFoundException
 from pyshark.capture.live_capture import LiveCapture
+from pyshark.tshark.tshark import TSharkNotFoundException
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -21,21 +20,19 @@ from pyshark.capture.live_capture import LiveCapture
 import os
 import re
 import sys
-#import uuid
 import json
 import time
 import enum
 import socket
 import ctypes
 import signal
-import atexit
 import logging
 import textwrap
 import threading
 import subprocess
 import webbrowser
 from pathlib import Path
-from threading import Timer
+from types import FrameType
 from operator import itemgetter
 from ipaddress import IPv4Address
 from typing import List, Dict, Optional
@@ -48,10 +45,10 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
 
-logging.basicConfig(filename='debug.log',
+logging.basicConfig(filename="debug.log",
                     level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+                    format="%(asctime)s - %(levelname)s - %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -109,7 +106,7 @@ class Msgbox(enum.IntFlag):
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class Interface:
-    all_interfaces: List['Interface'] = []
+    all_interfaces: List["Interface"] = []
 
     def __init__(
         self, name: str,
@@ -138,7 +135,7 @@ class Interface:
             details (Optional[Dict[str, str]]): Additional details related to ARP.
         """
         if ip_address and mac_address:
-            arp_info = {'mac_address': mac_address, 'details': details or {}}
+            arp_info = {"mac_address": mac_address, "details": details or {}}
             self.arp_infos[ip_address] = arp_info
 
     def update_arp_info(self, ip_address: str, details: Optional[Dict[str, str]] = None):
@@ -150,7 +147,7 @@ class Interface:
             details (Optional[Dict[str, str]]): Updated details related to ARP.
         """
         if ip_address in self.arp_infos:
-            self.arp_infos[ip_address]['details'].update(details or {})
+            self.arp_infos[ip_address]["details"].update(details or {})
 
     def get_infos(self):
         """
@@ -158,7 +155,7 @@ class Interface:
         """
         info_dict = self.__dict__.copy()
         # Remove any internal attributes or methods
-        info_dict.pop('arp_infos', None)
+        info_dict.pop("arp_infos", None)
         return info_dict
 
     def get_arp_info_by_ip(self, ip_address: str):
@@ -249,13 +246,13 @@ def create_unsafe_https_session():
     context.options |= ssl.OP_LEGACY_SERVER_CONNECT
 
     session = requests.session()
-    session.mount('https://', CustomSSLContextHTTPAdapter(context))
+    session.mount("https://", CustomSSLContextHTTPAdapter(context))
     session.headers.update(HEADERS)
     session.verify = False
 
     return session
 
-def signal_handler(sig, frame):
+def signal_handler(sig: int, frame: FrameType):
     if sig == 2: # means CTRL+C pressed
         cleanup_before_exit()
 
@@ -264,24 +261,22 @@ def cleanup_before_exit():
         return
     exit_signal.set()
 
-    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
-
     if (
         "stdout_render_core__thread" in globals()
         and stdout_render_core__thread.is_alive()
     ):
         stdout_render_core__thread.join()
 
-    """
-    capture.close()
+    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
-    I don't know why, but this trows me an error so I'll leave it commented until a fix is found.
 
-    The downside is that not gracefully closing the pyshark's capture can sometimes leaves stderr output
-    in the console if asyncio was currently working on something and we forces the script exiting.
 
-    For now I'm doing that, I think it helps a little bit:
-    """
+    # I don't know why, but this trows me an error so I'll leave it commented until a fix is found.
+    # The downside is that not gracefully closing the pyshark's capture can sometimes leaves stderr output
+    # in the console if asyncio was currently working on something and we forces the script exiting.
+    # For now I'm doing that, I think it helps a little bit:
+    #capture.close()
+
     if (
         "capture" in globals()
         and isinstance(capture, LiveCapture)
@@ -291,7 +286,7 @@ def cleanup_before_exit():
     sys.exit(0)
 
 def is_pyinstaller_compiled():
-    return getattr(sys, 'frozen', False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
+    return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
 def is_script_an_executable():
     return Path(sys.argv[0]).suffix.lower() == ".exe" # Check if the running Python script, command-line argument has a file extension ending with .exe
@@ -368,10 +363,8 @@ def get_vendor_name(mac_address: str):
     return vendor_name
 
 def get_and_parse_arp_cache():
-    # Change the code page to 65001
-    #subprocess.call('chcp 65001', shell=True)
-    # Run the arp command
-    arp_output = subprocess.check_output(['arp', '-a'], text=True)
+    #subprocess.call("chcp 65001", shell=True) # Changes the code page to 65001
+    arp_output = subprocess.check_output(["arp", "-a"], text=True)
 
     cached_arp_dict = {}
 
@@ -588,11 +581,11 @@ def update_and_initialize_geolite2_readers():
     msgbox_text = ""
 
     if update_geolite2_databases__dict["exception"]:
-        msgbox_text += f"Exception Error: {update_geolite2_databases__dict["exception"]}\n\n"
+        msgbox_text += f"Exception Error: {update_geolite2_databases__dict['exception']}\n\n"
         show_error = True
     if update_geolite2_databases__dict["url"]:
-        http_code_msgbox_error_text = f" (http_code: {update_geolite2_databases__dict["http_code"]})" if update_geolite2_databases__dict["http_code"] else ""
-        msgbox_text += f'Error: Failed fetching url: "{update_geolite2_databases__dict["url"]}"{http_code_msgbox_error_text}.\n'
+        http_code_msgbox_error_text = f" (http_code: {update_geolite2_databases__dict['http_code']})" if update_geolite2_databases__dict["http_code"] else ""
+        msgbox_text += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"{http_code_msgbox_error_text}.\n"
         msgbox_text += "Impossible to keep Maxmind's GeoLite2 IP-to-Country and ASN resolutions feature up-to-date.\n\n"
         show_error = True
 
@@ -615,12 +608,12 @@ def update_and_initialize_geolite2_readers():
     return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
 
 def reconstruct_settings():
-    print("\nCorrect reconstruction of 'Settings.ini' ...")
+    print("\nCorrect reconstruction of \"Settings.ini\" ...")
     text = f"""
         ;;-----------------------------------------------------------------------------
-        ;;Lines starting with ";;" symbols are commented lines.
+        ;;Lines starting with \";;\" symbols are commented lines.
         ;;
-        ;;This is the settings file for 'GTA V Session Sniffer' configuration.
+        ;;This is the settings file for \"GTA V Session Sniffer\" configuration.
         ;;
         ;;If you don't know what value to choose for a specifc setting, set it's value to None.
         ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
@@ -629,7 +622,7 @@ def reconstruct_settings():
         ;;Determine if you want or not to show the developper's advertisements in the script's display.
         ;;
         ;;<STDOUT_SHOW_DATE>
-        ;;Shows or not the date from which a player has been captured in "First Seen" and "Last Seen" fields.
+        ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
         ;;
         ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
         ;;Resets and recalculates each fields for players who were previously disconnected.
@@ -661,12 +654,12 @@ def reconstruct_settings():
         ;;<IP_ADDRESS>
         ;;The IP address of a network interface on your computer from which packets will be captured.
         ;;If the <ARP> setting is enabled, it can be from any device on your home network.
-        ;;Valid example value: 'x.x.x.x'
+        ;;Valid example value: \"x.x.x.x\"
         ;;
         ;;<MAC_ADDRESS>
         ;;The MAC address of a network interface on your computer from which packets will be captured.
         ;;If the <ARP> setting is enabled, it can be from any device on your home network.
-        ;;Valid example value: 'xx:xx:xx:xx:xx:xx' or 'xx-xx-xx-xx-xx-xx'
+        ;;Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
         ;;
         ;;<ARP>
         ;;Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
@@ -676,7 +669,7 @@ def reconstruct_settings():
         ;;
         ;;<PROGRAM_PRESET>
         ;;A program preset that will help capturing the right packets for your program.
-        ;;Supported program presets are only 'GTA5' and 'Minecraft'.
+        ;;Supported program presets are only \"GTA5\" and \"Minecraft\".
         ;;Note that Minecraft only supports Bedrock Edition.
         ;;Please also note that both of these have only been tested on PCs.
         ;;I do not have information regarding their functionality on consoles.
@@ -945,7 +938,6 @@ def apply_settings():
 
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
-atexit.register(cleanup_before_exit)
 exit_signal = threading.Event()
 
 if is_pyinstaller_compiled():
@@ -955,7 +947,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 21/03/2024 (21:16)"
+VERSION = "v1.0.7 - 22/03/2024 (18:45)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -978,7 +970,7 @@ SETTINGS_LIST = [
     "VPN_MODE",
     "LOW_PERFORMANCE_MODE"
 ]
-RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
+RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 s = create_unsafe_https_session()
 
 cls()
@@ -1038,7 +1030,7 @@ if error_updating__flag:
     msgbox_text = f"""
         ERROR: {TITLE} Failed updating itself.
 
-        Do you want to open the '{TITLE}' project download page ?
+        Do you want to open the \"{TITLE}\" project download page ?
         You can then download and run the latest version from there.
     """
     msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
@@ -1049,8 +1041,8 @@ if error_updating__flag:
         sys.exit(0)
 
 cls()
-title(f"Checking that 'Npcap' or 'WinpCap' driver is installed on your system - {TITLE}")
-print("\nChecking that 'Npcap' or 'WinpCap' driver is installed on your system ...\n")
+title(f"Checking that \"Npcap\" or \"WinpCap\" driver is installed on your system - {TITLE}")
+print("\nChecking that \"Npcap\" or \"WinpCap\" driver is installed on your system ...\n")
 
 while True:
     if npcap_or_winpcap_installed():
@@ -1059,10 +1051,10 @@ while True:
         webbrowser.open("https://nmap.org/npcap/")
         msgbox_title = TITLE
         msgbox_text = f"""
-            ERROR: {TITLE} could not detect the 'Npcap' or 'WinpCap' driver installed on your system.
+            ERROR: {TITLE} could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
 
-            Opening the 'Npcap' project download page for you.
-            You can then download and install it from there and press "Retry".
+            Opening the \"Npcap\" project download page for you.
+            You can then download and install it from there and press \"Retry\".
         """
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
@@ -1071,8 +1063,8 @@ while True:
             sys.exit(0)
 
 cls()
-title(f"Applying your custom settings from 'Settings.ini' - {TITLE}")
-print("\nApplying your custom settings from 'Settings.ini' ...\n")
+title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
+print("\nApplying your custom settings from \"Settings.ini\" ...\n")
 
 SETTINGS_PATH = Path("Settings.ini")
 
@@ -1146,10 +1138,10 @@ for interface, stats in net_io_stats.items():
 
             arp_info = [
                 {
-                    'ip_address': entry['ip_address'],
-                    'mac_address': entry['mac_address'],
-                    'vendor_name': (
-                        get_vendor_name(entry['mac_address'])
+                    "ip_address": entry["ip_address"],
+                    "mac_address": entry["mac_address"],
+                    "vendor_name": (
+                        get_vendor_name(entry["mac_address"])
                         or "N/A"
                     )
                 }
@@ -1185,10 +1177,10 @@ for interface in Interface.get_all_interfaces():
         counter += 1
 
         interfaces_options[counter] = {
-            'is_arp': False,
-            'Interface': interface.name,
-            'IP Address': ip_address,
-            'MAC Address': interface.mac_address
+            "is_arp": False,
+            "Interface": interface.name,
+            "IP Address": ip_address,
+            "MAC Address": interface.mac_address
         }
 
         table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, ip_address, interface.mac_address, interface.vendor_name])
@@ -1197,17 +1189,17 @@ for interface in Interface.get_all_interfaces():
         continue
 
     for ip_address, info in interface.get_all_arp_infos().items():
-        for detail in info['details']:
+        for detail in info["details"]:
             counter += 1
 
             interfaces_options[counter] = {
-                'is_arp': True,
-                'Interface': interface.name,
-                'IP Address': detail['ip_address'],
-                'MAC Address': detail['mac_address']
+                "is_arp": True,
+                "Interface": interface.name,
+                "IP Address": detail["ip_address"],
+                "MAC Address": detail["mac_address"]
             }
 
-            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{interface.name} (ARP)", "N/A", "N/A", detail['ip_address'], detail['mac_address'], detail['vendor_name']])
+            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{interface.name} (ARP)", "N/A", "N/A", detail["ip_address"], detail["mac_address"], detail["vendor_name"]])
 
 user_interface_selection = None
 
@@ -1287,8 +1279,8 @@ if PROGRAM_PRESET:
     elif PROGRAM_PRESET == "Minecraft":
         DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=49 and frame.len<=1498)")
 
-    # If the 'PROGRAM_PRESET' setting is set, automatically block RTCP connections.
-    # In case RTCP can be useful to get someone IP, I decided not to block them without using a 'PROGRAM_PRESET'.
+    # If the <PROGRAM_PRESET> setting is set, automatically blocks RTCP connections.
+    # In case RTCP can be useful to get someone IP, I decided not to block them without using a <PROGRAM_PRESET>.
     # RTCP is known to be for example the Discord's server IP while you are in a call there.
     # The "not rtcp" Display Filter have been heavily tested and I can confirm that it's indeed working correctly.
     # I know that eventually you will see their corresponding IPs time to time but I can guarantee that it does the job it is supposed to do.
@@ -1318,10 +1310,10 @@ while True:
         webbrowser.open("https://www.wireshark.org/download.html")
         msgbox_title = TITLE
         msgbox_text = f"""
-            ERROR: 'pyshark' Python module could not detect 'Tshark' installed on your system.
+            ERROR: \"pyshark\" Python module could not detect \"Tshark\" installed on your system.
 
-            Opening the 'Tshark' project download page for you.
-            You can then download and install it from there and press "Retry".
+            Opening the \"Tshark\" project download page for you.
+            You can then download and install it from there and press \"Retry\".
         """
         msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
@@ -1395,7 +1387,6 @@ def stdout_render_core():
     global pyshark_latency
 
     printer = PrintCacher()
-    refreshing_rate_t1 = time.perf_counter()
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1416,31 +1407,31 @@ def stdout_render_core():
 
             if player["datetime_left"]:
                 session_disconnected.append({
-                    'datetime_left': player['datetime_left'],
-                    'datetime_joined': player['datetime_joined'],
-                    'packets': f"{player['packets']}",
-                    'ip': f"{player['ip']}",
-                    'stdout_port_list': port_list_creation(Fore.RED),
-                    'country_name': f"{player['country_name']}",
-                    'country_iso': f"{player['country_iso']}",
-                    'asn': f"{player['asn']}"
+                    "datetime_left": player["datetime_left"],
+                    "datetime_joined": player["datetime_joined"],
+                    "packets": player["packets"],
+                    "ip": player["ip"],
+                    "stdout_port_list": port_list_creation(Fore.RED),
+                    "country_name": player["country_name"],
+                    "country_iso": player["country_iso"],
+                    "asn": player["asn"]
 
                 })
             else:
                 session_connected__padding_country_name = get_minimum_padding(player["country_name"], session_connected__padding_country_name, 27)
 
                 session_connected.append({
-                    'datetime_joined': player['datetime_joined'],
-                    'packets': f"{player['packets']}",
-                    'ip': f"{player['ip']}",
-                    'stdout_port_list': port_list_creation(Fore.GREEN),
-                    'country_name': f"{player['country_name']}",
-                    'country_iso': f"{player['country_iso']}",
-                    'asn': f"{player['asn']}"
+                    "datetime_joined": player["datetime_joined"],
+                    "packets": player["packets"],
+                    "ip": player["ip"],
+                    "stdout_port_list": port_list_creation(Fore.GREEN),
+                    "country_name": player["country_name"],
+                    "country_iso": player["country_iso"],
+                    "asn": player["asn"]
                 })
 
-        session_connected = sorted(session_connected, key=itemgetter('datetime_joined'))
-        session_disconnected = sorted(session_disconnected, key=itemgetter('datetime_left'))
+        session_connected = sorted(session_connected, key=itemgetter("datetime_joined"))
+        session_disconnected = sorted(session_disconnected, key=itemgetter("datetime_left"))
 
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
@@ -1472,7 +1463,7 @@ def stdout_render_core():
         printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
         printer.cache_print(f"-   " * 28)
-        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]['is_arp'] else "Disabled"
+        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         padding_width = calculate_padding_width(109, 44, len(str(IP_ADDRESS)), len(str(INTERFACE_NAME)), len(str(is_arp_enabled)))
         printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
         pyshark_average_latency = sum(pyshark_latency, timedelta(0)) / len(pyshark_latency) if pyshark_latency else timedelta(0)
@@ -1537,6 +1528,8 @@ def stdout_render_core():
         cls()
         printer.flush_cache()
 
+        refreshing_rate_t1 = time.perf_counter()
+        printed_text__flag = False
         while not exit_signal.is_set():
             refreshing_rate_t2 = time.perf_counter()
 
@@ -1550,23 +1543,24 @@ def stdout_render_core():
                     seconds_left = round(seconds_left)
                     sleep = 1
                 print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
+                printed_text__flag = True
 
                 time.sleep(sleep)
                 continue
 
             refreshing_rate_t1 = refreshing_rate_t2
             break
+        if (
+            exit_signal.is_set()
+            and printed_text__flag
+        ):
+            print("")
 
 def clear_recently_resolved_ips():
-    recently_resolved_ips.clear()
-
     if not exit_signal.is_set():
-        try:
-            Timer(1, clear_recently_resolved_ips).start()
-        except Exception as e:
-            if not exit_signal.is_set():
-                logger.debug(f"EXCEPTION: clear_recently_resolved_ips() [{exit_signal}], [{type(str(e))}], [{type(e).__name__}]")
-                raise
+        recently_resolved_ips.clear()
+
+        threading.Timer(1, clear_recently_resolved_ips).start()
 
 def packet_callback(packet: Packet):
     global pyshark_restarted_times
@@ -1633,25 +1627,22 @@ def packet_callback(packet: Packet):
 cls()
 title(TITLE)
 
+PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
+
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
-PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
+if LOW_PERFORMANCE_MODE:
+    recently_resolved_ips = set()
+    clear_recently_resolved_ips()
 
 while True:
-    if LOW_PERFORMANCE_MODE:
-        recently_resolved_ips = set()
-        clear_recently_resolved_ips()
-
     try:
         capture.apply_on_packets(callback=packet_callback)
     except ValueError as e:
         if str(e) == PACKET_CAPTURE_OVERFLOW:
-            capture.clear()
-            capture.close()
-
-            time.sleep(0.1)
-
+            #???capture.close()???
+            #???time.sleep(0.1)???
             continue
     except Exception as e:
         if not exit_signal.is_set():
