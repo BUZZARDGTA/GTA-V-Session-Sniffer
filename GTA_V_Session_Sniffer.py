@@ -269,8 +269,6 @@ def cleanup_before_exit():
 
     print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
-
-
     # I don't know why, but this trows me an error so I'll leave it commented until a fix is found.
     # The downside is that not gracefully closing the pyshark's capture can sometimes leaves stderr output
     # in the console if asyncio was currently working on something and we forces the script exiting.
@@ -350,12 +348,21 @@ def get_vendor_name(mac_address: str):
     if mac_address is None:
         return None
 
-    mac_address = mac_address.replace("-", ":").upper()
-
     try:
-        vendor_name: str = mac_lookup.lookup(mac_address)
+        vendor_name = mac_lookup.lookup(mac_address)
     except VendorNotFoundError:
-        vendor_name = None
+        return None
+
+    if not isinstance(vendor_name, str):
+        raise TypeError(
+            "\nERROR:\n"
+            "         Developer didn't expect this scenario to be possible.\n"
+            "\nINFOS:\n"
+            "         Vendor name is not a string\n"
+            "\nDEBUG:\n"
+            f"         vendor_name: {vendor_name}\n"
+            f"         type(vendor_name): {type(vendor_name)}"
+        )
 
     if vendor_name == "":
         return None
@@ -399,7 +406,7 @@ def get_and_parse_arp_cache():
             and is_mac_address(parts[1])
         ):
             ip_address = parts[0]
-            mac_address = parts[1].replace("-", ":").upper()
+            mac_address = format_mac_address(parts[1])
 
             cached_arp_dict[interface_index]["interface_arp_output"].append(
                 dict(
@@ -409,6 +416,9 @@ def get_and_parse_arp_cache():
             )
 
     return cached_arp_dict
+
+def format_mac_address(mac_address: str):
+    return mac_address.replace("-", ":").upper()
 
 def converts_pyshark_packet_timestamp_to_datetime_object(sniff_timestamp: str):
     return datetime.fromtimestamp(timestamp=float(sniff_timestamp))
@@ -619,7 +629,7 @@ def reconstruct_settings():
         ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
         ;;
         ;;<STDOUT_SHOW_ADVERTISING>
-        ;;Determine if you want or not to show the developper's advertisements in the script's display.
+        ;;Determine if you want or not to show the developer's advertisements in the script's display.
         ;;
         ;;<STDOUT_SHOW_DATE>
         ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
@@ -697,7 +707,7 @@ def apply_settings():
 
         if not settings_file_not_found:
             for line in SETTINGS:
-                line: str = line.rstrip("\n")
+                line = line.rstrip("\n")
                 corrected__line = line.strip()
 
                 if corrected__line.startswith(";;"):
@@ -820,7 +830,7 @@ def apply_settings():
                         reset_current_setting__flag = True
             if reset_current_setting__flag:
                 need_rewrite_settings = True
-                PLAYER_DISCONNECTED_TIMER = 10
+                PLAYER_DISCONNECTED_TIMER = 6
         elif setting == "PACKET_CAPTURE_OVERFLOW_TIMER":
             reset_current_setting__flag = False
             PACKET_CAPTURE_OVERFLOW_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
@@ -874,7 +884,7 @@ def apply_settings():
                 MAC_ADDRESS = None
             else:
                 if is_mac_address(MAC_ADDRESS):
-                    formatted_mac_address = MAC_ADDRESS.replace("-", ":").upper()
+                    formatted_mac_address = format_mac_address(MAC_ADDRESS)
                     if not formatted_mac_address == MAC_ADDRESS:
                         MAC_ADDRESS = formatted_mac_address
                         need_rewrite_settings = True
@@ -1106,16 +1116,23 @@ for interface, stats in net_io_stats.items():
         not ip_addresses
         or len(mac_addresses) > 1
     ):
-        raise ValueError(f"ERROR: Developper didn't expect some scenario to be possible.\nDEBUG: interface:{interface}, ip_address:{ip_addresses}, mac_address:{mac_addresses}")
+        raise ValueError(
+            "\nERROR:\n"
+            "         Developer didn't expect this scenario to be possible.\n"
+            "\nINFOS:\n"
+            "         It seems like an IP address has not been found within a network interface,\n"
+            "         or multiple MAC addresses have been found for this one.\n"
+            "\nDEBUG:\n"
+            f"         interface: {interface}\n"
+            f"         ip_addresses: {ip_addresses}\n"
+            f"         mac_addresses: {mac_addresses}"
+        )
 
     ip_addresses = [ip for ip in ip_addresses if is_private_device_ipv4(ip)]
     if not ip_addresses:
         continue
 
-    if mac_addresses:
-        mac_address = mac_addresses[0].replace("-", ":").upper()
-    else:
-        mac_address = None
+    mac_address = format_mac_address(mac_addresses[0]) if mac_addresses else None
 
     vendor_name = (
         get_vendor_name(mac_address)
@@ -1577,16 +1594,16 @@ def packet_callback(packet: Packet):
     if not "ip" in packet:
         return
 
-    source_address: str = packet.ip.src
-    destination_address: str = packet.ip.dst
+    source_address = packet.ip.src
+    destination_address = packet.ip.dst
     transport_layer = packet.transport_layer
 
     if source_address == IP_ADDRESS:
         target__ip = destination_address
-        target__port: int = packet[transport_layer].dstport
+        target__port = packet[transport_layer].dstport
     elif destination_address == IP_ADDRESS:
         target__ip = source_address
-        target__port: int = packet[transport_layer].srcport
+        target__port = packet[transport_layer].srcport
     else:
         return
 
