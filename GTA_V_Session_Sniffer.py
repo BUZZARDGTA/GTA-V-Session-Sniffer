@@ -381,7 +381,7 @@ def get_and_parse_arp_cache():
         parts = line.split()
 
         if (
-            len(parts) == 4
+            len(parts) >= 4
             and is_ipv4_address(parts[1])
             and parts[2] == "---"
             and is_hex(parts[3])
@@ -401,7 +401,7 @@ def get_and_parse_arp_cache():
             continue
 
         if (
-            len(parts) == 3
+            len(parts) >= 3
             and is_ipv4_address(parts[0])
             and is_mac_address(parts[1])
         ):
@@ -957,7 +957,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 22/03/2024 (18:45)"
+VERSION = "v1.0.7 - 23/03/2024 (23:35)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
