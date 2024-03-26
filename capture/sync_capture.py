@@ -89,8 +89,15 @@ def get_tshark_path(tshark_path: Path = None):
     possible_paths: List[Path] = []
 
     if tshark_path is not None:
-        user_tshark_path = tshark_path.parent / "tshark.exe"
-        possible_paths.insert(0, user_tshark_path)
+        if tshark_path.is_file():
+            if tshark_path.name.endswith("tshark.exe"):
+                user_tshark_path = tshark_path
+        elif tshark_path.is_dir():
+            if (tshark_path / "tshark.exe").is_file():
+                user_tshark_path = tshark_path / "tshark.exe"
+
+        if user_tshark_path:
+            possible_paths.insert(0, user_tshark_path)
 
     for env in ("ProgramFiles", "ProgramFiles(x86)"):
         program_files = Path(os.getenv(env))
