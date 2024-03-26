@@ -3,16 +3,13 @@
 # --------------------------------------------
 import wmi
 import psutil
-import pyshark
 import colorama
 import geoip2.errors
 import geoip2.database
 from colorama import Fore
 from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from prettytable import PrettyTable, SINGLE_BORDER
-from pyshark.packet.packet import Packet
-from pyshark.capture.live_capture import LiveCapture
-from pyshark.tshark.tshark import TSharkNotFoundException
+from capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -31,11 +28,12 @@ import textwrap
 import threading
 import subprocess
 import webbrowser
+import importlib.metadata
 from pathlib import Path
 from types import FrameType
 from operator import itemgetter
 from ipaddress import IPv4Address
-from typing import List, Dict, Optional
+from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
 
@@ -269,18 +267,6 @@ def cleanup_before_exit():
 
     print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
-    # I don't know why, but this trows me an error so I'll leave it commented until a fix is found.
-    # The downside is that not gracefully closing the pyshark's capture can sometimes leaves stderr output
-    # in the console if asyncio was currently working on something and we forces the script exiting.
-    # For now I'm doing that, I think it helps a little bit:
-    #capture.close()
-
-    if (
-        "capture" in globals()
-        and isinstance(capture, LiveCapture)
-    ):
-        time.sleep(1)
-
     sys.exit(0)
 
 def is_pyinstaller_compiled():
@@ -376,8 +362,6 @@ def get_and_parse_arp_cache():
     cached_arp_dict = {}
 
     for line in arp_output.splitlines():
-        line: str
-
         parts = line.split()
 
         if (
@@ -420,8 +404,8 @@ def get_and_parse_arp_cache():
 def format_mac_address(mac_address: str):
     return mac_address.replace("-", ":").upper()
 
-def converts_pyshark_packet_timestamp_to_datetime_object(sniff_timestamp: str):
-    return datetime.fromtimestamp(timestamp=float(sniff_timestamp))
+def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
+    return datetime.fromtimestamp(timestamp=float(packet_frame_time_epoch))
 
 def get_country_info(ip_address: str):
     country_name = "N/A"
@@ -594,14 +578,14 @@ def update_and_initialize_geolite2_readers():
         msgbox_text += f"Exception Error: {update_geolite2_databases__dict['exception']}\n\n"
         show_error = True
     if update_geolite2_databases__dict["url"]:
-        http_code_msgbox_error_text = f" (http_code: {update_geolite2_databases__dict['http_code']})" if update_geolite2_databases__dict["http_code"] else ""
-        msgbox_text += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"{http_code_msgbox_error_text}.\n"
-        msgbox_text += "Impossible to keep Maxmind's GeoLite2 IP-to-Country and ASN resolutions feature up-to-date.\n\n"
+        msgbox_text += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"."
+        if update_geolite2_databases__dict["http_code"]:
+            msgbox_text += f" (http_code: {update_geolite2_databases__dict['http_code']})"
+        msgbox_text += "\nImpossible to keep Maxmind's GeoLite2 IP-to-Country and ASN resolutions feature up-to-date.\n\n"
         show_error = True
 
     if exception__initialize_geolite2_readers:
         msgbox_text += f"Exception Error: {exception__initialize_geolite2_readers}\n\n"
-
         msgbox_text += "Now disabling MaxMind's GeoLite2 IP-to-Country and ASN resolutions feature.\n"
         msgbox_text += "Countrys and ASN from players won't shows up from the players fields."
         geoip2_enabled = False
@@ -611,7 +595,7 @@ def update_and_initialize_geolite2_readers():
 
     if show_error:
         msgbox_title = TITLE
-        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+        msgbox_text = msgbox_text.rstrip("\n")
         msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
         show_message_box(msgbox_title, msgbox_text, msgbox_style)
 
@@ -627,6 +611,10 @@ def reconstruct_settings():
         ;;
         ;;If you don't know what value to choose for a specifc setting, set it's value to None.
         ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
+        ;;
+        ;;<TSHARK_PATH>
+        ;;The full path to your "tshark.exe" executable.
+        ;;If not set, it will attempt to detect tshark from your Wireshark installation.
         ;;
         ;;<STDOUT_SHOW_ADVERTISING>
         ;;Determine if you want or not to show the developer's advertisements in the script's display.
@@ -700,7 +688,7 @@ def reconstruct_settings():
     SETTINGS_PATH.write_text(text, encoding="utf-8")
 
 def apply_settings():
-    global STDOUT_SHOW_ADVERTISING, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
+    global TSHARK_PATH, STDOUT_SHOW_ADVERTISING, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -753,6 +741,10 @@ def apply_settings():
         settings_file_not_found = False
 
     for setting in SETTINGS_LIST:
+        if setting == "TSHARK_PATH":
+            TSHARK_PATH, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if TSHARK_PATH is not None:
+                TSHARK_PATH = Path(TSHARK_PATH)
         if setting == "STDOUT_SHOW_ADVERTISING":
             STDOUT_SHOW_ADVERTISING, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if STDOUT_SHOW_ADVERTISING == "True":
@@ -957,12 +949,13 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 23/03/2024 (23:35)"
+VERSION = "v1.0.7 - 26/03/2024 (13:21)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
 }
 SETTINGS_LIST = [
+    "TSHARK_PATH",
     "STDOUT_SHOW_ADVERTISING",
     "STDOUT_SHOW_DATE",
     "STDOUT_RESET_INFOS_ON_CONNECTED",
@@ -982,6 +975,52 @@ SETTINGS_LIST = [
 ]
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 s = create_unsafe_https_session()
+
+cls()
+title(f"Checking that your Python packages versions matches with file \"requirements.txt\" - {TITLE}")
+print(f"\nChecking that your Python packages versions matches with file \"requirements.txt\" ...\n")
+
+def check_packages_version(third_party_packages: dict[str, str]):
+    outdated_packages = []
+
+    for package_name, required_version in third_party_packages.items():
+        installed_version = importlib.metadata.version(package_name)
+        if installed_version != required_version:
+            outdated_packages.append((package_name, installed_version, required_version))
+
+    return outdated_packages
+
+third_party_packages = {
+    "psutil": "5.9.8",
+    "requests": "2.31.0",
+    "urllib3": "2.2.1",
+    "WMI": "1.5.1"
+}
+
+outdated_packages: List[Tuple[str, str, str]] = check_packages_version(third_party_packages)
+if outdated_packages:
+    msgbox_text = "Your following packages are not up to date:\n\n"
+    msgbox_text += "Package Name\tInstalled version\tRequired version\n"
+
+    name_padding = len("Package Name") + 2
+    installed_padding = len("Installed version") + 2
+    required_padding = len("Required version") + 2
+
+
+    for package_info in outdated_packages:
+        package_name, installed_version, required_version = package_info
+
+        msgbox_text += f"{package_name.ljust(name_padding)}\t{installed_version.ljust(installed_padding)}\t{required_version}\n"
+
+    msgbox_text += f"\n\nKeeping your packages synced with \"{TITLE}\" ensures smooth script execution and prevents compatibility issues."
+    msgbox_text += "\n\nDo you want to ignore this warning and continue with script execution?"
+
+    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
+    msgbox_title = TITLE
+    errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+    if errorlevel != 6:
+        sys.exit(0)
+
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -1318,16 +1357,17 @@ if display_filter_protocols_to_exclude:
 
 while True:
     try:
-        capture = pyshark.LiveCapture(
+        capture = PacketCapture(
             interface = INTERFACE_NAME,
-            bpf_filter = BPF_FILTER,
-            display_filter = DISPLAY_FILTER
+            capture_filter = BPF_FILTER,
+            display_filter = DISPLAY_FILTER,
+            tshark_path = TSHARK_PATH
         )
     except TSharkNotFoundException:
         webbrowser.open("https://www.wireshark.org/download.html")
         msgbox_title = TITLE
         msgbox_text = f"""
-            ERROR: \"pyshark\" Python module could not detect \"Tshark\" installed on your system.
+            ERROR: Could not detect \"Tshark\" installed on your system.
 
             Opening the \"Tshark\" project download page for you.
             You can then download and install it from there and press \"Retry\".
@@ -1340,9 +1380,15 @@ while True:
     else:
         break
 
+if not capture.tshark__path == TSHARK_PATH:
+    TSHARK_PATH = capture.tshark__path
+    reconstruct_settings()
+
 session_db = []
-pyshark_latency = []
-pyshark_restarted_times = 0
+tshark_latency = []
+tshark_packets_per_second = 0
+pps = 0
+tshark_restarted_times = 0
 
 def stdout_render_core():
     def get_minimum_padding(var: str | int, max_padding: int, padding: int):
@@ -1401,7 +1447,7 @@ def stdout_render_core():
 
         return formatted_datetime
 
-    global pyshark_latency
+    global tshark_latency
 
     printer = PrintCacher()
 
@@ -1483,24 +1529,32 @@ def stdout_render_core():
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         padding_width = calculate_padding_width(109, 44, len(str(IP_ADDRESS)), len(str(INTERFACE_NAME)), len(str(is_arp_enabled)))
         printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
-        pyshark_average_latency = sum(pyshark_latency, timedelta(0)) / len(pyshark_latency) if pyshark_latency else timedelta(0)
-        pyshark_latency = []
+        tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
+        tshark_latency = []
 
         # Convert the average latency to seconds and round it to 1 decimal place
-        average_latency_seconds = pyshark_average_latency.total_seconds()
+        average_latency_seconds = tshark_average_latency.total_seconds()
         average_latency_rounded = round(average_latency_seconds, 1)
 
-        # Display the average latency rounded to 1 decimal place
-        if pyshark_average_latency >= timedelta(seconds=0.90 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
+        if tshark_average_latency >= timedelta(seconds=0.90 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
             color = Fore.RED
-        elif pyshark_average_latency >= timedelta(seconds=0.75 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
+        elif tshark_average_latency >= timedelta(seconds=0.75 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
             color = Fore.YELLOW
         else:
             color = Fore.GREEN
 
-        color_restarted_time = Fore.GREEN if pyshark_restarted_times == 0 else Fore.RED
-        padding_width = calculate_padding_width(109, 67, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(pyshark_restarted_times))), len(str(pyshark_restarted_times)))
-        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (pyshark restarted time{plural(pyshark_restarted_times)}:{color_restarted_time}{pyshark_restarted_times}{Fore.RESET})")
+        # For reference, in a GTA Online session with 28 players, the packets per second (PPS) typically range from 800 to 1500.
+        # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
+        if tshark_packets_per_second >= 3000: # Check if PPS exceeds 3000
+            pps_color = Fore.RED
+        elif tshark_packets_per_second >= 1500: # Check if PPS exceeds 1500
+            pps_color = Fore.YELLOW
+        else:
+            pps_color = Fore.GREEN
+
+        color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
+        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(tshark_packets_per_second)))
+        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{tshark_packets_per_second}{Fore.RESET}")
         printer.cache_print(f"-" * 109)
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
@@ -1571,7 +1625,7 @@ def stdout_render_core():
             exit_signal.is_set()
             and printed_text__flag
         ):
-            print("")
+            print("\033[K" + "\033[F", end="\r")
 
 def clear_recently_resolved_ips():
     if not exit_signal.is_set():
@@ -1579,31 +1633,39 @@ def clear_recently_resolved_ips():
 
         threading.Timer(1, clear_recently_resolved_ips).start()
 
+def clear_pps(tshark_packets_per_second_t1):
+    global pps, tshark_packets_per_second
+
+    if not exit_signal.is_set():
+        tshark_packets_per_second_t2 = time.perf_counter()
+        if tshark_packets_per_second_t2 - tshark_packets_per_second_t1 >= 1:
+            tshark_packets_per_second = pps
+            pps = 0
+            tshark_packets_per_second_t1 = tshark_packets_per_second_t2
+
+        threading.Timer(1, clear_pps, args=(tshark_packets_per_second_t1,)).start()
+
 def packet_callback(packet: Packet):
-    global pyshark_restarted_times
+    global pps, tshark_restarted_times
 
-    packet_timestamp = converts_pyshark_packet_timestamp_to_datetime_object(packet.sniff_timestamp)
+    pps += 1
+
+    packet_timestamp = converts_tshark_packet_timestamp_to_datetime_object(packet.frame.time_epoch)
     packet_latency = datetime.now() - packet_timestamp
-    pyshark_latency.append(packet_latency)
+    tshark_latency.append(packet_latency)
     if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
-        pyshark_restarted_times += 1
+        tshark_restarted_times += 1
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
-
-    # Believe it or not, this happened one time during my testings ...
-    # So instead of respawning "tshark.exe" due to a single weird packet, just ignore it.
-    if not "ip" in packet:
-        return
 
     source_address = packet.ip.src
     destination_address = packet.ip.dst
-    transport_layer = packet.transport_layer
 
     if source_address == IP_ADDRESS:
         target__ip = destination_address
-        target__port = packet[transport_layer].dstport
+        target__port = packet.udp.dstport
     elif destination_address == IP_ADDRESS:
         target__ip = source_address
-        target__port = packet[transport_layer].srcport
+        target__port = packet.udp.srcport
     else:
         return
 
@@ -1653,13 +1715,14 @@ if LOW_PERFORMANCE_MODE:
     recently_resolved_ips = set()
     clear_recently_resolved_ips()
 
+tshark_packets_per_second_t1 = time.perf_counter()
+clear_pps(tshark_packets_per_second_t1)
+
 while True:
     try:
         capture.apply_on_packets(callback=packet_callback)
     except ValueError as e:
         if str(e) == PACKET_CAPTURE_OVERFLOW:
-            #???capture.close()???
-            #???time.sleep(0.1)???
             continue
     except Exception as e:
         if not exit_signal.is_set():
