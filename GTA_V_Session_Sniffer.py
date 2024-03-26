@@ -949,7 +949,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 26/03/2024 (13:21)"
+VERSION = "v1.0.7 - 27/03/2024 (00:50)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1386,9 +1386,6 @@ if not capture.tshark__path == TSHARK_PATH:
 
 session_db = []
 tshark_latency = []
-tshark_packets_per_second = 0
-pps = 0
-tshark_restarted_times = 0
 
 def stdout_render_core():
     def get_minimum_padding(var: str | int, max_padding: int, padding: int):
@@ -1447,9 +1444,11 @@ def stdout_render_core():
 
         return formatted_datetime
 
-    global tshark_latency
+    global pps_counter, tshark_latency
 
     printer = PrintCacher()
+    pps_t1 = time.perf_counter()
+    packets_per_second = 0
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1543,18 +1542,25 @@ def stdout_render_core():
         else:
             color = Fore.GREEN
 
-        # For reference, in a GTA Online session with 28 players, the packets per second (PPS) typically range from 800 to 1500.
+        pps_t2 = time.perf_counter()
+        seconds_elapsed = pps_t2 - pps_t1
+        if seconds_elapsed >= 1:
+            packets_per_second = round(pps_counter / seconds_elapsed)
+            pps_counter = 0
+            pps_t1 = pps_t2
+
+        # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
         # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
-        if tshark_packets_per_second >= 3000: # Check if PPS exceeds 3000
+        if packets_per_second >= 3000: # Check if PPS exceeds 3000
             pps_color = Fore.RED
-        elif tshark_packets_per_second >= 1500: # Check if PPS exceeds 1500
+        elif packets_per_second >= 1500: # Check if PPS exceeds 1500
             pps_color = Fore.YELLOW
         else:
             pps_color = Fore.GREEN
 
         color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
-        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(tshark_packets_per_second)))
-        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{tshark_packets_per_second}{Fore.RESET}")
+        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(packets_per_second)))
+        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{packets_per_second}{Fore.RESET}")
         printer.cache_print(f"-" * 109)
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
@@ -1633,22 +1639,10 @@ def clear_recently_resolved_ips():
 
         threading.Timer(1, clear_recently_resolved_ips).start()
 
-def clear_pps(tshark_packets_per_second_t1):
-    global pps, tshark_packets_per_second
-
-    if not exit_signal.is_set():
-        tshark_packets_per_second_t2 = time.perf_counter()
-        if tshark_packets_per_second_t2 - tshark_packets_per_second_t1 >= 1:
-            tshark_packets_per_second = pps
-            pps = 0
-            tshark_packets_per_second_t1 = tshark_packets_per_second_t2
-
-        threading.Timer(1, clear_pps, args=(tshark_packets_per_second_t1,)).start()
-
 def packet_callback(packet: Packet):
-    global pps, tshark_restarted_times
+    global pps_counter, tshark_restarted_times
 
-    pps += 1
+    pps_counter += 1
 
     packet_timestamp = converts_tshark_packet_timestamp_to_datetime_object(packet.frame.time_epoch)
     packet_latency = datetime.now() - packet_timestamp
@@ -1707,6 +1701,8 @@ cls()
 title(TITLE)
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
+pps_counter = 0
+tshark_restarted_times = 0
 
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
@@ -1714,9 +1710,6 @@ stdout_render_core__thread.start()
 if LOW_PERFORMANCE_MODE:
     recently_resolved_ips = set()
     clear_recently_resolved_ips()
-
-tshark_packets_per_second_t1 = time.perf_counter()
-clear_pps(tshark_packets_per_second_t1)
 
 while True:
     try:
