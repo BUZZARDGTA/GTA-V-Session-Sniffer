@@ -1380,8 +1380,8 @@ while True:
     else:
         break
 
-if not capture.tshark__path == TSHARK_PATH:
-    TSHARK_PATH = capture.tshark__path
+if not capture.tshark_path == TSHARK_PATH:
+    TSHARK_PATH = capture.tshark_path
     reconstruct_settings()
 
 session_db = []

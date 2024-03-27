@@ -38,10 +38,13 @@ class PacketCapture:
         display_filter: None | str = None,
         tshark_path: Path = None
     ):
-        self.tshark__path = get_tshark_path(tshark_path)
-        self.tshark__process = None
-        self.command = [
-            self.tshark__path,
+        self.interface = interface
+        self.capture_filter = capture_filter
+        self.display_filter = display_filter
+        self.tshark_path = get_tshark_path(tshark_path)
+
+        self._tshark_command  = [
+            self.tshark_path,
             '-l',
             '-n',
             '-Q',
@@ -58,6 +61,7 @@ class PacketCapture:
             '-e', 'udp.srcport',
             '-e', 'udp.dstport',
         ]
+        self._tshark__process = None
 
     def apply_on_packets(self, callback: Callable[[Packet], None]):
         for packet in self._capture_packets():
@@ -67,15 +71,15 @@ class PacketCapture:
         def process_tshark_stdout(line: str):
             return line.rstrip().split('|', 4)
 
-        self.tshark__process = subprocess.Popen(
-            self.command,
+        with subprocess.Popen(
+            self._tshark_command,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True
-        )
-        assert self.tshark__process.stdout
+        ) as process:
+            self._tshark__process = process
 
-        yield from (Packet(fields) for fields in map(process_tshark_stdout, self.tshark__process.stdout))
+            yield from (Packet(fields) for fields in map(process_tshark_stdout, process.stdout))
 
 def get_tshark_path(tshark_path: Path = None):
     """Finds the path of the tshark executable.
