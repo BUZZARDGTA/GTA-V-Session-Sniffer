@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 
 
 class TSharkNotFoundException(Exception):
@@ -59,7 +59,7 @@ class PacketCapture:
             '-e', 'udp.dstport',
         ]
 
-    def apply_on_packets(self, callback):
+    def apply_on_packets(self, callback: Callable[[Packet], None]):
         for packet in self._capture_packets():
             callback(packet)
 
