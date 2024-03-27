@@ -111,6 +111,6 @@ def get_tshark_path(tshark_path: Path = None):
             return path
 
     raise TSharkNotFoundException(
-        "TShark not found. Try adding its location to the configuration file. "
-        f"Searched these paths: {[path for path in possible_paths]}"
+        f"TShark not found. Try adding its location to the configuration file.\n"
+        f"Searched these paths: {', '.join(f'\"{path}\"' for path in possible_paths)}"
     )
