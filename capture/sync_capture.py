@@ -89,6 +89,8 @@ def get_tshark_path(tshark_path: Path = None):
     possible_paths: List[Path] = []
 
     if tshark_path is not None:
+        user_tshark_path = None
+
         if tshark_path.is_file():
             if tshark_path.name.endswith("tshark.exe"):
                 user_tshark_path = tshark_path
