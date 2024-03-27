@@ -1,4 +1,5 @@
 /.devfolder
+/capture/__pycache__
 /GeoLite2 Databases
 Settings.ini
 debug.log
