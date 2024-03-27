@@ -356,8 +356,15 @@ def get_vendor_name(mac_address: str):
     return vendor_name
 
 def get_and_parse_arp_cache():
-    #subprocess.call("chcp 65001", shell=True) # Changes the code page to 65001
-    arp_output = subprocess.check_output(["arp", "-a"], text=True)
+    ## Changes the code page to 65001
+    #arp_output = subprocess.check_output([
+    #    "chcp", "65001",
+    #    "&",
+    #    "arp", "-a"
+    #], shell=True, text=True)
+    arp_output = subprocess.check_output([
+        "arp", "-a"
+    ], text=True)
 
     cached_arp_dict = {}
 
