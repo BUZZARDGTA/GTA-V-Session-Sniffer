@@ -7,6 +7,7 @@ import colorama
 import geoip2.errors
 import geoip2.database
 from colorama import Fore
+from wmi import _wmi_namespace, _wmi_object
 from mac_vendor_lookup import MacLookup, VendorNotFoundError
 from prettytable import PrettyTable, SINGLE_BORDER
 from capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
@@ -323,10 +324,29 @@ def is_private_device_ipv4(ip_address: str):
 
     return True
 
-def get_interface_info(InterfaceIndex: str):
-    c = wmi.WMI()
+def get_interface_info(interface_index: str):
+    c: _wmi_namespace = wmi.WMI()
+    if not isinstance(c, _wmi_namespace):
+        raise TypeError(f"Expected '_wmi_namespace' object, got '{type(c)}'")
 
-    interfaces = c.Win32_NetworkAdapter(InterfaceIndex=InterfaceIndex)
+    interfaces: list[_wmi_object] = c.Win32_NetworkAdapter(InterfaceIndex=interface_index)
+    if not isinstance(interfaces, list):
+        raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
+    for interface in interfaces:
+        if not isinstance(interface, _wmi_object):
+            raise TypeError(f"Expected '_wmi_object' object, got '{type(interface)}'")
+
+    if len(interfaces) != 1:
+        raise ValueError(
+            "\nERROR:\n"
+            "         Developer didn't expect this scenario to be possible.\n"
+            "\nINFOS:\n"
+            "         \"WMI\" Python's module did not return a single interface for a given interface Index.\n"
+            "\nDEBUG:\n"
+            f"         interface_index: {interface_index}\n"
+            f"         interfaces: {interfaces}\n"
+            f"         len(interfaces): {len(interfaces)}"
+        )
 
     return interfaces[0]
 
@@ -380,7 +400,20 @@ def get_and_parse_arp_cache():
             interface_index = hex_to_int(parts[3])
             interface_info = get_interface_info(interface_index)
 
-            interface_name = interface_info.NetConnectionID
+            interface_name: str | None = interface_info.NetConnectionID
+            if not isinstance(interface_name, str):
+                if interface_name is None:
+                    raise TypeError(
+                        "\nERROR:\n"
+                        "         Developer didn't expect this scenario to be possible.\n"
+                        "\nINFOS:\n"
+                        "         \"WMI\" Python module returned \"None\" for the interface name when a string was expected.\n"
+                        "\nDEBUG:\n"
+                        f"         interface_index: {interface_index}\n"
+                        f"         interface_name: {interface_name}"
+                    )
+                raise TypeError(f"Expected 'str', got '{type(interface_name)}'")
+
             interface_ip_address = parts[1]
 
             cached_arp_dict[interface_index] = dict(
@@ -956,7 +989,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 27/03/2024 (00:50)"
+VERSION = "v1.0.7 - 28/03/2024 (10:46)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
