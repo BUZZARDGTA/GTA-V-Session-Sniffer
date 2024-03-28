@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable
 
 
 class TSharkNotFoundException(Exception):
@@ -90,7 +90,7 @@ def get_tshark_path(tshark_path: Path = None):
     :param tshark_path: Path of the tshark binary
     :raises TSharkNotFoundException in case TShark is not found in any location.
     """
-    possible_paths: List[Path] = []
+    possible_paths: list[Path] = []
 
     if tshark_path is not None:
         user_tshark_path = None

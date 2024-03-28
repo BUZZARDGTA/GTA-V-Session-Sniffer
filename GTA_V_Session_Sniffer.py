@@ -33,7 +33,7 @@ from pathlib import Path
 from types import FrameType
 from operator import itemgetter
 from ipaddress import IPv4Address
-from typing import List, Dict, Tuple, Optional
+from typing import Optional
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
 
@@ -64,10 +64,10 @@ class Version:
         return self.version_date
 
 class Updater:
-    def __init__(self, current_version: str):
+    def __init__(self, current_version: Version):
         self.current_version = current_version
 
-    def check_for_update(self, latest_version: str):
+    def check_for_update(self, latest_version: Version):
         if latest_version.major > self.current_version.major:
             return True
         elif latest_version.major == self.current_version.major:
@@ -104,11 +104,11 @@ class Msgbox(enum.IntFlag):
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class Interface:
-    all_interfaces: List["Interface"] = []
+    all_interfaces: list["Interface"] = []
 
     def __init__(
         self, name: str,
-        ip_addresses: List[str] = None,
+        ip_addresses: list[str] = None,
         mac_address: str = None,
         vendor_name: str = None,
         packets_sent: int = None,
@@ -120,10 +120,10 @@ class Interface:
         self.vendor_name = vendor_name
         self.packets_sent = packets_sent
         self.packets_recv = packets_recv
-        self.arp_infos: Dict[str, dict] = {}
+        self.arp_infos: dict[str, dict] = {}
         Interface.all_interfaces.append(self)
 
-    def add_arp_info(self, ip_address: str, mac_address: str, details: Optional[Dict[str, str]] = None):
+    def add_arp_info(self, ip_address: str, mac_address: str, details: Optional[dict[str, str]] = None):
         """
         Add ARP information for the given IP and MAC addresses.
 
@@ -136,7 +136,7 @@ class Interface:
             arp_info = {"mac_address": mac_address, "details": details or {}}
             self.arp_infos[ip_address] = arp_info
 
-    def update_arp_info(self, ip_address: str, details: Optional[Dict[str, str]] = None):
+    def update_arp_info(self, ip_address: str, details: Optional[dict[str, str]] = None):
         """
         Update ARP information for the given IP address.
 
@@ -1004,7 +1004,7 @@ third_party_packages = {
     "WMI": "1.5.1"
 }
 
-outdated_packages: List[Tuple[str, str, str]] = check_packages_version(third_party_packages)
+outdated_packages: list[tuple[str, str, str]] = check_packages_version(third_party_packages)
 if outdated_packages:
     msgbox_text = "Your following packages are not up to date:\n\n"
     msgbox_text += "Package Name\tInstalled version\tRequired version\n"
