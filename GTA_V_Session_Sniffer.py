@@ -376,21 +376,24 @@ def get_vendor_name(mac_address: str):
     return vendor_name
 
 def get_and_parse_arp_cache():
+    def process_arp_output(arp_output: str):
+        return arp_output.split(maxsplit=5)
+
     ## Changes the code page to 65001
     #arp_output = subprocess.check_output([
     #    "chcp", "65001",
     #    "&",
     #    "arp", "-a"
     #], shell=True, text=True)
+
+    # deepcode ignore HandleUnicode: Strings in Python 3 are already Unicode by default.
     arp_output = subprocess.check_output([
         "arp", "-a"
     ], text=True)
 
     cached_arp_dict = {}
 
-    for line in arp_output.splitlines():
-        parts = line.split()
-
+    for parts in map(process_arp_output, arp_output.splitlines()):
         if (
             len(parts) >= 4
             and is_ipv4_address(parts[1])
@@ -442,6 +445,17 @@ def get_and_parse_arp_cache():
     return cached_arp_dict
 
 def format_mac_address(mac_address: str):
+    if not is_mac_address(mac_address):
+        raise ValueError(
+            "\nERROR:\n"
+            "         Developer didn't expect this scenario to be possible.\n"
+            "\nINFOS:\n"
+            "         It seems like a MAC address does not follow \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\" format."
+            "\nDEBUG:\n"
+            f"         mac_address: {mac_address}"
+        )
+
+    # deepcode ignore AttributeLoadOnNone: It's impossible for 'mac_address' to be 'None' at this point. If it were 'None', a TypeError would have been raised earlier in the code, most likely from the 'is_mac_address()' function.
     return mac_address.replace("-", ":").upper()
 
 def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
@@ -1497,9 +1511,15 @@ def stdout_render_core():
         session_disconnected = []
 
         for player in session_db:
-            if not player["datetime_left"]:
-                if (datetime.now() - player["t1"]) > timedelta(seconds=PLAYER_DISCONNECTED_TIMER):
-                    player["datetime_left"] = player["t1"]
+            date_time_now = datetime.now()
+
+            if (
+                not player["datetime_left"]
+                and (date_time_now - player["datetime_last_seen"]) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
+            ):
+               player["datetime_left"] = player["datetime_last_seen"]
+               player["pps"] = 0
+               player["packets_per_second"] = 0
 
             if not "asn" in player:
                 player["asn"] = get_asn_info(player["ip"])
@@ -1509,22 +1529,28 @@ def stdout_render_core():
 
             if player["datetime_left"]:
                 session_disconnected.append({
-                    "datetime_left": player["datetime_left"],
-                    "datetime_joined": player["datetime_joined"],
+                    "datetime_last_seen": player["datetime_last_seen"],
+                    "datetime_first_seen": player["datetime_first_seen"],
                     "packets": player["packets"],
                     "ip": player["ip"],
                     "stdout_port_list": port_list_creation(Fore.RED),
                     "country_name": player["country_name"],
                     "country_iso": player["country_iso"],
                     "asn": player["asn"]
-
                 })
             else:
                 session_connected__padding_country_name = get_minimum_padding(player["country_name"], session_connected__padding_country_name, 27)
 
+                player_time_delta: timedelta = (date_time_now - player["pps_t1"])
+                if player_time_delta >= timedelta(seconds=1):
+                    player["packets_per_second"] = round(player["pps_counter"] / player_time_delta.total_seconds())
+                    player["pps_counter"] = 0
+                    player["pps_t1"] = date_time_now
+
                 session_connected.append({
-                    "datetime_joined": player["datetime_joined"],
+                    "datetime_first_seen": player["datetime_first_seen"],
                     "packets": player["packets"],
+                    "packets_per_second": player["packets_per_second"],
                     "ip": player["ip"],
                     "stdout_port_list": port_list_creation(Fore.GREEN),
                     "country_name": player["country_name"],
@@ -1532,8 +1558,8 @@ def stdout_render_core():
                     "asn": player["asn"]
                 })
 
-        session_connected = sorted(session_connected, key=itemgetter("datetime_joined"))
-        session_disconnected = sorted(session_disconnected, key=itemgetter("datetime_left"))
+        session_connected = sorted(session_connected, key=itemgetter("datetime_first_seen"))
+        session_disconnected = sorted(session_disconnected, key=itemgetter("datetime_last_seen"))
 
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
@@ -1576,11 +1602,11 @@ def stdout_render_core():
         average_latency_rounded = round(average_latency_seconds, 1)
 
         if tshark_average_latency >= timedelta(seconds=0.90 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
-            color = Fore.RED
+            latency_color = Fore.RED
         elif tshark_average_latency >= timedelta(seconds=0.75 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
-            color = Fore.YELLOW
+            latency_color = Fore.YELLOW
         else:
-            color = Fore.GREEN
+            latency_color = Fore.GREEN
 
         pps_t2 = time.perf_counter()
         seconds_elapsed = pps_t2 - pps_t1
@@ -1600,42 +1626,37 @@ def stdout_render_core():
 
         color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
         padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(packets_per_second)))
-        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{color}{average_latency_rounded}{Fore.RESET}/{color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{packets_per_second}{Fore.RESET}")
+        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{packets_per_second}{Fore.RESET}")
         printer.cache_print(f"-" * 109)
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-        connected_players_table.field_names = ["First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
+        connected_players_table.field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]
         connected_players_table.align = "l"
-        connected_players_table.add_rows(
-            [
-                f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
-                f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
-                f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
-                f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}",
-                f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
-                f"{Fore.GREEN}{player['asn']}{Fore.RESET}"
-            ]
-            for player in session_connected
-        )
+        connected_players_table.add_rows([
+            f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_first_seen'])}{Fore.RESET}",
+            f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
+            f"{Fore.GREEN}{player['packets_per_second']}{Fore.RESET}",
+            f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
+            f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}",
+            f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+            f"{Fore.GREEN}{player['asn']}{Fore.RESET}"
+        ] for player in session_connected)
 
         disconnected_players_table = PrettyTable()
         disconnected_players_table.set_style(SINGLE_BORDER)
         disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
         disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
         disconnected_players_table.align = "l"
-        disconnected_players_table.add_rows(
-            [
-                f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_left'])}{Fore.RESET}",
-                f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_joined'])}{Fore.RESET}",
-                f"{Fore.RED}{player['packets']}{Fore.RESET}",
-                f"{Fore.RED}{player['ip']}{Fore.RESET}",
-                f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}",
-                f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
-                f"{Fore.RED}{player['asn']}{Fore.RESET}"
-            ]
-            for player in session_disconnected__stdout_counter
-        )
+        disconnected_players_table.add_rows([
+            f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_last_seen'])}{Fore.RESET}",
+            f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_first_seen'])}{Fore.RESET}",
+            f"{Fore.RED}{player['packets']}{Fore.RESET}",
+            f"{Fore.RED}{player['ip']}{Fore.RESET}",
+            f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}",
+            f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
+            f"{Fore.RED}{player['asn']}{Fore.RESET}"
+        ] for player in session_disconnected__stdout_counter)
 
         printer.cache_print("")
         printer.cache_print(connected_players_table.get_string())
@@ -1715,24 +1736,27 @@ def packet_callback(packet: Packet):
                     session_db.remove(player)
                     break
                 player["datetime_left"] = None
-            player["t1"] = packet_timestamp
+            player["datetime_last_seen"] = packet_timestamp
             player["packets"] += 1
+            player["pps_counter"] += 1
             if target__port not in player["ports"]:
                 player["ports"].append(target__port)
-            if player["last_port"] != target__port:
-                player["last_port"] = target__port
+            player["last_port"] = target__port
 
             return
 
     session_db.append(
         dict(
-            t1 = packet_timestamp,
             packets = 1,
+            pps_counter = 0,
+            pps_t1 = packet_timestamp,
+            packets_per_second = 0,
             ip = target__ip,
             ports = [target__port],
             first_port = target__port,
             last_port = target__port,
-            datetime_joined = packet_timestamp,
+            datetime_first_seen = packet_timestamp,
+            datetime_last_seen = packet_timestamp,
             datetime_left = None
         )
     )
@@ -1744,6 +1768,7 @@ PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 pps_counter = 0
 tshark_restarted_times = 0
 
+# deepcode ignore MissingAPI: <please specify a reason of ignoring this>
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
