@@ -1498,6 +1498,17 @@ def stdout_render_core():
 
         return formatted_datetime
 
+    def format_player_pps(packets_per_second: int):
+        # TODO: Add that it's not red when new people are showd
+        if packets_per_second == 0:
+            pps_color = Fore.RED
+        elif packets_per_second == 1:
+            pps_color = Fore.YELLOW
+        else:
+            pps_color = Fore.GREEN
+
+        return f"{pps_color}{packets_per_second}{Fore.RESET}"
+
     global pps_counter, tshark_latency
 
     printer = PrintCacher()
@@ -1510,16 +1521,15 @@ def stdout_render_core():
         session_connected = []
         session_disconnected = []
 
-        for player in session_db:
-            date_time_now = datetime.now()
+        date_time_now = datetime.now()
+        time_perf_counter = time.perf_counter()
 
+        for player in session_db:
             if (
                 not player["datetime_left"]
                 and (date_time_now - player["datetime_last_seen"]) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
             ):
                player["datetime_left"] = player["datetime_last_seen"]
-               player["pps"] = 0
-               player["packets_per_second"] = 0
 
             if not "asn" in player:
                 player["asn"] = get_asn_info(player["ip"])
@@ -1608,7 +1618,7 @@ def stdout_render_core():
         else:
             latency_color = Fore.GREEN
 
-        pps_t2 = time.perf_counter()
+        pps_t2 = time_perf_counter
         seconds_elapsed = pps_t2 - pps_t1
         if seconds_elapsed >= 1:
             packets_per_second = round(pps_counter / seconds_elapsed)
@@ -1636,7 +1646,7 @@ def stdout_render_core():
         connected_players_table.add_rows([
             f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_first_seen'])}{Fore.RESET}",
             f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
-            f"{Fore.GREEN}{player['packets_per_second']}{Fore.RESET}",
+            f"{Fore.GREEN}{format_player_pps(player['packets_per_second'])}{Fore.RESET}",
             f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
             f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}",
             f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
@@ -1666,7 +1676,7 @@ def stdout_render_core():
         cls()
         printer.flush_cache()
 
-        refreshing_rate_t1 = time.perf_counter()
+        refreshing_rate_t1 = time_perf_counter
         printed_text__flag = False
         while not exit_signal.is_set():
             refreshing_rate_t2 = time.perf_counter()
@@ -1735,21 +1745,24 @@ def packet_callback(packet: Packet):
                 if STDOUT_RESET_INFOS_ON_CONNECTED:
                     session_db.remove(player)
                     break
+                player["pps_t1"] = packet_timestamp
+                player["pps_counter"] = 0
                 player["datetime_left"] = None
-            player["datetime_last_seen"] = packet_timestamp
+            else:
+                player["pps_counter"] += 1
             player["packets"] += 1
-            player["pps_counter"] += 1
             if target__port not in player["ports"]:
                 player["ports"].append(target__port)
             player["last_port"] = target__port
+            player["datetime_last_seen"] = packet_timestamp
 
             return
 
     session_db.append(
         dict(
             packets = 1,
-            pps_counter = 0,
             pps_t1 = packet_timestamp,
+            pps_counter = 0,
             packets_per_second = 0,
             ip = target__ip,
             ports = [target__port],
