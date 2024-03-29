@@ -273,9 +273,6 @@ def cleanup_before_exit():
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
-def is_script_an_executable():
-    return Path(sys.argv[0]).suffix.lower() == ".exe" # Check if the running Python script, command-line argument has a file extension ending with .exe
-
 def title(title: str):
     print(f"\033]0;{title}\007", end="")
 
@@ -1095,8 +1092,8 @@ try:
 except:
     error_updating__flag = True
 else:
-    error_updating__flag = False
     if response.status_code == 200:
+        error_updating__flag = False
         current_version = Version(VERSION)
         latest_version = Version(response.text)
         if Updater(current_version).check_for_update(latest_version):
@@ -1111,20 +1108,8 @@ else:
             msgbox_style = Msgbox.YesNo | Msgbox.Question
             errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
             if errorlevel == 6:
-                if is_script_an_executable():
-                    webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-                    sys.exit(0)
-                try:
-                    response = s.get("https://raw.githubusercontent.com/Illegal-Services/GTA-V-Session-Sniffer/main/GTA_V_Session_Sniffer.py")
-                except:
-                    error_updating__flag = True
-                else:
-                    if response.status_code == 200:
-                        Path(f"{Path(__file__).name}").write_bytes(response.content)
-                        subprocess.Popen(["start", "python", f"{Path(__file__).name}"], shell=True)
-                        sys.exit(0)
-                    else:
-                        error_updating__flag = True
+                webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
+                sys.exit(0)
     else:
         error_updating__flag = True
 
