@@ -229,19 +229,21 @@ class Player:
         self.rejoined = None
 
 class PlayersRegistry:
-    def __init__(self):
-        self.players: dict[str, Player] = {}
+    players_registry: dict[str, Player] = {}
 
-    def add_player(self, player: Player):
-        if player.ip in self.players:
+    @classmethod
+    def add_player(cls, player: Player):
+        if player.ip in cls.players_registry:
             raise ValueError(f"Player with IP \"{player.ip}\" already exists.")
-        self.players[player.ip] = player
+        cls.players_registry[player.ip] = player
 
-    def get_player(self, ip: str):
-        return self.players.get(ip)
+    @classmethod
+    def get_player(cls, ip: str):
+        return cls.players_registry.get(ip)
 
-    def iterate_players_from_registry(self):
-        for player in self.players.values():
+    @classmethod
+    def iterate_players_from_registry(cls):
+        for player in cls.players_registry.values():
             yield player
 
 def create_unsafe_https_session():
@@ -1038,7 +1040,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 28/03/2024 (10:46)"
+VERSION = "v1.0.7 - 30/03/2024 (10:12)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1461,7 +1463,6 @@ if not capture.tshark_path == TSHARK_PATH:
     TSHARK_PATH = capture.tshark_path
     reconstruct_settings()
 
-players_registry = PlayersRegistry()
 tshark_latency = []
 
 def stdout_render_core():
@@ -1522,7 +1523,6 @@ def stdout_render_core():
         return formatted_datetime
 
     def format_player_pps(is_pps_first_calculation: bool, packets_per_second: int):
-        # TODO: Add that it's not red when new people are showd
         if packets_per_second == 0:
             if is_pps_first_calculation:
                 pps_color = Fore.GREEN
@@ -1550,7 +1550,7 @@ def stdout_render_core():
         date_time_now = datetime.now()
         time_perf_counter = time.perf_counter()
 
-        for player in players_registry.iterate_players_from_registry():
+        for player in PlayersRegistry.iterate_players_from_registry():
             if (
                 not player.datetime_left
                 and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
@@ -1748,9 +1748,9 @@ def packet_callback(packet: Packet):
             return
         recently_resolved_ips.add(target__ip)
 
-    player = players_registry.get_player(target__ip)
+    player = PlayersRegistry.get_player(target__ip)
     if player is None:
-        players_registry.add_player(
+        PlayersRegistry.add_player(
             Player(packet_timestamp, target__ip, target__port)
         )
         return
@@ -1760,13 +1760,14 @@ def packet_callback(packet: Packet):
     if not player.datetime_left:
         player.rejoined = False
 
+        player.datetime_last_seen = packet_timestamp
+
         player.packets += 1
         player.pps_counter += 1
 
         if target__port not in player.ports:
             player.ports.append(target__port)
         player.last_port = target__port
-        player.datetime_last_seen = packet_timestamp
 
         return
 
