@@ -197,8 +197,10 @@ class ThirdPartyServers(enum.Enum):
 class PrintCacher:
     def __init__(self):
         self.cache = []
-    def cache_print(self, statement: str):
-        self.cache.append(statement)
+
+    def cache_print(self, string: str):
+        self.cache.append(string)
+
     def flush_cache(self):
         print("\n".join(self.cache))
         self.cache = []
@@ -431,7 +433,7 @@ def get_and_parse_arp_cache():
         "arp", "-a"
     ], text=True)
 
-    cached_arp_dict = {}
+    cached_arp_dict: dict[int, dict[str, str | list[Optional[dict[str, str]]]]] = {}
 
     for parts in map(process_arp_output, arp_output.splitlines()):
         if (
@@ -1040,7 +1042,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 30/03/2024 (10:12)"
+VERSION = "v1.0.7 - 30/03/2024 (10:47)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
@@ -1263,7 +1265,7 @@ for interface, stats in net_io_stats.items():
         continue
 
     for ip_address in ip_addresses:
-        for interface_index, interface_info in cached_arp_dict.items():
+        for interface_info in cached_arp_dict.values():
             if (
                 not interface_info["interface_name"] == interface
                 or not interface_info["interface_ip_address"] == ip_address
@@ -1271,7 +1273,7 @@ for interface, stats in net_io_stats.items():
             ):
                 continue
 
-            arp_info = [
+            arp_info: dict[str, str] = [
                 {
                     "ip_address": entry["ip_address"],
                     "mac_address": entry["mac_address"],
