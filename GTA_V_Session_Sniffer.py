@@ -77,7 +77,6 @@ class Settings:
     BLOCK_THIRD_PARTY_SERVERS = True
     PROGRAM_PRESET = None
     VPN_MODE = False
-    LOW_PERFORMANCE_MODE = False
 
     @classmethod
     def iterate_over_settings(cls):
@@ -185,11 +184,6 @@ class Settings:
             ;;<VPN_MODE>
             ;;Setting this to False will add filters to exclude unrelated IPs from the output.
             ;;However, if you are scanning trough a VPN <INTERFACE_NAME>, you have to set it to True.
-            ;;
-            ;;<LOW_PERFORMANCE_MODE>
-            ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
-            ;;consider setting this to True. This will reduce the resource usage on your computer.
-            ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
             ;;-----------------------------------------------------------------------------
         """
         text = textwrap.dedent(text.removeprefix("\n"))
@@ -429,11 +423,6 @@ class Settings:
                 elif setting_name == "VPN_MODE":
                     try:
                         Settings.VPN_MODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
-                    except InvalidBooleanValueError:
-                        need_rewrite_settings = True
-                elif setting_name == "LOW_PERFORMANCE_MODE":
-                    try:
-                        Settings.LOW_PERFORMANCE_MODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
 
@@ -1764,12 +1753,6 @@ def stdout_render_core():
         ):
             print("\033[K" + "\033[F", end="\r")
 
-def clear_recently_resolved_ips():
-    if not exit_signal.is_set():
-        recently_resolved_ips.clear()
-
-        threading.Timer(1, clear_recently_resolved_ips).start()
-
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
 
@@ -1794,11 +1777,6 @@ def packet_callback(packet: Packet):
         raise ValueError("Neither the source nor destination address matches the specified IP_ADDRESS.")
 
     global_pps_counter += 1
-
-    if Settings.LOW_PERFORMANCE_MODE:
-        if target__ip in recently_resolved_ips:
-            return
-        recently_resolved_ips.add(target__ip)
 
     player = PlayersRegistry.get_player(target__ip)
     if player is None:
@@ -1850,10 +1828,6 @@ global_pps_counter = 0
 # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
-
-if Settings.LOW_PERFORMANCE_MODE:
-    recently_resolved_ips = set()
-    clear_recently_resolved_ips()
 
 while True:
     try:
