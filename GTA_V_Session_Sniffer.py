@@ -51,6 +51,397 @@ logging.basicConfig(filename="debug.log",
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+class InvalidBooleanValueError(Exception):
+    pass
+
+class InvalidNoneTypeValueError(Exception):
+    pass
+
+class Settings:
+    TSHARK_PATH = None
+    STDOUT_SHOW_ADVERTISING = True
+    STDOUT_FIELD_SHOW_SEEN_DATE = False
+    STDOUT_FIELD_SORTED_BY = "First Seen"
+    STDOUT_FIELD_PPS_TIMER = 1.0
+    STDOUT_GLOBAL_PPS_TIMER = 1.0
+    STDOUT_RESET_INFOS_ON_CONNECTED = True
+    STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
+    STDOUT_REFRESHING_TIMER = 3.0
+    PLAYER_DISCONNECTED_TIMER = 6.0
+    PACKET_CAPTURE_OVERFLOW_TIMER = 3.0
+    NETWORK_INTERFACE_CONNECTION_PROMPT = True
+    INTERFACE_NAME = None
+    IP_ADDRESS = None
+    MAC_ADDRESS = None
+    ARP = True
+    BLOCK_THIRD_PARTY_SERVERS = True
+    PROGRAM_PRESET = None
+    VPN_MODE = False
+    LOW_PERFORMANCE_MODE = False
+
+    @classmethod
+    def iterate_over_settings(cls):
+        for attr_name in vars(cls):
+            if not (
+                attr_name.startswith("_")
+                and not callable(getattr(cls, attr_name))
+            ):
+                yield attr_name, getattr(cls, attr_name)
+
+    @classmethod
+    def get_settings_length(cls):
+        return len([
+            attr_name
+            for attr_name in vars(cls)
+            if not attr_name.startswith("_")
+            and not callable(getattr(cls, attr_name))
+        ])
+
+    @classmethod
+    def has_setting(cls, setting_name):
+        return hasattr(cls, setting_name)
+
+    def reconstruct_settings():
+        print("\nCorrect reconstruction of \"Settings.ini\" ...")
+        text = f"""
+            ;;-----------------------------------------------------------------------------
+            ;;Lines starting with \";;\" symbols are commented lines.
+            ;;
+            ;;This is the settings file for \"GTA V Session Sniffer\" configuration.
+            ;;
+            ;;If you don't know what value to choose for a specifc setting, set it's value to None.
+            ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
+            ;;
+            ;;<TSHARK_PATH>
+            ;;The full path to your "tshark.exe" executable.
+            ;;If not set, it will attempt to detect tshark from your Wireshark installation.
+            ;;
+            ;;<STDOUT_SHOW_ADVERTISING>
+            ;;Determine if you want or not to show the developer's advertisements in the script's display.
+            ;;
+            ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
+            ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
+            ;;
+            ;;<STDOUT_FIELD_SORTED_BY>
+            ;;Specifies the fields by which you want the output data to be sorted.
+            ;;Valid values include any field names. For example: First Seen
+            ;;
+            ;;<STDOUT_FIELD_PPS_TIMER>
+            ;;The Packets Per Second (PPS) time interval calculated for each player.
+            ;;
+            ;;<STDOUT_GLOBAL_PPS_TIMER>
+            ;;The global Packets Per Second (PPS) time interval calculated for all players combined.
+            ;;
+            ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
+            ;;Resets and recalculates each fields for players who were previously disconnected.
+            ;;
+            ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
+            ;;The maximum number of players showing up in disconnected players list.
+            ;;Valid values include any number greater than or equal to 0.
+            ;;Setting it to 0 will make it unlimitted.
+            ;;
+            ;;<STDOUT_REFRESHING_TIMER>
+            ;;Time interval between which this will refresh the console display.
+            ;;
+            ;;<PLAYER_DISCONNECTED_TIMER>
+            ;;The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
+            ;;Valid values include any number greater than or equal to 3.
+            ;;
+            ;;<PACKET_CAPTURE_OVERFLOW_TIMER>
+            ;;This timer represents the duration between the timestamp of a captured packet and the current time.
+            ;;When this timer is reached, the tshark process will be restarted.
+            ;;Valid values include any number greater than or equal to 3.
+            ;;
+            ;;<NETWORK_INTERFACE_CONNECTION_PROMPT>
+            ;;Allows you to skip the network interface selection by automatically
+            ;;using the <INTERFACE_NAME>, <MAC_ADDRESS> and <IP_ADDRESS> settings.
+            ;;
+            ;;<INTERFACE_NAME>
+            ;;The network interface from which packets will be captured.
+            ;;
+            ;;<IP_ADDRESS>
+            ;;The IP address of a network interface on your computer from which packets will be captured.
+            ;;If the <ARP> setting is enabled, it can be from any device on your home network.
+            ;;Valid example value: \"x.x.x.x\"
+            ;;
+            ;;<MAC_ADDRESS>
+            ;;The MAC address of a network interface on your computer from which packets will be captured.
+            ;;If the <ARP> setting is enabled, it can be from any device on your home network.
+            ;;Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
+            ;;
+            ;;<ARP>
+            ;;Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
+            ;;
+            ;;<BLOCK_THIRD_PARTY_SERVERS>
+            ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
+            ;;
+            ;;<PROGRAM_PRESET>
+            ;;A program preset that will help capturing the right packets for your program.
+            ;;Supported program presets are only \"GTA5\" and \"Minecraft\".
+            ;;Note that Minecraft only supports Bedrock Edition.
+            ;;Please also note that both of these have only been tested on PCs.
+            ;;I do not have information regarding their functionality on consoles.
+            ;;
+            ;;<VPN_MODE>
+            ;;Setting this to False will add filters to exclude unrelated IPs from the output.
+            ;;However, if you are scanning trough a VPN <INTERFACE_NAME>, you have to set it to True.
+            ;;
+            ;;<LOW_PERFORMANCE_MODE>
+            ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
+            ;;consider setting this to True. This will reduce the resource usage on your computer.
+            ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
+            ;;-----------------------------------------------------------------------------
+        """
+        text = textwrap.dedent(text.removeprefix("\n"))
+        for setting, _ in Settings.iterate_over_settings():
+            text += f"{setting}={getattr(Settings, setting)}\n"
+        SETTINGS_PATH.write_text(text, encoding="utf-8")
+
+    def load_from_file(settings_path: Path):
+        def iterate_and_parse_settings_file_data(settings_data: str):
+            def process_setting_line_output(line: str):
+                return line.rstrip("\n")
+
+            for line in map(process_setting_line_output, settings_data):
+                need_rewrite_current_setting = False
+
+                corrected__line = line.strip()
+
+                if corrected__line.startswith(";;"):
+                    continue
+                elif not corrected__line == line:
+                    need_rewrite_current_setting = True
+
+                parts = corrected__line.split("=", 1)
+                try:
+                    setting_name = parts[0]
+                    setting_value = parts[1]
+                except IndexError:
+                    continue
+
+                corrected__setting_name = setting_name.strip()
+                if corrected__setting_name == "":
+                    continue
+                elif not corrected__setting_name == setting_name:
+                    need_rewrite_current_setting = True
+
+                if Settings.has_setting(corrected__setting_name):
+                    corrected__setting_value = setting_value.strip()
+
+                    if corrected__setting_value == "":
+                        continue
+                    elif not corrected__setting_value == setting_value:
+                        need_rewrite_current_setting = True
+
+                    yield corrected__setting_name, corrected__setting_value, need_rewrite_current_setting
+
+        def custom_str_to_bool(string: str):
+            """
+            This function returns the boolean value represented by the string for lowercase or any case variation;\n
+            otherwise, it raises an \"InvalidBooleanValueError\".
+
+            Args:
+                string (str): The boolean string to be checked.
+            """
+            string_lower = string.lower()
+            need_rewrite_current_setting = False
+
+            if string_lower == "true":
+                if not string == "True":
+                    need_rewrite_current_setting = True
+                value = True
+            elif string_lower == "false":
+                if not string == "False":
+                    need_rewrite_current_setting = True
+                value = False
+            else:
+                raise InvalidBooleanValueError("Input is not a valid boolean value")
+
+            return value, need_rewrite_current_setting
+
+        def custom_str_to_nonetype(string: str):
+            """
+            This function returns the NoneType value represented by the string for lowercase or any case variation;\n
+            otherwise, it raises an \"InvalidNoneTypeValueError\".
+
+            Args:
+                string (str): The NoneType string to be checked.
+            """
+            string_lower = string.lower()
+            need_rewrite_current_setting = False
+
+            if string_lower == "none":
+                if not string == "None":
+                    need_rewrite_current_setting = True
+                value = None
+            else:
+                raise InvalidNoneTypeValueError("Input is not a valid NoneType value")
+
+            return value, need_rewrite_current_setting
+
+        try:
+            settings_data = settings_path.read_text("utf-8").splitlines(keepends=False)
+        except FileNotFoundError:
+            need_rewrite_settings = True
+        else:
+            need_rewrite_settings = False
+            matched_settings_count = 0
+
+            for setting_name, setting_value, need_rewrite_current_setting in iterate_and_parse_settings_file_data(settings_data):
+                matched_settings_count += 1
+
+                if need_rewrite_current_setting:
+                    need_rewrite_settings = True
+
+                if setting_name == "TSHARK_PATH":
+                    try:
+                        Settings.TSHARK_PATH, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        Settings.TSHARK_PATH = Path(setting_value)
+                elif setting_name == "STDOUT_SHOW_ADVERTISING":
+                    try:
+                        Settings.STDOUT_SHOW_ADVERTISING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_SHOW_SEEN_DATE":
+                    try:
+                        Settings.STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_SORTED_BY":
+                    if setting_value in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]:
+                        Settings.STDOUT_FIELD_SORTED_BY = setting_value
+                    else:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_PPS_TIMER":
+                    try:
+                        stdout_field_pps_timer = float(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_pps_timer >= 1.0:
+                            Settings.STDOUT_FIELD_PPS_TIMER = stdout_field_pps_timer
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_GLOBAL_PPS_TIMER":
+                    try:
+                        stdout_global_pps_timer = float(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_global_pps_timer >= 1.0:
+                            Settings.STDOUT_GLOBAL_PPS_TIMER = stdout_global_pps_timer
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_RESET_INFOS_ON_CONNECTED":
+                    try:
+                        Settings.STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
+                    try:
+                        stdout_counter_session_disconnected_players = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_counter_session_disconnected_players >= 0:
+                            Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = stdout_counter_session_disconnected_players
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_REFRESHING_TIMER":
+                    try:
+                        if "." in setting_value:
+                            stdout_refreshing_timer = float(setting_value)
+                        else:
+                            stdout_refreshing_timer = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_refreshing_timer >= 0:
+                            Settings.STDOUT_REFRESHING_TIMER = stdout_refreshing_timer
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "PLAYER_DISCONNECTED_TIMER":
+                    try:
+                        player_disconnected_timer = float(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if player_disconnected_timer >= 3.0:
+                            Settings.PLAYER_DISCONNECTED_TIMER = player_disconnected_timer
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "PACKET_CAPTURE_OVERFLOW_TIMER":
+                    try:
+                        packet_capture_overflow_timer = float(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if packet_capture_overflow_timer >= 1:
+                            Settings.PACKET_CAPTURE_OVERFLOW_TIMER = packet_capture_overflow_timer
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "NETWORK_INTERFACE_CONNECTION_PROMPT":
+                    try:
+                        Settings.NETWORK_INTERFACE_CONNECTION_PROMPT, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "INTERFACE_NAME":
+                    if setting_value == "None":
+                        Settings.INTERFACE_NAME = None
+                    else:
+                        Settings.INTERFACE_NAME = setting_value
+                elif setting_name == "IP_ADDRESS":
+                    if setting_value == "None":
+                        Settings.IP_ADDRESS = None
+                    elif is_ipv4_address(setting_value):
+                        Settings.IP_ADDRESS = setting_value
+                    else:
+                        need_rewrite_settings = True
+                elif setting_name == "MAC_ADDRESS":
+                    if setting_value == "None":
+                        Settings.MAC_ADDRESS = None
+                    elif is_mac_address(setting_value):
+                        formatted_mac_address = format_mac_address(setting_value)
+                        if not formatted_mac_address == setting_value:
+                            need_rewrite_settings = True
+                        Settings.MAC_ADDRESS = formatted_mac_address
+                    else:
+                        need_rewrite_settings = True
+                elif setting_name == "ARP":
+                    try:
+                        Settings.ARP, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "BLOCK_THIRD_PARTY_SERVERS":
+                    try:
+                        Settings.BLOCK_THIRD_PARTY_SERVERS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "PROGRAM_PRESET":
+                    try:
+                        Settings.PROGRAM_PRESET, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        if setting_value in ["GTA5", "Minecraft"]:
+                            Settings.PROGRAM_PRESET = setting_value
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "VPN_MODE":
+                    try:
+                        Settings.VPN_MODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "LOW_PERFORMANCE_MODE":
+                    try:
+                        Settings.LOW_PERFORMANCE_MODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+
+            if not matched_settings_count == Settings.get_settings_length():
+                need_rewrite_settings = True
+
+        if need_rewrite_settings:
+            Settings.reconstruct_settings()
 
 class Version:
     def __init__(self, version: str):
@@ -694,385 +1085,6 @@ def update_and_initialize_geolite2_readers():
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
 
-def reconstruct_settings():
-    print("\nCorrect reconstruction of \"Settings.ini\" ...")
-    text = f"""
-        ;;-----------------------------------------------------------------------------
-        ;;Lines starting with \";;\" symbols are commented lines.
-        ;;
-        ;;This is the settings file for \"GTA V Session Sniffer\" configuration.
-        ;;
-        ;;If you don't know what value to choose for a specifc setting, set it's value to None.
-        ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
-        ;;
-        ;;<TSHARK_PATH>
-        ;;The full path to your "tshark.exe" executable.
-        ;;If not set, it will attempt to detect tshark from your Wireshark installation.
-        ;;
-        ;;<STDOUT_SHOW_ADVERTISING>
-        ;;Determine if you want or not to show the developer's advertisements in the script's display.
-        ;;
-        ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
-        ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
-        ;;
-        ;;<STDOUT_FIELD_SORTED_BY>
-        ;;Specifies the fields by which you want the output data to be sorted.
-        ;;Valid values include any field names. For example: First Seen
-        ;;
-        ;;<STDOUT_FIELD_PPS_TIMER>
-        ;;The Packets Per Second (PPS) time interval calculated for each player.
-        ;;
-        ;;<STDOUT_GLOBAL_PPS_TIMER>
-        ;;The global Packets Per Second (PPS) time interval calculated for all players combined.
-        ;;
-        ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
-        ;;Resets and recalculates each fields for players who were previously disconnected.
-        ;;
-        ;;<STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS>
-        ;;The maximum number of players showing up in disconnected players list.
-        ;;Valid values include any number greater than or equal to 0.
-        ;;Setting it to 0 will make it unlimitted.
-        ;;
-        ;;<STDOUT_REFRESHING_TIMER>
-        ;;Time interval between which this will refresh the console display.
-        ;;
-        ;;<PLAYER_DISCONNECTED_TIMER>
-        ;;The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
-        ;;Valid values include any number greater than or equal to 3.
-        ;;
-        ;;<PACKET_CAPTURE_OVERFLOW_TIMER>
-        ;;This timer represents the duration between the timestamp of a captured packet and the current time.
-        ;;When this timer is reached, the tshark process will be restarted.
-        ;;Valid values include any number greater than or equal to 3.
-        ;;
-        ;;<NETWORK_INTERFACE_CONNECTION_PROMPT>
-        ;;Allows you to skip the network interface selection by automatically
-        ;;using the <INTERFACE_NAME>, <MAC_ADDRESS> and <IP_ADDRESS> settings.
-        ;;
-        ;;<INTERFACE_NAME>
-        ;;The network interface from which packets will be captured.
-        ;;
-        ;;<IP_ADDRESS>
-        ;;The IP address of a network interface on your computer from which packets will be captured.
-        ;;If the <ARP> setting is enabled, it can be from any device on your home network.
-        ;;Valid example value: \"x.x.x.x\"
-        ;;
-        ;;<MAC_ADDRESS>
-        ;;The MAC address of a network interface on your computer from which packets will be captured.
-        ;;If the <ARP> setting is enabled, it can be from any device on your home network.
-        ;;Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
-        ;;
-        ;;<ARP>
-        ;;Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
-        ;;
-        ;;<BLOCK_THIRD_PARTY_SERVERS>
-        ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
-        ;;
-        ;;<PROGRAM_PRESET>
-        ;;A program preset that will help capturing the right packets for your program.
-        ;;Supported program presets are only \"GTA5\" and \"Minecraft\".
-        ;;Note that Minecraft only supports Bedrock Edition.
-        ;;Please also note that both of these have only been tested on PCs.
-        ;;I do not have information regarding their functionality on consoles.
-        ;;
-        ;;<VPN_MODE>
-        ;;Setting this to False will add filters to exclude unrelated IPs from the output.
-        ;;However, if you are scanning trough a VPN <INTERFACE_NAME>, you have to set it to True.
-        ;;
-        ;;<LOW_PERFORMANCE_MODE>
-        ;;If the script is responding inappropriately, such as displaying all players as disconnected even when they are not,
-        ;;consider setting this to True. This will reduce the resource usage on your computer.
-        ;;Enabling this option will process fewer packets at a time, alleviating strain on your CPU.
-        ;;-----------------------------------------------------------------------------
-    """
-    text = textwrap.dedent(text.removeprefix("\n"))
-    for setting in SETTINGS_LIST:
-        text += f"{setting}={globals().get(setting)}\n"
-    SETTINGS_PATH.write_text(text, encoding="utf-8")
-
-def apply_settings():
-    global TSHARK_PATH, STDOUT_SHOW_ADVERTISING, STDOUT_FIELD_SHOW_SEEN_DATE, STDOUT_FIELD_SORTED_BY, STDOUT_FIELD_PPS_TIMER, STDOUT_GLOBAL_PPS_TIMER, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
-
-    def return_setting(setting: str, need_rewrite_settings: bool):
-        return_setting_value = None
-
-        if not settings_file_not_found:
-            for line in SETTINGS:
-                line = line.rstrip("\n")
-                corrected__line = line.strip()
-
-                if corrected__line.startswith(";;"):
-                    continue
-
-                if not line == corrected__line:
-                    need_rewrite_settings = True
-
-                parts = corrected__line.split(sep="=", maxsplit=1)
-                try:
-                    setting_name = parts[0]
-                    setting_value = parts[1]
-                except IndexError:
-                    need_rewrite_settings = True
-                    continue
-
-                if setting_name == setting:
-                    corrected__setting_value = setting_value.strip()
-                    if corrected__setting_value == "":
-                        return_setting_value = None
-                        need_rewrite_settings = True
-
-                        continue
-                    if not corrected__setting_value == setting_value:
-                        need_rewrite_settings = True
-                    return_setting_value = corrected__setting_value
-
-                    break
-
-        if return_setting_value is None:
-            need_rewrite_settings = True
-
-        return return_setting_value, need_rewrite_settings
-
-    need_rewrite_settings = False
-
-    try:
-        SETTINGS = SETTINGS_PATH.read_text("utf-8").splitlines(keepends=False)
-    except FileNotFoundError:
-        settings_file_not_found = True
-        need_rewrite_settings = True
-    else:
-        settings_file_not_found = False
-
-    for setting in SETTINGS_LIST:
-        if setting == "TSHARK_PATH":
-            TSHARK_PATH, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if TSHARK_PATH is not None:
-                TSHARK_PATH = Path(TSHARK_PATH)
-        if setting == "STDOUT_SHOW_ADVERTISING":
-            STDOUT_SHOW_ADVERTISING, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_SHOW_ADVERTISING == "True":
-                STDOUT_SHOW_ADVERTISING = True
-            elif STDOUT_SHOW_ADVERTISING == "False":
-                STDOUT_SHOW_ADVERTISING = False
-            else:
-                need_rewrite_settings = True
-                STDOUT_SHOW_ADVERTISING = True
-        elif setting == "STDOUT_FIELD_SHOW_SEEN_DATE":
-            STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_FIELD_SHOW_SEEN_DATE == "True":
-                STDOUT_FIELD_SHOW_SEEN_DATE = True
-            elif STDOUT_FIELD_SHOW_SEEN_DATE == "False":
-                STDOUT_FIELD_SHOW_SEEN_DATE = False
-            else:
-                need_rewrite_settings = True
-                STDOUT_FIELD_SHOW_SEEN_DATE = False
-        elif setting == "STDOUT_FIELD_SORTED_BY":
-            STDOUT_FIELD_SORTED_BY, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if not STDOUT_FIELD_SORTED_BY in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]:
-                STDOUT_FIELD_SORTED_BY = "First Seen"
-        elif setting == "STDOUT_FIELD_PPS_TIMER":
-            STDOUT_FIELD_PPS_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            try:
-                STDOUT_FIELD_PPS_TIMER = float(STDOUT_FIELD_PPS_TIMER)
-            except (ValueError, TypeError):
-                reset_current_setting__flag = True
-            else:
-                if STDOUT_FIELD_PPS_TIMER < 1.0:
-                    reset_current_setting__flag = True
-                else:
-                    reset_current_setting__flag = False
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                STDOUT_FIELD_PPS_TIMER = 1.0
-        elif setting == "STDOUT_GLOBAL_PPS_TIMER":
-            STDOUT_GLOBAL_PPS_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            try:
-                STDOUT_GLOBAL_PPS_TIMER = float(STDOUT_GLOBAL_PPS_TIMER)
-            except (ValueError, TypeError):
-                reset_current_setting__flag = True
-            else:
-                if STDOUT_GLOBAL_PPS_TIMER < 1.0:
-                    reset_current_setting__flag = True
-                else:
-                    reset_current_setting__flag = False
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                STDOUT_GLOBAL_PPS_TIMER = 1.0
-        elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
-            STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
-                STDOUT_RESET_INFOS_ON_CONNECTED = True
-            elif STDOUT_RESET_INFOS_ON_CONNECTED == "False":
-                STDOUT_RESET_INFOS_ON_CONNECTED = False
-            else:
-                need_rewrite_settings = True
-                STDOUT_RESET_INFOS_ON_CONNECTED = True
-        elif setting == "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS":
-            reset_current_setting__flag = False
-            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS is None:
-                reset_current_setting__flag = True
-            else:
-                try:
-                    STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = int(STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS)
-                except (ValueError, TypeError):
-                    reset_current_setting__flag = True
-                else:
-                    if STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS < 0:
-                        reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
-        elif setting == "STDOUT_REFRESHING_TIMER":
-            reset_current_setting__flag = False
-            STDOUT_REFRESHING_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_REFRESHING_TIMER is None:
-                reset_current_setting__flag = True
-            else:
-                try:
-                    if "." in STDOUT_REFRESHING_TIMER:
-                        STDOUT_REFRESHING_TIMER = float(STDOUT_REFRESHING_TIMER)
-                    else:
-                        STDOUT_REFRESHING_TIMER = int(STDOUT_REFRESHING_TIMER)
-                except (ValueError, TypeError):
-                    reset_current_setting__flag = True
-                else:
-                    if STDOUT_REFRESHING_TIMER < 0:
-                        reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                STDOUT_REFRESHING_TIMER = 3
-        elif setting == "PLAYER_DISCONNECTED_TIMER":
-            reset_current_setting__flag = False
-            PLAYER_DISCONNECTED_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if PLAYER_DISCONNECTED_TIMER is None:
-                reset_current_setting__flag = True
-            else:
-                try:
-                    PLAYER_DISCONNECTED_TIMER = float(PLAYER_DISCONNECTED_TIMER)
-                except (ValueError, TypeError):
-                    reset_current_setting__flag = True
-                else:
-                    if PLAYER_DISCONNECTED_TIMER < 3.0:
-                        reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                PLAYER_DISCONNECTED_TIMER = 6
-        elif setting == "PACKET_CAPTURE_OVERFLOW_TIMER":
-            reset_current_setting__flag = False
-            PACKET_CAPTURE_OVERFLOW_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if PACKET_CAPTURE_OVERFLOW_TIMER is None:
-                reset_current_setting__flag = True
-            else:
-                try:
-                    PACKET_CAPTURE_OVERFLOW_TIMER = float(PACKET_CAPTURE_OVERFLOW_TIMER)
-                except (ValueError, TypeError):
-                    reset_current_setting__flag = True
-                else:
-                    if PACKET_CAPTURE_OVERFLOW_TIMER < 1:
-                        reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                PACKET_CAPTURE_OVERFLOW_TIMER = 3
-        elif setting == "NETWORK_INTERFACE_CONNECTION_PROMPT":
-            NETWORK_INTERFACE_CONNECTION_PROMPT, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if NETWORK_INTERFACE_CONNECTION_PROMPT == "True":
-                NETWORK_INTERFACE_CONNECTION_PROMPT = True
-            elif NETWORK_INTERFACE_CONNECTION_PROMPT == "False":
-                NETWORK_INTERFACE_CONNECTION_PROMPT = False
-            else:
-                need_rewrite_settings = True
-                NETWORK_INTERFACE_CONNECTION_PROMPT = True
-        elif setting == "INTERFACE_NAME":
-            INTERFACE_NAME, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if INTERFACE_NAME is None:
-                need_rewrite_settings = True
-            elif INTERFACE_NAME == "None":
-                INTERFACE_NAME = None
-        elif setting == "IP_ADDRESS":
-            reset_current_setting__flag = False
-            IP_ADDRESS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if IP_ADDRESS is None:
-                reset_current_setting__flag = True
-            elif IP_ADDRESS == "None":
-                IP_ADDRESS = None
-            else:
-                if not is_ipv4_address(IP_ADDRESS):
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                IP_ADDRESS = None
-        elif setting == "MAC_ADDRESS":
-            reset_current_setting__flag = False
-            MAC_ADDRESS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if MAC_ADDRESS is None:
-                reset_current_setting__flag = True
-            elif MAC_ADDRESS == "None":
-                MAC_ADDRESS = None
-            else:
-                if is_mac_address(MAC_ADDRESS):
-                    formatted_mac_address = format_mac_address(MAC_ADDRESS)
-                    if not formatted_mac_address == MAC_ADDRESS:
-                        MAC_ADDRESS = formatted_mac_address
-                        need_rewrite_settings = True
-                else:
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                MAC_ADDRESS = None
-        elif setting == "ARP":
-            ARP, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if ARP == "True":
-                ARP = True
-            elif ARP == "False":
-                ARP = False
-            else:
-                need_rewrite_settings = True
-                ARP = False
-        elif setting == "BLOCK_THIRD_PARTY_SERVERS":
-            BLOCK_THIRD_PARTY_SERVERS, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if BLOCK_THIRD_PARTY_SERVERS == "True":
-                BLOCK_THIRD_PARTY_SERVERS = True
-            elif BLOCK_THIRD_PARTY_SERVERS == "False":
-                BLOCK_THIRD_PARTY_SERVERS = False
-            else:
-                need_rewrite_settings = True
-                BLOCK_THIRD_PARTY_SERVERS = True
-        elif setting == "PROGRAM_PRESET":
-            reset_current_setting__flag = False
-            PROGRAM_PRESET, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if PROGRAM_PRESET is None:
-                reset_current_setting__flag = True
-            elif PROGRAM_PRESET == "None":
-                PROGRAM_PRESET = None
-            else:
-                if not PROGRAM_PRESET in ["GTA5", "Minecraft"]:
-                    reset_current_setting__flag = True
-            if reset_current_setting__flag:
-                need_rewrite_settings = True
-                PROGRAM_PRESET = None
-        elif setting == "VPN_MODE":
-            VPN_MODE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if VPN_MODE == "True":
-                VPN_MODE = True
-            elif VPN_MODE == "False":
-                VPN_MODE = False
-            else:
-                need_rewrite_settings = True
-                VPN_MODE = False
-        elif setting == "LOW_PERFORMANCE_MODE":
-            LOW_PERFORMANCE_MODE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if LOW_PERFORMANCE_MODE == "True":
-                LOW_PERFORMANCE_MODE = True
-            elif LOW_PERFORMANCE_MODE == "False":
-                LOW_PERFORMANCE_MODE = False
-            else:
-                need_rewrite_settings = True
-                LOW_PERFORMANCE_MODE = True
-
-    if need_rewrite_settings:
-        reconstruct_settings()
-
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
 exit_signal = threading.Event()
@@ -1086,31 +1098,10 @@ os.chdir(SCRIPT_DIR)
 TITLE = "GTA V Session Sniffer"
 VERSION = "v1.0.7 - 30/03/2024 (10:47)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
+SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:123.0) Gecko/20100101 Firefox/123.0"
 }
-SETTINGS_LIST = [
-    "TSHARK_PATH",
-    "STDOUT_SHOW_ADVERTISING",
-    "STDOUT_FIELD_SHOW_SEEN_DATE",
-    "STDOUT_FIELD_SORTED_BY",
-    "STDOUT_FIELD_PPS_TIMER",
-    "STDOUT_GLOBAL_PPS_TIMER",
-    "STDOUT_RESET_INFOS_ON_CONNECTED",
-    "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
-    "STDOUT_REFRESHING_TIMER",
-    "PLAYER_DISCONNECTED_TIMER",
-    "PACKET_CAPTURE_OVERFLOW_TIMER",
-    "NETWORK_INTERFACE_CONNECTION_PROMPT",
-    "INTERFACE_NAME",
-    "IP_ADDRESS",
-    "MAC_ADDRESS",
-    "ARP",
-    "BLOCK_THIRD_PARTY_SERVERS",
-    "PROGRAM_PRESET",
-    "VPN_MODE",
-    "LOW_PERFORMANCE_MODE"
-]
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 s = create_unsafe_https_session()
 
@@ -1158,7 +1149,6 @@ if outdated_packages:
     errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
     if errorlevel != 6:
         sys.exit(0)
-
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -1240,10 +1230,7 @@ while True:
 cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
 print("\nApplying your custom settings from \"Settings.ini\" ...\n")
-
-SETTINGS_PATH = Path("Settings.ini")
-
-apply_settings()
+Settings.load_from_file(SETTINGS_PATH)
 
 cls()
 title(f"Initializing and updating MaxMind's GeoLite2 Country, and ASN databases - {TITLE}")
@@ -1258,7 +1245,7 @@ print(f"\nCapture network interface selection ...\n")
 #mac_lookup.update_vendors()
 mac_lookup = MacLookup()
 
-if ARP:
+if Settings.ARP:
     cached_arp_dict = get_and_parse_arp_cache()
 
 net_io_stats = psutil.net_io_counters(pernic=True)
@@ -1306,7 +1293,7 @@ for interface, stats in net_io_stats.items():
 
     Interface(interface, ip_addresses, mac_address, vendor_name, stats.packets_sent, stats.packets_recv)
 
-    if not ARP:
+    if not Settings.ARP:
         continue
 
     for ip_address in ip_addresses:
@@ -1348,12 +1335,12 @@ counter = 0
 
 for interface in Interface.get_all_interfaces():
     if (
-        INTERFACE_NAME is not None
-        and INTERFACE_NAME.lower() == interface.name.lower()
-        and not INTERFACE_NAME == interface.name
+        Settings.INTERFACE_NAME is not None
+        and Settings.INTERFACE_NAME.lower() == interface.name.lower()
+        and not Settings.INTERFACE_NAME == interface.name
     ):
-        INTERFACE_NAME = interface.name
-        reconstruct_settings()
+        Settings.INTERFACE_NAME = interface.name
+        Settings.reconstruct_settings()
 
     for ip_address in interface.ip_addresses:
         counter += 1
@@ -1367,7 +1354,7 @@ for interface in Interface.get_all_interfaces():
 
         table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, ip_address, interface.mac_address, interface.vendor_name])
 
-    if not ARP:
+    if not Settings.ARP:
         continue
 
     for ip_address, info in interface.get_all_arp_infos().items():
@@ -1386,19 +1373,19 @@ for interface in Interface.get_all_interfaces():
 user_interface_selection = None
 
 if (
-    not NETWORK_INTERFACE_CONNECTION_PROMPT
-    and any(setting is not None for setting in [INTERFACE_NAME, MAC_ADDRESS, IP_ADDRESS])
+    not Settings.NETWORK_INTERFACE_CONNECTION_PROMPT
+    and any(setting is not None for setting in [Settings.INTERFACE_NAME, Settings.MAC_ADDRESS, Settings.IP_ADDRESS])
 ):
     max_priority = 0
 
     for interface_counter, interface_options in interfaces_options.items():
         priority = 0
 
-        if INTERFACE_NAME == interface_options["Interface"]:
+        if Settings.INTERFACE_NAME == interface_options["Interface"]:
             priority += 1
-        if MAC_ADDRESS == interface_options["MAC Address"]:
+        if Settings.MAC_ADDRESS == interface_options["MAC Address"]:
             priority += 1
-        if IP_ADDRESS == interface_options["IP Address"]:
+        if Settings.IP_ADDRESS == interface_options["IP Address"]:
             priority += 1
 
         if priority == max_priority: # If multiple matches on the same priority are found we search for the next bigger priority else we prompt the user.
@@ -1430,36 +1417,36 @@ print(f"\nInitializing addresses and establishing connection to your PC / Consol
 
 need_rewrite_settings = False
 
-if not INTERFACE_NAME == interfaces_options[user_interface_selection]["Interface"]:
-    INTERFACE_NAME = interfaces_options[user_interface_selection]["Interface"]
+if not Settings.INTERFACE_NAME == interfaces_options[user_interface_selection]["Interface"]:
+    Settings.INTERFACE_NAME = interfaces_options[user_interface_selection]["Interface"]
     need_rewrite_settings = True
 
-if not MAC_ADDRESS == interfaces_options[user_interface_selection]["MAC Address"]:
-    MAC_ADDRESS = interfaces_options[user_interface_selection]["MAC Address"]
+if not Settings.MAC_ADDRESS == interfaces_options[user_interface_selection]["MAC Address"]:
+    Settings.MAC_ADDRESS = interfaces_options[user_interface_selection]["MAC Address"]
     need_rewrite_settings = True
 
-if not IP_ADDRESS == interfaces_options[user_interface_selection]["IP Address"]:
-    IP_ADDRESS = interfaces_options[user_interface_selection]["IP Address"]
+if not Settings.IP_ADDRESS == interfaces_options[user_interface_selection]["IP Address"]:
+    Settings.IP_ADDRESS = interfaces_options[user_interface_selection]["IP Address"]
     need_rewrite_settings = True
 
 if need_rewrite_settings:
-    reconstruct_settings()
+    Settings.reconstruct_settings()
 
-BPF_FILTER = None
-DISPLAY_FILTER = None
+bpf_filter = None
+display_filter = None
 display_filter_protocols_to_exclude = []
 
-BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"((src host {IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))")
-BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "udp")
-if not VPN_MODE:
-    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not (broadcast or multicast)")
-BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", "not (portrange 0-1023 or port 5353)")
+bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"((src host {Settings.IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {Settings.IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))")
+bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", "udp")
+if not Settings.VPN_MODE:
+    bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"not (broadcast or multicast)")
+bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", "not (portrange 0-1023 or port 5353)")
 
-if PROGRAM_PRESET:
-    if PROGRAM_PRESET == "GTA5":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=71 and frame.len<=999)")
-    elif PROGRAM_PRESET == "Minecraft":
-        DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", "(frame.len>=49 and frame.len<=1498)")
+if Settings.PROGRAM_PRESET:
+    if Settings.PROGRAM_PRESET == "GTA5":
+        display_filter = create_or_happen_to_variable(display_filter, " and ", "(frame.len>=71 and frame.len<=999)")
+    elif Settings.PROGRAM_PRESET == "Minecraft":
+        display_filter = create_or_happen_to_variable(display_filter, " and ", "(frame.len>=49 and frame.len<=1498)")
 
     # If the <PROGRAM_PRESET> setting is set, automatically blocks RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a <PROGRAM_PRESET>.
@@ -1470,24 +1457,24 @@ if PROGRAM_PRESET:
     # And that's exactly why the "Discord" (`class ThirdPartyServers`) IP ranges Capture Filters are useful for.
     display_filter_protocols_to_exclude.append("rtcp")
 
-if BLOCK_THIRD_PARTY_SERVERS:
+if Settings.BLOCK_THIRD_PARTY_SERVERS:
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
     display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "llmnr"])
 
     ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
-    BPF_FILTER = create_or_happen_to_variable(BPF_FILTER, " and ", f"not (net {' or '.join(ip_ranges)})")
+    bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"not (net {' or '.join(ip_ranges)})")
 
 if display_filter_protocols_to_exclude:
-    DISPLAY_FILTER = create_or_happen_to_variable(DISPLAY_FILTER, " and ", f"not ({' or '.join(display_filter_protocols_to_exclude)})")
+    display_filter = create_or_happen_to_variable(display_filter, " and ", f"not ({' or '.join(display_filter_protocols_to_exclude)})")
 
 while True:
     try:
         capture = PacketCapture(
-            interface = INTERFACE_NAME,
-            capture_filter = BPF_FILTER,
-            display_filter = DISPLAY_FILTER,
-            tshark_path = TSHARK_PATH
+            interface = Settings.INTERFACE_NAME,
+            capture_filter = bpf_filter,
+            display_filter = display_filter,
+            tshark_path = Settings.TSHARK_PATH
         )
     except TSharkNotFoundException:
         webbrowser.open("https://www.wireshark.org/download.html")
@@ -1506,9 +1493,9 @@ while True:
     else:
         break
 
-if not capture.tshark_path == TSHARK_PATH:
-    TSHARK_PATH = capture.tshark_path
-    reconstruct_settings()
+if not capture.tshark_path == Settings.TSHARK_PATH:
+    Settings.TSHARK_PATH = capture.tshark_path
+    Settings.reconstruct_settings()
 
 tshark_latency = []
 
@@ -1562,7 +1549,7 @@ def stdout_render_core():
         return padding_width
 
     def extract_datetime_from_timestamp(datetime_object: datetime):
-        if STDOUT_FIELD_SHOW_SEEN_DATE:
+        if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
             formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
         else:
             formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
@@ -1582,12 +1569,12 @@ def stdout_render_core():
 
         return f"{pps_color}{packets_per_second}{Fore.RESET}"
 
-    global tshark_latency
+    global global_pps_counter, tshark_latency
 
     printer = PrintCacher()
     global_pps_t1 = time.perf_counter()
-    global_pps_counter = 0
-    packets_per_second = 0
+    global_packets_per_second = 0
+
     # Mapping of field names
     field_mapping = {
         "First Seen": "datetime_first_seen",
@@ -1612,7 +1599,7 @@ def stdout_render_core():
         for player in PlayersRegistry.iterate_players_from_registry():
             if (
                 not player.datetime_left
-                and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
+                and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=Settings.PLAYER_DISCONNECTED_TIMER)
             ):
                player.datetime_left = player.datetime_last_seen
 
@@ -1626,10 +1613,9 @@ def stdout_render_core():
                 session_disconnected.append(player)
             else:
                 session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
-                global_pps_counter += player.pps_counter
 
                 player_time_delta: timedelta = (date_time_now - player.pps_t1)
-                if player_time_delta >= timedelta(seconds=STDOUT_FIELD_PPS_TIMER):
+                if player_time_delta >= timedelta(seconds=Settings.STDOUT_FIELD_PPS_TIMER):
                     player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
                     player.pps_counter = 0
                     player.pps_t1 = date_time_now
@@ -1638,29 +1624,29 @@ def stdout_render_core():
                 session_connected.append(player)
 
 
-        sorted_key = field_mapping.get(STDOUT_FIELD_SORTED_BY, None)
+        sorted_key = field_mapping.get(Settings.STDOUT_FIELD_SORTED_BY, None)
         session_connected = sorted(session_connected, key=attrgetter(sorted_key))
         session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
 
         session_connected = sorted(session_connected, key=attrgetter(sorted_key))
         session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
 
-        session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
+        session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
         for player in session_disconnected__stdout_counter:
             session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
 
         if (
-            STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
-            or STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
+            Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
+            or Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
         ):
             len_session_disconnected_message = str(len(session_disconnected))
         else:
-            len_session_disconnected_message = f"showing {STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
+            len_session_disconnected_message = f"showing {Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
 
         printer.cache_print("")
 
-        if STDOUT_SHOW_ADVERTISING:
+        if Settings.STDOUT_SHOW_ADVERTISING:
             printer.cache_print("-" * 109)
             printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
             printer.cache_print("  * https://illegal-services.com/")
@@ -1676,8 +1662,8 @@ def stdout_render_core():
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
         printer.cache_print(f"-   " * 28)
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        padding_width = calculate_padding_width(109, 44, len(str(IP_ADDRESS)), len(str(INTERFACE_NAME)), len(str(is_arp_enabled)))
-        printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
+        padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
+        printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
         tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
         tshark_latency = []
 
@@ -1685,32 +1671,32 @@ def stdout_render_core():
         average_latency_seconds = tshark_average_latency.total_seconds()
         average_latency_rounded = round(average_latency_seconds, 1)
 
-        if tshark_average_latency >= timedelta(seconds=0.90 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
+        if tshark_average_latency >= timedelta(seconds=0.90 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
             latency_color = Fore.RED
-        elif tshark_average_latency >= timedelta(seconds=0.75 * PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
+        elif tshark_average_latency >= timedelta(seconds=0.75 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
             latency_color = Fore.YELLOW
         else:
             latency_color = Fore.GREEN
 
         global_pps_t2 = time_perf_counter
         seconds_elapsed = global_pps_t2 - global_pps_t1
-        if seconds_elapsed >= STDOUT_GLOBAL_PPS_TIMER:
-            packets_per_second = round(global_pps_counter / seconds_elapsed)
+        if seconds_elapsed >= Settings.STDOUT_GLOBAL_PPS_TIMER:
+            global_packets_per_second = round(global_pps_counter / seconds_elapsed)
             global_pps_counter = 0
             global_pps_t1 = global_pps_t2
 
         # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
         # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
-        if packets_per_second >= 3000: # Check if PPS exceeds 3000
+        if global_packets_per_second >= 3000: # Check if PPS exceeds 3000
             pps_color = Fore.RED
-        elif packets_per_second >= 1500: # Check if PPS exceeds 1500
+        elif global_packets_per_second >= 1500: # Check if PPS exceeds 1500
             pps_color = Fore.YELLOW
         else:
             pps_color = Fore.GREEN
 
         color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
-        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(packets_per_second)))
-        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{packets_per_second}{Fore.RESET}")
+        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(Settings.PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_packets_per_second)))
+        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_packets_per_second}{Fore.RESET}")
         printer.cache_print(f"-" * 109)
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
@@ -1756,9 +1742,9 @@ def stdout_render_core():
             refreshing_rate_t2 = time.perf_counter()
 
             seconds_elapsed = refreshing_rate_t2 - refreshing_rate_t1
-            if seconds_elapsed <= STDOUT_REFRESHING_TIMER:
-                seconds_left = max(STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
-                if isinstance(STDOUT_REFRESHING_TIMER, float):
+            if seconds_elapsed <= Settings.STDOUT_REFRESHING_TIMER:
+                seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
+                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
                     seconds_left = round(seconds_left, 1)
                     sleep = 0.1
                 else:
@@ -1785,29 +1771,31 @@ def clear_recently_resolved_ips():
         threading.Timer(1, clear_recently_resolved_ips).start()
 
 def packet_callback(packet: Packet):
-    global tshark_restarted_times
+    global tshark_restarted_times, global_pps_counter
 
     packet_timestamp = packet.frame.time_epoch
 
     packet_latency = datetime.now() - packet_timestamp
     tshark_latency.append(packet_latency)
-    if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
+    if packet_latency >= timedelta(seconds=Settings.PACKET_CAPTURE_OVERFLOW_TIMER):
         tshark_restarted_times += 1
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     source_address = packet.ip.src
     destination_address = packet.ip.dst
 
-    if source_address == IP_ADDRESS:
+    if source_address == Settings.IP_ADDRESS:
         target__ip = destination_address
         target__port = packet.udp.dstport
-    elif destination_address == IP_ADDRESS:
+    elif destination_address == Settings.IP_ADDRESS:
         target__ip = source_address
         target__port = packet.udp.srcport
     else:
-        return
+        raise ValueError("Neither the source nor destination address matches the specified IP_ADDRESS.")
 
-    if LOW_PERFORMANCE_MODE:
+    global_pps_counter += 1
+
+    if Settings.LOW_PERFORMANCE_MODE:
         if target__ip in recently_resolved_ips:
             return
         recently_resolved_ips.add(target__ip)
@@ -1843,7 +1831,7 @@ def packet_callback(packet: Packet):
     player.packets_per_second = 0
     player.is_pps_first_calculation = True
 
-    if STDOUT_RESET_INFOS_ON_CONNECTED:
+    if Settings.STDOUT_RESET_INFOS_ON_CONNECTED:
         player.packets = 1
 
         player.ports = [target__port]
@@ -1857,12 +1845,13 @@ title(TITLE)
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 tshark_restarted_times = 0
+global_pps_counter = 0
 
-# deepcode ignore MissingAPI: <please specify a reason of ignoring this>
+# deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
-if LOW_PERFORMANCE_MODE:
+if Settings.LOW_PERFORMANCE_MODE:
     recently_resolved_ips = set()
     clear_recently_resolved_ips()
 
