@@ -21,7 +21,6 @@ for %%A in (
     mac-vendor-lookup
     prettytable
     psutil
-    pyshark
     requests
     urllib3
     WMI

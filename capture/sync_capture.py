@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Callable
+from datetime import datetime
 
 
 class TSharkNotFoundException(Exception):
@@ -12,7 +13,7 @@ class TSharkCrashException(Exception):
 
 class Frame:
     def __init__(self, time_epoch: str):
-        self.time_epoch = time_epoch
+        self.time_epoch = converts_tshark_packet_timestamp_to_datetime_object(time_epoch)
 
 class IP:
     def __init__(self, src: str, dst: str):
@@ -21,8 +22,8 @@ class IP:
 
 class UDP:
     def __init__(self, srcport: str, dstport: str):
-        self.srcport = srcport
-        self.dstport = dstport
+        self.srcport = int(srcport)
+        self.dstport = int(dstport)
 
 class Packet:
     def __init__(self, fields: list):
@@ -80,6 +81,9 @@ class PacketCapture:
             self._tshark__process = process
 
             yield from (Packet(fields) for fields in map(process_tshark_stdout, process.stdout))
+
+def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
+    return datetime.fromtimestamp(timestamp=float(packet_frame_time_epoch))
 
 def get_tshark_path(tshark_path: Path = None):
     """Finds the path of the tshark executable.

@@ -32,7 +32,7 @@ import webbrowser
 import importlib.metadata
 from pathlib import Path
 from types import FrameType
-from operator import itemgetter
+from operator import attrgetter
 from ipaddress import IPv4Address
 from typing import Optional
 from datetime import datetime, timedelta
@@ -202,6 +202,47 @@ class PrintCacher:
     def flush_cache(self):
         print("\n".join(self.cache))
         self.cache = []
+
+class Player:
+    def __init__(self, packet_timestamp: datetime, ip: str, port: int):
+        self.packets = 1
+        self.pps_t1 = packet_timestamp
+        self.pps_counter = 0
+        self.packets_per_second = 0
+        self.is_pps_first_calculation = True
+
+        self.ip = ip
+
+        self.ports = [port]
+        self.first_port = port
+        self.last_port = port
+
+        self.datetime_first_seen = packet_timestamp
+        self.datetime_last_seen = packet_timestamp
+        self.datetime_left = None
+
+        self.country_iso = None
+        self.country_name = None
+        self.asn = None
+
+        self.just_joined = True
+        self.rejoined = None
+
+class PlayersRegistry:
+    def __init__(self):
+        self.players: dict[str, Player] = {}
+
+    def add_player(self, player: Player):
+        if player.ip in self.players:
+            raise ValueError(f"Player with IP \"{player.ip}\" already exists.")
+        self.players[player.ip] = player
+
+    def get_player(self, ip: str):
+        return self.players.get(ip)
+
+    def iterate_players_from_registry(self):
+        for player in self.players.values():
+            yield player
 
 def create_unsafe_https_session():
     # Standard Python Libraries
@@ -454,9 +495,6 @@ def format_mac_address(mac_address: str):
 
     # deepcode ignore AttributeLoadOnNone: It's impossible for 'mac_address' to be 'None' at this point. If it were 'None', a TypeError would have been raised earlier in the code, most likely from the 'is_mac_address()' function.
     return mac_address.replace("-", ":").upper()
-
-def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
-    return datetime.fromtimestamp(timestamp=float(packet_frame_time_epoch))
 
 def get_country_info(ip_address: str):
     country_name = "N/A"
@@ -1423,7 +1461,7 @@ if not capture.tshark_path == TSHARK_PATH:
     TSHARK_PATH = capture.tshark_path
     reconstruct_settings()
 
-session_db = []
+players_registry = PlayersRegistry()
 tshark_latency = []
 
 def stdout_render_core():
@@ -1436,23 +1474,23 @@ def stdout_render_core():
 
         return max_padding
 
-    def port_list_creation(color: str):
+    def port_list_creation(player: Player):
         stdout_port_list = ""
 
-        for port in player["ports"]:
+        for port in player.ports:
             to_add_in_portlist = None
 
-            if port == player["first_port"] == player["last_port"]:
+            if port == player.first_port == player.last_port:
                 to_add_in_portlist = f"[{UNDERLINE}{port}{UNDERLINE_RESET}]"
-            elif port == player["first_port"]:
+            elif port == player.first_port:
                 to_add_in_portlist = f"[{port}]"
-            elif port == player["last_port"]:
+            elif port == player.last_port:
                 to_add_in_portlist = f"{UNDERLINE}{port}{UNDERLINE_RESET}"
             else:
                 to_add_in_portlist = f"{port}"
 
             if to_add_in_portlist:
-                stdout_port_list = create_or_happen_to_variable(stdout_port_list, ", ", f"{color}{to_add_in_portlist}{Fore.RESET}")
+                stdout_port_list = create_or_happen_to_variable(stdout_port_list, ", ", to_add_in_portlist)
 
         return stdout_port_list
 
@@ -1477,16 +1515,19 @@ def stdout_render_core():
 
     def extract_datetime_from_timestamp(datetime_object: datetime):
         if STDOUT_SHOW_DATE:
-            formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S")
+            formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
         else:
-            formatted_datetime = datetime_object.strftime("%H:%M:%S")
+            formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
 
         return formatted_datetime
 
-    def format_player_pps(packets_per_second: int):
+    def format_player_pps(is_pps_first_calculation: bool, packets_per_second: int):
         # TODO: Add that it's not red when new people are showd
         if packets_per_second == 0:
-            pps_color = Fore.RED
+            if is_pps_first_calculation:
+                pps_color = Fore.GREEN
+            else:
+                pps_color = Fore.RED
         elif packets_per_second == 1:
             pps_color = Fore.YELLOW
         else:
@@ -1503,63 +1544,46 @@ def stdout_render_core():
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
         session_disconnected__padding_country_name = 0
-        session_connected = []
-        session_disconnected = []
+        session_connected: list[Player] = []
+        session_disconnected: list[Player] = []
 
         date_time_now = datetime.now()
         time_perf_counter = time.perf_counter()
 
-        for player in session_db:
+        for player in players_registry.iterate_players_from_registry():
             if (
-                not player["datetime_left"]
-                and (date_time_now - player["datetime_last_seen"]) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
+                not player.datetime_left
+                and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=PLAYER_DISCONNECTED_TIMER)
             ):
-               player["datetime_left"] = player["datetime_last_seen"]
+               player.datetime_left = player.datetime_last_seen
 
-            if not "asn" in player:
-                player["asn"] = get_asn_info(player["ip"])
+            if player.asn is None:
+                player.asn = get_asn_info(player.ip)
 
-            if not "country_name" in player:
-                player["country_name"], player["country_iso"] = get_country_info(player["ip"])
+            if player.country_name is None:
+                player.country_name, player.country_iso = get_country_info(player.ip)
 
-            if player["datetime_left"]:
-                session_disconnected.append({
-                    "datetime_last_seen": player["datetime_last_seen"],
-                    "datetime_first_seen": player["datetime_first_seen"],
-                    "packets": player["packets"],
-                    "ip": player["ip"],
-                    "stdout_port_list": port_list_creation(Fore.RED),
-                    "country_name": player["country_name"],
-                    "country_iso": player["country_iso"],
-                    "asn": player["asn"]
-                })
+            if player.datetime_left:
+                session_disconnected.append(player)
             else:
-                session_connected__padding_country_name = get_minimum_padding(player["country_name"], session_connected__padding_country_name, 27)
+                session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
 
-                player_time_delta: timedelta = (date_time_now - player["pps_t1"])
+                player_time_delta: timedelta = (date_time_now - player.pps_t1)
                 if player_time_delta >= timedelta(seconds=1):
-                    player["packets_per_second"] = round(player["pps_counter"] / player_time_delta.total_seconds())
-                    player["pps_counter"] = 0
-                    player["pps_t1"] = date_time_now
+                    player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
+                    player.pps_counter = 0
+                    player.pps_t1 = date_time_now
+                    player.is_pps_first_calculation = False
 
-                session_connected.append({
-                    "datetime_first_seen": player["datetime_first_seen"],
-                    "packets": player["packets"],
-                    "packets_per_second": player["packets_per_second"],
-                    "ip": player["ip"],
-                    "stdout_port_list": port_list_creation(Fore.GREEN),
-                    "country_name": player["country_name"],
-                    "country_iso": player["country_iso"],
-                    "asn": player["asn"]
-                })
+                session_connected.append(player)
 
-        session_connected = sorted(session_connected, key=itemgetter("datetime_first_seen"))
-        session_disconnected = sorted(session_disconnected, key=itemgetter("datetime_last_seen"))
+        session_connected = sorted(session_connected, key=attrgetter("datetime_first_seen"))
+        session_disconnected = sorted(session_disconnected, key=attrgetter("datetime_last_seen"))
 
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
         for player in session_disconnected__stdout_counter:
-            session_disconnected__padding_country_name = get_minimum_padding(player["country_name"], session_disconnected__padding_country_name, 27)
+            session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
 
         if (
             STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
@@ -1629,13 +1653,13 @@ def stdout_render_core():
         connected_players_table.field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]
         connected_players_table.align = "l"
         connected_players_table.add_rows([
-            f"{Fore.GREEN}{extract_datetime_from_timestamp(player['datetime_first_seen'])}{Fore.RESET}",
-            f"{Fore.GREEN}{player['packets']}{Fore.RESET}",
-            f"{Fore.GREEN}{format_player_pps(player['packets_per_second'])}{Fore.RESET}",
-            f"{Fore.GREEN}{player['ip']}{Fore.RESET}",
-            f"{Fore.GREEN}{player['stdout_port_list']}{Fore.RESET}",
-            f"{Fore.GREEN}{player['country_name']:<{session_connected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
-            f"{Fore.GREEN}{player['asn']}{Fore.RESET}"
+            f"{Fore.GREEN}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
+            f"{Fore.GREEN}{player.packets}{Fore.RESET}",
+            f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
+            f"{Fore.GREEN}{player.ip}{Fore.RESET}",
+            f"{Fore.GREEN}{port_list_creation(player)}{Fore.RESET}",
+            f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
+            f"{Fore.GREEN}{player.asn}{Fore.RESET}"
         ] for player in session_connected)
 
         disconnected_players_table = PrettyTable()
@@ -1644,13 +1668,13 @@ def stdout_render_core():
         disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
         disconnected_players_table.align = "l"
         disconnected_players_table.add_rows([
-            f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_last_seen'])}{Fore.RESET}",
-            f"{Fore.RED}{extract_datetime_from_timestamp(player['datetime_first_seen'])}{Fore.RESET}",
-            f"{Fore.RED}{player['packets']}{Fore.RESET}",
-            f"{Fore.RED}{player['ip']}{Fore.RESET}",
-            f"{Fore.RED}{player['stdout_port_list']}{Fore.RESET}",
-            f"{Fore.RED}{player['country_name']:<{session_disconnected__padding_country_name}} ({player['country_iso']}){Fore.RESET}",
-            f"{Fore.RED}{player['asn']}{Fore.RESET}"
+            f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_last_seen)}{Fore.RESET}",
+            f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
+            f"{Fore.RED}{player.packets}{Fore.RESET}",
+            f"{Fore.RED}{player.ip}{Fore.RESET}",
+            f"{Fore.RED}{port_list_creation(player)}{Fore.RESET}",
+            f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
+            f"{Fore.RED}{player.asn}{Fore.RESET}"
         ] for player in session_disconnected__stdout_counter)
 
         printer.cache_print("")
@@ -1700,7 +1724,7 @@ def packet_callback(packet: Packet):
 
     pps_counter += 1
 
-    packet_timestamp = converts_tshark_packet_timestamp_to_datetime_object(packet.frame.time_epoch)
+    packet_timestamp = packet.frame.time_epoch
     packet_latency = datetime.now() - packet_timestamp
     tshark_latency.append(packet_latency)
     if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
@@ -1724,40 +1748,44 @@ def packet_callback(packet: Packet):
             return
         recently_resolved_ips.add(target__ip)
 
-    for player in session_db:
-        if player["ip"] == target__ip:
-            if player["datetime_left"]:
-                if STDOUT_RESET_INFOS_ON_CONNECTED:
-                    session_db.remove(player)
-                    break
-                player["pps_t1"] = packet_timestamp
-                player["pps_counter"] = 0
-                player["datetime_left"] = None
-            else:
-                player["pps_counter"] += 1
-            player["packets"] += 1
-            if target__port not in player["ports"]:
-                player["ports"].append(target__port)
-            player["last_port"] = target__port
-            player["datetime_last_seen"] = packet_timestamp
-
-            return
-
-    session_db.append(
-        dict(
-            packets = 1,
-            pps_t1 = packet_timestamp,
-            pps_counter = 0,
-            packets_per_second = 0,
-            ip = target__ip,
-            ports = [target__port],
-            first_port = target__port,
-            last_port = target__port,
-            datetime_first_seen = packet_timestamp,
-            datetime_last_seen = packet_timestamp,
-            datetime_left = None
+    player = players_registry.get_player(target__ip)
+    if player is None:
+        players_registry.add_player(
+            Player(packet_timestamp, target__ip, target__port)
         )
-    )
+        return
+
+    player.just_joined = False
+
+    if not player.datetime_left:
+        player.rejoined = False
+
+        player.packets += 1
+        player.pps_counter += 1
+
+        if target__port not in player.ports:
+            player.ports.append(target__port)
+        player.last_port = target__port
+        player.datetime_last_seen = packet_timestamp
+
+        return
+
+    player.datetime_left = None
+    player.rejoined = True
+
+    player.pps_t1 = packet_timestamp
+    player.pps_counter = 0
+    player.packets_per_second = 0
+    player.is_pps_first_calculation = True
+
+    if STDOUT_RESET_INFOS_ON_CONNECTED:
+        player.packets = 1
+
+        player.ports = [target__port]
+        player.first_port = target__port
+        player.last_port = target__port
+
+    return
 
 cls()
 title(TITLE)
