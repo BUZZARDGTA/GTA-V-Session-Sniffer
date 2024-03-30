@@ -712,8 +712,18 @@ def reconstruct_settings():
         ;;<STDOUT_SHOW_ADVERTISING>
         ;;Determine if you want or not to show the developer's advertisements in the script's display.
         ;;
-        ;;<STDOUT_SHOW_DATE>
+        ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
         ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
+        ;;
+        ;;<STDOUT_FIELD_SORTED_BY>
+        ;;Specifies the fields by which you want the output data to be sorted.
+        ;;Valid values include any field names. For example: First Seen
+        ;;
+        ;;<STDOUT_FIELD_PPS_TIMER>
+        ;;The Packets Per Second (PPS) time interval calculated for each player.
+        ;;
+        ;;<STDOUT_GLOBAL_PPS_TIMER>
+        ;;The global Packets Per Second (PPS) time interval calculated for all players combined.
         ;;
         ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
         ;;Resets and recalculates each fields for players who were previously disconnected.
@@ -781,7 +791,7 @@ def reconstruct_settings():
     SETTINGS_PATH.write_text(text, encoding="utf-8")
 
 def apply_settings():
-    global TSHARK_PATH, STDOUT_SHOW_ADVERTISING, STDOUT_SHOW_DATE, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
+    global TSHARK_PATH, STDOUT_SHOW_ADVERTISING, STDOUT_FIELD_SHOW_SEEN_DATE, STDOUT_FIELD_SORTED_BY, STDOUT_FIELD_PPS_TIMER, STDOUT_GLOBAL_PPS_TIMER, STDOUT_RESET_INFOS_ON_CONNECTED, STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, STDOUT_REFRESHING_TIMER, PLAYER_DISCONNECTED_TIMER, PACKET_CAPTURE_OVERFLOW_TIMER, NETWORK_INTERFACE_CONNECTION_PROMPT, INTERFACE_NAME, IP_ADDRESS, MAC_ADDRESS, ARP, BLOCK_THIRD_PARTY_SERVERS, PROGRAM_PRESET, VPN_MODE, LOW_PERFORMANCE_MODE
 
     def return_setting(setting: str, need_rewrite_settings: bool):
         return_setting_value = None
@@ -847,15 +857,47 @@ def apply_settings():
             else:
                 need_rewrite_settings = True
                 STDOUT_SHOW_ADVERTISING = True
-        elif setting == "STDOUT_SHOW_DATE":
-            STDOUT_SHOW_DATE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
-            if STDOUT_SHOW_DATE == "True":
-                STDOUT_SHOW_DATE = True
-            elif STDOUT_SHOW_DATE == "False":
-                STDOUT_SHOW_DATE = False
+        elif setting == "STDOUT_FIELD_SHOW_SEEN_DATE":
+            STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if STDOUT_FIELD_SHOW_SEEN_DATE == "True":
+                STDOUT_FIELD_SHOW_SEEN_DATE = True
+            elif STDOUT_FIELD_SHOW_SEEN_DATE == "False":
+                STDOUT_FIELD_SHOW_SEEN_DATE = False
             else:
                 need_rewrite_settings = True
-                STDOUT_SHOW_DATE = False
+                STDOUT_FIELD_SHOW_SEEN_DATE = False
+        elif setting == "STDOUT_FIELD_SORTED_BY":
+            STDOUT_FIELD_SORTED_BY, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            if not STDOUT_FIELD_SORTED_BY in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]:
+                STDOUT_FIELD_SORTED_BY = "First Seen"
+        elif setting == "STDOUT_FIELD_PPS_TIMER":
+            STDOUT_FIELD_PPS_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            try:
+                STDOUT_FIELD_PPS_TIMER = float(STDOUT_FIELD_PPS_TIMER)
+            except (ValueError, TypeError):
+                reset_current_setting__flag = True
+            else:
+                if STDOUT_FIELD_PPS_TIMER < 1.0:
+                    reset_current_setting__flag = True
+                else:
+                    reset_current_setting__flag = False
+            if reset_current_setting__flag:
+                need_rewrite_settings = True
+                STDOUT_FIELD_PPS_TIMER = 1.0
+        elif setting == "STDOUT_GLOBAL_PPS_TIMER":
+            STDOUT_GLOBAL_PPS_TIMER, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
+            try:
+                STDOUT_GLOBAL_PPS_TIMER = float(STDOUT_GLOBAL_PPS_TIMER)
+            except (ValueError, TypeError):
+                reset_current_setting__flag = True
+            else:
+                if STDOUT_GLOBAL_PPS_TIMER < 1.0:
+                    reset_current_setting__flag = True
+                else:
+                    reset_current_setting__flag = False
+            if reset_current_setting__flag:
+                need_rewrite_settings = True
+                STDOUT_GLOBAL_PPS_TIMER = 1.0
         elif setting == "STDOUT_RESET_INFOS_ON_CONNECTED":
             STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_settings = return_setting(setting, need_rewrite_settings)
             if STDOUT_RESET_INFOS_ON_CONNECTED == "True":
@@ -1050,7 +1092,10 @@ HEADERS = {
 SETTINGS_LIST = [
     "TSHARK_PATH",
     "STDOUT_SHOW_ADVERTISING",
-    "STDOUT_SHOW_DATE",
+    "STDOUT_FIELD_SHOW_SEEN_DATE",
+    "STDOUT_FIELD_SORTED_BY",
+    "STDOUT_FIELD_PPS_TIMER",
+    "STDOUT_GLOBAL_PPS_TIMER",
     "STDOUT_RESET_INFOS_ON_CONNECTED",
     "STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS",
     "STDOUT_REFRESHING_TIMER",
@@ -1517,7 +1562,7 @@ def stdout_render_core():
         return padding_width
 
     def extract_datetime_from_timestamp(datetime_object: datetime):
-        if STDOUT_SHOW_DATE:
+        if STDOUT_FIELD_SHOW_SEEN_DATE:
             formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
         else:
             formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
@@ -1537,11 +1582,23 @@ def stdout_render_core():
 
         return f"{pps_color}{packets_per_second}{Fore.RESET}"
 
-    global pps_counter, tshark_latency
+    global tshark_latency
 
     printer = PrintCacher()
-    pps_t1 = time.perf_counter()
+    global_pps_t1 = time.perf_counter()
+    global_pps_counter = 0
     packets_per_second = 0
+    # Mapping of field names
+    field_mapping = {
+        "First Seen": "datetime_first_seen",
+        "Last Seen": "datetime_last_seen",
+        "Packets": "packets",
+        "PPS": "packets_per_second",
+        "IP Address": "ip",
+        "Ports": "ports",
+        "Country": "country_name",
+        "Asn": "asn"
+    }
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1569,9 +1626,10 @@ def stdout_render_core():
                 session_disconnected.append(player)
             else:
                 session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
+                global_pps_counter += player.pps_counter
 
                 player_time_delta: timedelta = (date_time_now - player.pps_t1)
-                if player_time_delta >= timedelta(seconds=1):
+                if player_time_delta >= timedelta(seconds=STDOUT_FIELD_PPS_TIMER):
                     player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
                     player.pps_counter = 0
                     player.pps_t1 = date_time_now
@@ -1579,8 +1637,13 @@ def stdout_render_core():
 
                 session_connected.append(player)
 
-        session_connected = sorted(session_connected, key=attrgetter("datetime_first_seen"))
-        session_disconnected = sorted(session_disconnected, key=attrgetter("datetime_last_seen"))
+
+        sorted_key = field_mapping.get(STDOUT_FIELD_SORTED_BY, None)
+        session_connected = sorted(session_connected, key=attrgetter(sorted_key))
+        session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
+
+        session_connected = sorted(session_connected, key=attrgetter(sorted_key))
+        session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
 
         session_disconnected__stdout_counter = session_disconnected[-STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
@@ -1629,12 +1692,12 @@ def stdout_render_core():
         else:
             latency_color = Fore.GREEN
 
-        pps_t2 = time_perf_counter
-        seconds_elapsed = pps_t2 - pps_t1
-        if seconds_elapsed >= 1:
-            packets_per_second = round(pps_counter / seconds_elapsed)
-            pps_counter = 0
-            pps_t1 = pps_t2
+        global_pps_t2 = time_perf_counter
+        seconds_elapsed = global_pps_t2 - global_pps_t1
+        if seconds_elapsed >= STDOUT_GLOBAL_PPS_TIMER:
+            packets_per_second = round(global_pps_counter / seconds_elapsed)
+            global_pps_counter = 0
+            global_pps_t1 = global_pps_t2
 
         # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
         # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
@@ -1722,11 +1785,10 @@ def clear_recently_resolved_ips():
         threading.Timer(1, clear_recently_resolved_ips).start()
 
 def packet_callback(packet: Packet):
-    global pps_counter, tshark_restarted_times
-
-    pps_counter += 1
+    global tshark_restarted_times
 
     packet_timestamp = packet.frame.time_epoch
+
     packet_latency = datetime.now() - packet_timestamp
     tshark_latency.append(packet_latency)
     if packet_latency >= timedelta(seconds=PACKET_CAPTURE_OVERFLOW_TIMER):
@@ -1794,7 +1856,6 @@ cls()
 title(TITLE)
 
 PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
-pps_counter = 0
 tshark_restarted_times = 0
 
 # deepcode ignore MissingAPI: <please specify a reason of ignoring this>
