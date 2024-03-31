@@ -118,7 +118,8 @@ class Settings:
     TSHARK_PATH = None
     STDOUT_SHOW_ADVERTISING = True
     STDOUT_FIELD_SHOW_SEEN_DATE = False
-    STDOUT_FIELD_SORTED_BY = "First Seen"
+    STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY = "First Seen"
+    STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
     STDOUT_FIELD_PPS_TIMER = 1.0
     STDOUT_GLOBAL_PPS_TIMER = 1.0
     STDOUT_RESET_INFOS_ON_CONNECTED = True
@@ -135,23 +136,37 @@ class Settings:
     PROGRAM_PRESET = None
     VPN_MODE = False
 
+    _allowed_settings_types = (Path, str, int, bool, float, type(None))
+
+    _stdout_fields_mapping = {
+        "First Seen": "datetime_first_seen",
+        "Last Seen": "datetime_last_seen",
+        "Packets": "packets",
+        "PPS": "packets_per_second",
+        "IP Address": "ip",
+        "Ports": "ports",
+        "Country": "country_name",
+        "City": "city",
+        "Asn": "asn"
+    }
+
     @classmethod
     def iterate_over_settings(cls):
         for attr_name in vars(cls):
+            attr_value = getattr(cls, attr_name)
+
             if (
-                not attr_name.startswith("_")
-                and not callable(getattr(cls, attr_name))
+                attr_name.startswith("_")
+                or callable(attr_value)
+                or not isinstance(attr_value, Settings._allowed_settings_types)
             ):
-                yield attr_name, getattr(cls, attr_name)
+                continue
+
+            yield attr_name, attr_value
 
     @classmethod
     def get_settings_length(cls):
-        return len([
-            attr_name for attr_name in vars(cls) if (
-                not attr_name.startswith("_")
-                and not callable(getattr(cls, attr_name))
-            )
-        ])
+        return sum(1 for _ in cls.iterate_over_settings())
 
     @classmethod
     def has_setting(cls, setting_name):
@@ -178,8 +193,12 @@ class Settings:
             ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
             ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
             ;;
-            ;;<STDOUT_FIELD_SORTED_BY>
-            ;;Specifies the fields by which you want the output data to be sorted.
+            ;;<STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY>
+            ;;Specifies the fields from the connected players by which you want the output data to be sorted.
+            ;;Valid values include any field names. For example: First Seen
+            ;;
+            ;;<STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY>
+            ;;Specifies the fields from the disconnected players by which you want the output data to be sorted.
             ;;Valid values include any field names. For example: First Seen
             ;;
             ;;<STDOUT_FIELD_PPS_TIMER>
@@ -359,9 +378,14 @@ class Settings:
                         Settings.STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_SORTED_BY":
-                    if setting_value in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]:
-                        Settings.STDOUT_FIELD_SORTED_BY = setting_value
+                elif setting_name == "STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY":
+                    if setting_value in Settings._stdout_fields_mapping.keys():
+                        Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY = setting_value
+                    else:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY":
+                    if setting_value in Settings._stdout_fields_mapping.keys():
+                        Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY = setting_value
                     else:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_PPS_TIMER":
@@ -1580,24 +1604,26 @@ def stdout_render_core():
 
         return f"{pps_color}{packets_per_second}{Fore.RESET}"
 
+    def add_down_arrow_to_field(field_names: list[str], target_field: str):
+        for i, field in enumerate(field_names):
+            if field == target_field:
+                field_names[i] += " \u2193"
+                break
+
     global global_pps_counter, tshark_latency
+
+    session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
+    session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
+
+    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]
+    add_down_arrow_to_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
+    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn"]
+    add_down_arrow_to_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
 
     global_pps_t1 = time.perf_counter()
     global_packets_per_second = 0
-
-    field_mapping = {
-        "First Seen": "datetime_first_seen",
-        "Last Seen": "datetime_last_seen",
-        "Packets": "packets",
-        "PPS": "packets_per_second",
-        "IP Address": "ip",
-        "Ports": "ports",
-        "Country": "country_name",
-        "City": "city",
-        "Asn": "asn"
-    }
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1638,15 +1664,13 @@ def stdout_render_core():
 
                 session_connected.append(player)
 
+        session_connected = sorted(session_connected, key=attrgetter(session_connected_sorted_key))
+        session_disconnected = sorted(session_disconnected, key=attrgetter(session_disconnected_sorted_key))
 
-        sorted_key = field_mapping.get(Settings.STDOUT_FIELD_SORTED_BY, None)
-        session_connected = sorted(session_connected, key=attrgetter(sorted_key))
-        session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
-
-        session_connected = sorted(session_connected, key=attrgetter(sorted_key))
-        session_disconnected = sorted(session_disconnected, key=attrgetter(sorted_key))
-
-        session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
+        if Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY == "First Seen":
+            session_disconnected__stdout_counter = session_disconnected[:Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS]
+        else:
+            session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
 
         for player in session_disconnected__stdout_counter:
             session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
@@ -1716,7 +1740,7 @@ def stdout_render_core():
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-        connected_players_table.field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]
+        connected_players_table.field_names = connected_players_table__field_names
         connected_players_table.align = "l"
         connected_players_table.add_rows([
             f"{Fore.GREEN}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
@@ -1732,7 +1756,7 @@ def stdout_render_core():
         disconnected_players_table = PrettyTable()
         disconnected_players_table.set_style(SINGLE_BORDER)
         disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn"]
+        disconnected_players_table.field_names = disconnected_players_table__field_names
         disconnected_players_table.align = "l"
         disconnected_players_table.add_rows([
             f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_last_seen)}{Fore.RESET}",
