@@ -110,8 +110,9 @@ def get_tshark_path(tshark_path: Path = None):
             possible_paths.insert(0, user_tshark_path)
 
     for env in ("ProgramFiles", "ProgramFiles(x86)"):
-        program_files = Path(os.getenv(env))
-        if program_files is not None:
+        env_path = os.getenv(env)
+        if env_path is not None:
+            program_files = Path(env_path)
             possible_paths.append(program_files / "Wireshark" / "tshark.exe")
 
     for path in possible_paths:
