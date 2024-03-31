@@ -303,7 +303,7 @@ class Settings:
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_SORTED_BY":
-                    if setting_value in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]:
+                    if setting_value in ["First Seen", "Last Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]:
                         Settings.STDOUT_FIELD_SORTED_BY = setting_value
                     else:
                         need_rewrite_settings = True
@@ -605,6 +605,7 @@ class Player:
 
         self.country_iso = None
         self.country_name = None
+        self.city = None
         self.asn = None
 
         self.just_joined = True
@@ -895,6 +896,19 @@ def get_country_info(ip_address: str):
 
     return country_name, country_iso
 
+def get_city_info(ip_address: str):
+    city = "N/A"
+
+    if geoip2_enabled:
+        try:
+            response = geolite2_city_reader.city(ip_address)
+        except geoip2.errors.AddressNotFoundError:
+            pass
+        else:
+            city = str(response.city.name)
+
+    return city
+
 def get_asn_info(ip_address: str):
     asn = "N/A"
 
@@ -941,7 +955,7 @@ def update_and_initialize_geolite2_readers():
                 "last_version": None,
                 "download_url": None
             }
-            for db in ["ASN", "Country"]
+            for db in ["ASN", "City", "Country"]
         }
 
         try:
@@ -1025,24 +1039,27 @@ def update_and_initialize_geolite2_readers():
     def initialize_geolite2_readers():
         try:
             geolite2_asn_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-ASN.mmdb")
+            geolite2_city_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-City.mmdb")
             geolite2_country_reader = geoip2.database.Reader(geolite2_databases_folder_path / R"GeoLite2-Country.mmdb")
 
             geolite2_asn_reader.asn("1.1.1.1")
+            geolite2_city_reader.city("1.1.1.1")
             geolite2_country_reader.country("1.1.1.1")
-
-            exception = None
         except Exception as e:
             geolite2_asn_reader = None
+            geolite2_city_reader = None
             geolite2_country_reader = None
 
             exception = e
+        else:
+            exception = None
 
-        return exception, geolite2_asn_reader, geolite2_country_reader
+        return exception, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
     geolite2_databases_folder_path = Path("GeoLite2 Databases")
 
     update_geolite2_databases__dict = update_geolite2_databases()
-    exception__initialize_geolite2_readers, geolite2_asn_reader, geolite2_country_reader = initialize_geolite2_readers()
+    exception__initialize_geolite2_readers, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = initialize_geolite2_readers()
 
     show_error = False
     msgbox_text = ""
@@ -1054,13 +1071,13 @@ def update_and_initialize_geolite2_readers():
         msgbox_text += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"."
         if update_geolite2_databases__dict["http_code"]:
             msgbox_text += f" (http_code: {update_geolite2_databases__dict['http_code']})"
-        msgbox_text += "\nImpossible to keep Maxmind's GeoLite2 IP-to-Country and ASN resolutions feature up-to-date.\n\n"
+        msgbox_text += "\nImpossible to keep Maxmind's GeoLite2 IP to Country, City and ASN resolutions feature up-to-date.\n\n"
         show_error = True
 
     if exception__initialize_geolite2_readers:
         msgbox_text += f"Exception Error: {exception__initialize_geolite2_readers}\n\n"
-        msgbox_text += "Now disabling MaxMind's GeoLite2 IP-to-Country and ASN resolutions feature.\n"
-        msgbox_text += "Countrys and ASN from players won't shows up from the players fields."
+        msgbox_text += "Now disabling MaxMind's GeoLite2 IP to Country, City and ASN resolutions feature.\n"
+        msgbox_text += "Countrys, Citys and ASN from players won't shows up from the players fields."
         geoip2_enabled = False
         show_error = True
     else:
@@ -1072,7 +1089,7 @@ def update_and_initialize_geolite2_readers():
         msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
         show_message_box(msgbox_title, msgbox_text, msgbox_style)
 
-    return geoip2_enabled, geolite2_asn_reader, geolite2_country_reader
+    return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
@@ -1222,10 +1239,10 @@ print("\nApplying your custom settings from \"Settings.ini\" ...\n")
 Settings.load_from_file(SETTINGS_PATH)
 
 cls()
-title(f"Initializing and updating MaxMind's GeoLite2 Country, and ASN databases - {TITLE}")
-print("\nInitializing and updating MaxMind's GeoLite2 Country, and ASN databases ...\n")
+title(f"Initializing and updating MaxMind's GeoLite2 Country, City and ASN databases - {TITLE}")
+print("\nInitializing and updating MaxMind's GeoLite2 Country, City and ASN databases ...\n")
 
-geoip2_enabled, geolite2_asn_reader, geolite2_country_reader = update_and_initialize_geolite2_readers()
+geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = update_and_initialize_geolite2_readers()
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -1561,10 +1578,10 @@ def stdout_render_core():
     global global_pps_counter, tshark_latency
 
     printer = PrintCacher()
+
     global_pps_t1 = time.perf_counter()
     global_packets_per_second = 0
 
-    # Mapping of field names
     field_mapping = {
         "First Seen": "datetime_first_seen",
         "Last Seen": "datetime_last_seen",
@@ -1573,6 +1590,7 @@ def stdout_render_core():
         "IP Address": "ip",
         "Ports": "ports",
         "Country": "country_name",
+        "City": "city",
         "Asn": "asn"
     }
 
@@ -1597,6 +1615,9 @@ def stdout_render_core():
 
             if player.country_name is None:
                 player.country_name, player.country_iso = get_country_info(player.ip)
+
+            if player.city is None:
+                player.city = get_city_info(player.ip)
 
             if player.datetime_left:
                 session_disconnected.append(player)
@@ -1690,7 +1711,7 @@ def stdout_render_core():
         connected_players_table = PrettyTable()
         connected_players_table.set_style(SINGLE_BORDER)
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-        connected_players_table.field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "Asn"]
+        connected_players_table.field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]
         connected_players_table.align = "l"
         connected_players_table.add_rows([
             f"{Fore.GREEN}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
@@ -1699,13 +1720,14 @@ def stdout_render_core():
             f"{Fore.GREEN}{player.ip}{Fore.RESET}",
             f"{Fore.GREEN}{port_list_creation(player)}{Fore.RESET}",
             f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
+            f"{Fore.GREEN}{player.city}{Fore.RESET}",
             f"{Fore.GREEN}{player.asn}{Fore.RESET}"
         ] for player in session_connected)
 
         disconnected_players_table = PrettyTable()
         disconnected_players_table.set_style(SINGLE_BORDER)
         disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "Asn"]
+        disconnected_players_table.field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn"]
         disconnected_players_table.align = "l"
         disconnected_players_table.add_rows([
             f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_last_seen)}{Fore.RESET}",
@@ -1714,6 +1736,7 @@ def stdout_render_core():
             f"{Fore.RED}{player.ip}{Fore.RESET}",
             f"{Fore.RED}{port_list_creation(player)}{Fore.RESET}",
             f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
+            f"{Fore.RED}{player.city}{Fore.RESET}",
             f"{Fore.RED}{player.asn}{Fore.RESET}"
         ] for player in session_disconnected__stdout_counter)
 
