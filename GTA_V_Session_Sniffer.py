@@ -29,7 +29,6 @@ import textwrap
 import threading
 import subprocess
 import webbrowser
-import importlib.metadata
 from pathlib import Path
 from types import FrameType
 from operator import attrgetter
@@ -56,6 +55,64 @@ class InvalidBooleanValueError(Exception):
 
 class InvalidNoneTypeValueError(Exception):
     pass
+
+class Version:
+    def __init__(self, version: str):
+        self.major, self.minor, self.patch = map(int, version[1:6:2])
+        self.date = datetime.strptime(version[9:19], "%d/%m/%Y").date().strftime("%d/%m/%Y")
+
+        # Check if the version string contains the time component
+        if (
+            len(version) == 27
+            and re.search(r" \((\d{2}:\d{2})\)$", version)
+        ):
+            self.time = datetime.strptime(version[21:26], "%H:%M").time().strftime("%H:%M")
+            self._date_time = datetime.strptime(version[9:27], "%d/%m/%Y (%H:%M)")
+        else:
+            self.time = None
+            self._date_time = datetime.strptime(version[9:19], "%d/%m/%Y")
+
+    def __str__(self):
+        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f' ({self.time})' if self.time else ''}"
+
+class Updater:
+    def __init__(self, current_version: Version):
+        self.current_version = current_version
+
+    def check_for_update(self, latest_version: Version):
+        # Check if the latest version is newer than the current version
+        if (latest_version.major, latest_version.minor, latest_version.patch) > (self.current_version.major, self.current_version.minor, self.current_version.patch):
+            return True
+        elif (latest_version.major, latest_version.minor, latest_version.patch) == (self.current_version.major, self.current_version.minor, self.current_version.patch):
+            # Compare date and time if versioning is equal
+            if latest_version._date_time > self.current_version._date_time:
+                return True
+        return False
+
+class Msgbox(enum.IntFlag):
+    # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw
+    # https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/msgbox-function
+    OKOnly = 0  # Display OK button only.
+    OKCancel = 1  # Display OK and Cancel buttons.
+    AbortRetryIgnore = 2  # Display Abort, Retry, and Ignore buttons.
+    YesNoCancel = 3  # Display Yes, No, and Cancel buttons.
+    YesNo = 4  # Display Yes and No buttons.
+    RetryCancel = 5  # Display Retry and Cancel buttons.
+    Critical = 16  # Display Critical Message icon.
+    Question = 32  # Display Warning Query icon.
+    Exclamation = 48  # Display Warning Message icon.
+    Information = 64  # Display Information Message icon.
+    DefaultButton1 = 0  # First button is default.
+    DefaultButton2 = 256  # Second button is default.
+    DefaultButton3 = 512  # Third button is default.
+    DefaultButton4 = 768  # Fourth button is default.
+    ApplicationModal = 0  # Application modal; the user must respond to the message box before continuing work in the current application.
+    SystemModal = 4096  # System modal; all applications are suspended until the user responds to the message box.
+    MsgBoxHelpButton = 16384  # Adds Help button to the message box.
+    MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
+    MsgBoxRight = 524288  # Text is right-aligned.
+    MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class Settings:
     TSHARK_PATH = None
@@ -432,58 +489,6 @@ class Settings:
         if need_rewrite_settings:
             Settings.reconstruct_settings()
 
-class Version:
-    def __init__(self, version: str):
-        self.major = int(version[1])
-        self.minor = int(version[3])
-        self.patch = int(version[5])
-        self.date = f"{version[9:19]}"
-        self.version = f"v{version[1:6]}"
-        self.version_date = f"{self.version} - {self.date}"
-
-    def __str__(self):
-        return self.version_date
-
-class Updater:
-    def __init__(self, current_version: Version):
-        self.current_version = current_version
-
-    def check_for_update(self, latest_version: Version):
-        if latest_version.major > self.current_version.major:
-            return True
-        elif latest_version.major == self.current_version.major:
-            if latest_version.minor > self.current_version.minor:
-                return True
-            elif latest_version.minor == self.current_version.minor:
-                if latest_version.patch > self.current_version.patch:
-                    return True
-        return False
-
-class Msgbox(enum.IntFlag):
-    # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
-    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw
-    # https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/msgbox-function
-    OKOnly = 0  # Display OK button only.
-    OKCancel = 1  # Display OK and Cancel buttons.
-    AbortRetryIgnore = 2  # Display Abort, Retry, and Ignore buttons.
-    YesNoCancel = 3  # Display Yes, No, and Cancel buttons.
-    YesNo = 4  # Display Yes and No buttons.
-    RetryCancel = 5  # Display Retry and Cancel buttons.
-    Critical = 16  # Display Critical Message icon.
-    Question = 32  # Display Warning Query icon.
-    Exclamation = 48  # Display Warning Message icon.
-    Information = 64  # Display Information Message icon.
-    DefaultButton1 = 0  # First button is default.
-    DefaultButton2 = 256  # Second button is default.
-    DefaultButton3 = 512  # Third button is default.
-    DefaultButton4 = 768  # Fourth button is default.
-    ApplicationModal = 0  # Application modal; the user must respond to the message box before continuing work in the current application.
-    SystemModal = 4096  # System modal; all applications are suspended until the user responds to the message box.
-    MsgBoxHelpButton = 16384  # Adds Help button to the message box.
-    MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
-    MsgBoxRight = 524288  # Text is right-aligned.
-    MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
-
 class Interface:
     all_interfaces: list["Interface"] = []
 
@@ -626,7 +631,8 @@ class PlayersRegistry:
 
     @classmethod
     def iterate_players_from_registry(cls):
-        for player in cls.players_registry.values():
+        # Using list() ensures a static snapshot of the dictionary's values is used, avoiding the 'RuntimeError: dictionary changed size during iteration'.
+        for player in list(cls.players_registry.values()):
             yield player
 
 def create_unsafe_https_session():
@@ -746,6 +752,15 @@ def is_private_device_ipv4(ip_address: str):
         return False
 
     return True
+
+def get_minimum_padding(var: str | int, max_padding: int, padding: int):
+    current_padding = len(str(var))
+
+    if current_padding <= padding:
+        if current_padding > max_padding:
+            max_padding = current_padding
+
+    return max_padding
 
 def get_interface_info(interface_index: str):
     c: _wmi_namespace = wmi.WMI()
@@ -981,7 +996,7 @@ def update_and_initialize_geolite2_readers():
                 "url": github_release_api__geolite2,
                 "http_code": None
             }
-        if not response.status_code == 200:
+        if response.status_code != 200:
             return {
                 "exception": None,
                 "url": github_release_api__geolite2,
@@ -1009,7 +1024,7 @@ def update_and_initialize_geolite2_readers():
                         "url": database_info["download_url"],
                         "http_code": None
                     }
-                if not response.status_code == 200:
+                if response.status_code != 200:
                     return {
                         "exception": None,
                         "url": database_info["download_url"],
@@ -1102,7 +1117,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.0.7 - 30/03/2024 (10:47)"
+VERSION = "v1.1.0 - 31/03/2024 (18:38)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1112,49 +1127,48 @@ RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$"
 s = create_unsafe_https_session()
 
 cls()
-title(f"Checking that your Python packages versions matches with file \"requirements.txt\" - {TITLE}")
-print(f"\nChecking that your Python packages versions matches with file \"requirements.txt\" ...\n")
+if not is_pyinstaller_compiled():
+    import importlib.metadata
 
-def check_packages_version(third_party_packages: dict[str, str]):
-    outdated_packages = []
+    title(f"Checking that your Python packages versions matches with file \"requirements.txt\" - {TITLE}")
+    print(f"\nChecking that your Python packages versions matches with file \"requirements.txt\" ...\n")
 
-    for package_name, required_version in third_party_packages.items():
-        installed_version = importlib.metadata.version(package_name)
-        if installed_version != required_version:
-            outdated_packages.append((package_name, installed_version, required_version))
+    def check_packages_version(third_party_packages: dict[str, str]):
+        outdated_packages = []
 
-    return outdated_packages
+        for package_name, required_version in third_party_packages.items():
+            installed_version = importlib.metadata.version(package_name)
+            if not installed_version == required_version:
+                outdated_packages.append((package_name, installed_version, required_version))
 
-third_party_packages = {
-    "psutil": "5.9.8",
-    "requests": "2.31.0",
-    "urllib3": "2.2.1",
-    "WMI": "1.5.1"
-}
+        return outdated_packages
 
-outdated_packages: list[tuple[str, str, str]] = check_packages_version(third_party_packages)
-if outdated_packages:
-    msgbox_text = "Your following packages are not up to date:\n\n"
-    msgbox_text += "Package Name\tInstalled version\tRequired version\n"
+    third_party_packages = {
+        "psutil": "5.9.8",
+        "requests": "2.31.0",
+        "urllib3": "2.2.1",
+        "WMI": "1.5.1"
+    }
 
-    name_padding = len("Package Name") + 2
-    installed_padding = len("Installed version") + 2
-    required_padding = len("Required version") + 2
+    outdated_packages: list[tuple[str, str, str]] = check_packages_version(third_party_packages)
+    if outdated_packages:
+        msgbox_text = "Your following packages are not up to date:\n\n"
+        msgbox_text += f"Package Name: Installed version --> Required version\n"
 
+        # Iterate over outdated packages and add each package's information to the message box text
+        for package_name, installed_version, required_version in outdated_packages:
+            msgbox_text += f"{package_name}: {installed_version} --> {required_version}\n"
 
-    for package_info in outdated_packages:
-        package_name, installed_version, required_version = package_info
+        # Add additional message box text
+        msgbox_text += f"\nKeeping your packages synced with \"{TITLE}\" ensures smooth script execution and prevents compatibility issues."
+        msgbox_text += "\n\nDo you want to ignore this warning and continue with script execution?"
 
-        msgbox_text += f"{package_name.ljust(name_padding)}\t{installed_version.ljust(installed_padding)}\t{required_version}\n"
-
-    msgbox_text += f"\n\nKeeping your packages synced with \"{TITLE}\" ensures smooth script execution and prevents compatibility issues."
-    msgbox_text += "\n\nDo you want to ignore this warning and continue with script execution?"
-
-    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
-    msgbox_title = TITLE
-    errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
-    if errorlevel != 6:
-        sys.exit(0)
+        # Show message box
+        msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
+        msgbox_title = TITLE
+        errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+        if errorlevel != 6:
+            sys.exit(0)
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -1270,10 +1284,10 @@ for interface, stats in net_io_stats.items():
         elif addr.family == psutil.AF_LINK:
             mac_addresses.append(addr.address)
 
-    if (
-        not ip_addresses
-        or len(mac_addresses) > 1
-    ):
+    if not ip_addresses:
+        continue
+
+    if len(mac_addresses) > 1:
         raise ValueError(
             "\nERROR:\n"
             "         Developer didn't expect this scenario to be possible.\n"
@@ -1506,15 +1520,6 @@ if not capture.tshark_path == Settings.TSHARK_PATH:
 tshark_latency = []
 
 def stdout_render_core():
-    def get_minimum_padding(var: str | int, max_padding: int, padding: int):
-
-        current_padding = len(str(var))
-        if current_padding <= padding:
-            if current_padding > max_padding:
-                max_padding = current_padding
-
-        return max_padding
-
     def port_list_creation(player: Player):
         stdout_port_list = ""
 
