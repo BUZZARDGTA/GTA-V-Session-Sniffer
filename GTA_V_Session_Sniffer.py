@@ -1117,7 +1117,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.0 - 31/03/2024 (18:38)"
+VERSION = "v1.1.0 - 31/03/2024 (19:01)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1198,7 +1198,7 @@ else:
             msgbox_text = f"""
                 New version found. Do you want to update ?
 
-                Current version: {VERSION}
+                Current version: {current_version}
                 Latest version : {latest_version}
             """
             msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
