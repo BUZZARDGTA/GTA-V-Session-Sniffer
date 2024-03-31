@@ -66,7 +66,7 @@ class Settings:
     STDOUT_GLOBAL_PPS_TIMER = 1.0
     STDOUT_RESET_INFOS_ON_CONNECTED = True
     STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS = 6
-    STDOUT_REFRESHING_TIMER = 3.0
+    STDOUT_REFRESHING_TIMER = 3
     PLAYER_DISCONNECTED_TIMER = 6.0
     PACKET_CAPTURE_OVERFLOW_TIMER = 3.0
     NETWORK_INTERFACE_CONNECTION_PROMPT = True
@@ -81,8 +81,8 @@ class Settings:
     @classmethod
     def iterate_over_settings(cls):
         for attr_name in vars(cls):
-            if not (
-                attr_name.startswith("_")
+            if (
+                not attr_name.startswith("_")
                 and not callable(getattr(cls, attr_name))
             ):
                 yield attr_name, getattr(cls, attr_name)
@@ -90,10 +90,10 @@ class Settings:
     @classmethod
     def get_settings_length(cls):
         return len([
-            attr_name
-            for attr_name in vars(cls)
-            if not attr_name.startswith("_")
-            and not callable(getattr(cls, attr_name))
+            attr_name for attr_name in vars(cls) if (
+                not attr_name.startswith("_")
+                and not callable(getattr(cls, attr_name))
+            )
         ])
 
     @classmethod
@@ -187,8 +187,8 @@ class Settings:
             ;;-----------------------------------------------------------------------------
         """
         text = textwrap.dedent(text.removeprefix("\n"))
-        for setting, _ in Settings.iterate_over_settings():
-            text += f"{setting}={getattr(Settings, setting)}\n"
+        for setting_name, setting_value in Settings.iterate_over_settings():
+            text += f"{setting_name}={setting_value}\n"
         SETTINGS_PATH.write_text(text, encoding="utf-8")
 
     def load_from_file(settings_path: Path):
@@ -1742,7 +1742,11 @@ def stdout_render_core():
                 print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
                 printed_text__flag = True
 
+                if exit_signal.is_set():
+                    break
                 time.sleep(sleep)
+                if exit_signal.is_set():
+                    break
                 continue
 
             refreshing_rate_t1 = refreshing_rate_t2
