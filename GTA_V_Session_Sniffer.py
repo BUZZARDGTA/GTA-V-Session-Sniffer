@@ -199,7 +199,7 @@ class Settings:
             ;;
             ;;<STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY>
             ;;Specifies the fields from the disconnected players by which you want the output data to be sorted.
-            ;;Valid values include any field names. For example: First Seen
+            ;;Valid values include any field names. For example: Last Seen
             ;;
             ;;<STDOUT_FIELD_PPS_TIMER>
             ;;The Packets Per Second (PPS) time interval calculated for each player.
@@ -1141,7 +1141,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.0 - 31/03/2024 (19:01)"
+VERSION = "v1.1.0 - 31/03/2024 (23:04)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
