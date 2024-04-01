@@ -4,6 +4,7 @@
 import wmi
 import psutil
 import colorama
+import requests
 import geoip2.errors
 import geoip2.database
 from colorama import Fore
@@ -29,11 +30,12 @@ import textwrap
 import threading
 import subprocess
 import webbrowser
+from queue import Queue
 from pathlib import Path
 from types import FrameType
+from typing import Optional
 from operator import attrgetter
 from ipaddress import IPv4Address
-from typing import Optional
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
 
@@ -637,6 +639,10 @@ class Player:
         self.city = None
         self.asn = None
 
+        self.mobile = None
+        self.proxy = None
+        self.hosting = None
+
         self.just_joined = True
         self.rejoined = None
 
@@ -665,8 +671,6 @@ def create_unsafe_https_session():
     from ssl import SSLContext
 
     # Third-party library imports
-    import requests
-    import requests.adapters
     import urllib3
     from urllib3.poolmanager import PoolManager
     from urllib3.util import create_urllib3_context
@@ -716,11 +720,18 @@ def cleanup_before_exit():
         return
     exit_signal.set()
 
-    if (
-        "stdout_render_core__thread" in globals()
-        and stdout_render_core__thread.is_alive()
-    ):
-        stdout_render_core__thread.join()
+
+    for thread_name in [
+        "stdout_render_core__thread",
+        "ip_lookup_core__thread"
+    ]:
+        if thread_name in globals():
+            thread = globals().get(thread_name)
+            if (
+                isinstance(thread, threading.Thread)
+                and thread.is_alive()
+            ):
+                thread.join()
 
     print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
 
@@ -776,6 +787,11 @@ def is_private_device_ipv4(ip_address: str):
         return False
 
     return True
+
+def is_item_in_queue(queue: Queue, item):
+    queue_list = list(queue.queue)
+
+    return item in queue_list
 
 def get_minimum_padding(var: str | int, max_padding: int, padding: int):
     current_padding = len(str(var))
@@ -964,6 +980,14 @@ def get_asn_info(ip_address: str):
 def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
+def sleep_with_interrupt(seconds: int):
+    start_time = time.time()
+
+    while not exit_signal.is_set():
+        time.sleep(1)
+        if (time.time() - start_time) >= seconds:
+            break
+
 def npcap_or_winpcap_installed():
     service_names = ["npcap", "npf"]
 
@@ -1141,7 +1165,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.0 - 31/03/2024 (23:04)"
+VERSION = "v1.1.1 - 01/04/2024 (23:12)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1610,20 +1634,72 @@ def stdout_render_core():
                 field_names[i] += " \u2193"
                 break
 
-    global global_pps_counter, tshark_latency
+    def get_ip_infos_from_players(ip_lookup__queue: Queue):
+        def fetch_ip_infos_from_player_with_retries(player: Player):
+            retries = 2  # Number of retries for HTTP 429
+            while retries > 0:
+                try:
+                    response = s.get(f"http://ip-api.com/json/{player.ip}?fields=mobile,proxy,hosting", timeout=1)
+                except:
+                    return None
+
+                if response.status_code == 200:
+                    return response
+                elif response.status_code == 429:
+                    retries -= 1
+                    sleep_with_interrupt(61)
+
+            return None
+
+        while not exit_signal.is_set():
+            if ip_lookup__queue.empty():
+                time.sleep(1)
+                continue
+
+            try:
+                player: Player = ip_lookup__queue.get_nowait()
+            except:
+                continue
+
+            if not isinstance(player, Player):
+                continue
+
+            response = fetch_ip_infos_from_player_with_retries(player)
+            time.sleep(0.1)
+            if response is None:
+                continue
+
+            try:
+                response_json = response.json()
+            except json.JSONDecodeError:
+                continue
+
+            if not isinstance(response_json, dict):
+                continue
+
+            player.mobile = response_json.get('mobile', 'N/A')
+            player.proxy = response_json.get('proxy', 'N/A')
+            player.hosting = response_json.get('hosting', 'N/A')
+
+    global ip_lookup_core__thread, global_pps_counter, tshark_latency
 
     session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
     session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
 
-    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn"]
+    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
     add_down_arrow_to_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
-    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn"]
+    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
     add_down_arrow_to_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
 
     global_pps_t1 = time.perf_counter()
     global_packets_per_second = 0
+    ip_lookup__queue = Queue()
+
+    # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
+    ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players, args=(ip_lookup__queue,))
+    ip_lookup_core__thread.start()
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1649,6 +1725,10 @@ def stdout_render_core():
 
             if player.city is None:
                 player.city = get_city_info(player.ip)
+
+            if None in (player.mobile, player.proxy, player.hosting):
+                if not is_item_in_queue(ip_lookup__queue, player):
+                    ip_lookup__queue.put_nowait(player)
 
             if player.datetime_left:
                 session_disconnected.append(player)
@@ -1750,7 +1830,10 @@ def stdout_render_core():
             f"{Fore.GREEN}{port_list_creation(player)}{Fore.RESET}",
             f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
             f"{Fore.GREEN}{player.city}{Fore.RESET}",
-            f"{Fore.GREEN}{player.asn}{Fore.RESET}"
+            f"{Fore.GREEN}{player.asn}{Fore.RESET}",
+            f"{Fore.GREEN}{player.mobile}{Fore.RESET}",
+            f"{Fore.GREEN}{player.proxy}{Fore.RESET}",
+            f"{Fore.GREEN}{player.hosting}{Fore.RESET}"
         ] for player in session_connected)
 
         disconnected_players_table = PrettyTable()
@@ -1766,7 +1849,10 @@ def stdout_render_core():
             f"{Fore.RED}{port_list_creation(player)}{Fore.RESET}",
             f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
             f"{Fore.RED}{player.city}{Fore.RESET}",
-            f"{Fore.RED}{player.asn}{Fore.RESET}"
+            f"{Fore.RED}{player.asn}{Fore.RESET}",
+            f"{Fore.RED}{player.mobile}{Fore.RESET}",
+            f"{Fore.RED}{player.proxy}{Fore.RESET}",
+            f"{Fore.RED}{player.hosting}{Fore.RESET}"
         ] for player in session_disconnected__stdout_counter)
 
         printer.cache_print("")
