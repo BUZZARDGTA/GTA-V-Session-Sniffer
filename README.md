@@ -55,13 +55,17 @@ Therefore, if you've made any changes and wish to apply them, you'll need to res
 
 _If you are curious about all the settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
-### Resolving countrys
+### Resolving countrys, citys and asn fields.
 
-In order to resolve country information from players within the script, you need to download the MaxMind Database `GeoLite2-Country.mmdb`.<br />
-Obtain a copy of this database by signing up for GeoLite2 on their website and downloading it from there.
+The script relies on MaxMind's GeoLite2 databases to resolve player information.<br />
+Upon startup, it automatically attempts to check for updates and downloads the latest version from the [PrxyHunter/GeoLite2](https://github.com/PrxyHunter/GeoLite2) repository.
+
+In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.<br />
+You can obtain copies of these databases by signing up for GeoLite2 on the [MaxMind](https://www.maxmind.com/) official website and downloading them from there.<br />
+Then you will need to creates a new folder named "GeoLite2 Databases" within the script's dir, and place the database files there.
 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br />
-You must obtain it directly from [MaxMind](https://www.maxmind.com/).
+You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 
 ## Troubleshooting
 
@@ -73,7 +77,7 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ...
 - The configuration for the script may not be set up correctly.<br />
   Please refer to [Editing Settings](#Editing-Settings) for detailed instructions.
 
-### Players undetected
+### Some players are undetected
 
 On GTA V, occasionally, players may go undetected, but it's crucial to emphasize that this is not specific to the script.<br />
 Similar occurrences happen even with mod-menus, affecting the same individuals as those encountered with the script.<br />
