@@ -616,9 +616,9 @@ class PrintCacher:
         self.cache = []
 
 class Player:
-    def __init__(self, packet_timestamp: datetime, ip: str, port: int):
+    def __init__(self, packet_datetime: datetime, ip: str, port: int):
         self.packets = 1
-        self.pps_t1 = packet_timestamp
+        self.pps_t1 = packet_datetime
         self.pps_counter = 0
         self.packets_per_second = 0
         self.is_pps_first_calculation = True
@@ -629,8 +629,8 @@ class Player:
         self.first_port = port
         self.last_port = port
 
-        self.datetime_first_seen = packet_timestamp
-        self.datetime_last_seen = packet_timestamp
+        self.datetime_first_seen = packet_datetime
+        self.datetime_last_seen = packet_datetime
         self.datetime_left = None
 
         self.country_iso = None
@@ -1159,7 +1159,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 01/04/2024 (23:12)"
+VERSION = "v1.1.1 - 02/04/2024 (21:04)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1219,8 +1219,8 @@ if sys.getwindowsversion().major >= 10:
     UNDERLINE = "\033[4m"
     UNDERLINE_RESET = "\033[24m"
 else:
-    UNDERLINE = ""
-    UNDERLINE_RESET = ""
+    UNDERLINE = "_"
+    UNDERLINE_RESET = "_"
 
 cls()
 title(f"Searching for a new update - {TITLE}")
@@ -1562,26 +1562,6 @@ if not capture.tshark_path == Settings.TSHARK_PATH:
 tshark_latency = []
 
 def stdout_render_core():
-    def port_list_creation(player: Player):
-        stdout_port_list = ""
-
-        for port in player.ports:
-            to_add_in_portlist = None
-
-            if port == player.first_port == player.last_port:
-                to_add_in_portlist = f"[{UNDERLINE}{port}{UNDERLINE_RESET}]"
-            elif port == player.first_port:
-                to_add_in_portlist = f"[{port}]"
-            elif port == player.last_port:
-                to_add_in_portlist = f"{UNDERLINE}{port}{UNDERLINE_RESET}"
-            else:
-                to_add_in_portlist = f"{port}"
-
-            if to_add_in_portlist:
-                stdout_port_list = create_or_happen_to_variable(stdout_port_list, ", ", to_add_in_portlist)
-
-        return stdout_port_list
-
     def calculate_padding_width(total_width: int, *lengths: int):
         """
         Calculate the padding width based on the total width and the lengths of provided strings.
@@ -1601,7 +1581,7 @@ def stdout_render_core():
 
         return padding_width
 
-    def extract_datetime_from_timestamp(datetime_object: datetime):
+    def format_player_datetime(datetime_object: datetime):
         if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
             formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
         else:
@@ -1622,7 +1602,22 @@ def stdout_render_core():
 
         return f"{pps_color}{packets_per_second}{Fore.RESET}"
 
-    def add_down_arrow_to_field(field_names: list[str], target_field: str):
+    def format_player_ports_list(ports_list: list[int], first_port: int, last_port: int):
+        formatted_ports = []
+
+        for port in ports_list:
+            if port == first_port == last_port:
+                formatted_ports.append(f"[{UNDERLINE}{port}{UNDERLINE_RESET}]")
+            elif port == first_port:
+                formatted_ports.append(f"[{port}]")
+            elif port == last_port:
+                formatted_ports.append(f"{UNDERLINE}{port}{UNDERLINE_RESET}")
+            else:
+                formatted_ports.append(str(port))
+
+        return ", ".join(formatted_ports)
+
+    def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
         for i, field in enumerate(field_names):
             if field == target_field:
                 field_names[i] += " \u2193"
@@ -1688,14 +1683,17 @@ def stdout_render_core():
     session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
 
     connected_players_table__field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
-    add_down_arrow_to_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
+    add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
     disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
-    add_down_arrow_to_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
+    add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
 
     global_pps_t1 = time.perf_counter()
     global_packets_per_second = 0
+    is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+    padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
+    stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
 
     # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
     ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
@@ -1776,9 +1774,7 @@ def stdout_render_core():
         printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
         printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
         printer.cache_print(f"-   " * 28)
-        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
-        printer.cache_print(f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
+        printer.cache_print(stdout__scanning_on_network_interface)
         tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
         tshark_latency = []
 
@@ -1819,11 +1815,11 @@ def stdout_render_core():
         connected_players_table.field_names = connected_players_table__field_names
         connected_players_table.align = "l"
         connected_players_table.add_rows([
-            f"{Fore.GREEN}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
+            f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
             f"{Fore.GREEN}{player.packets}{Fore.RESET}",
             f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
             f"{Fore.GREEN}{player.ip}{Fore.RESET}",
-            f"{Fore.GREEN}{port_list_creation(player)}{Fore.RESET}",
+            f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
             f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
             f"{Fore.GREEN}{player.city}{Fore.RESET}",
             f"{Fore.GREEN}{player.asn}{Fore.RESET}",
@@ -1838,11 +1834,11 @@ def stdout_render_core():
         disconnected_players_table.field_names = disconnected_players_table__field_names
         disconnected_players_table.align = "l"
         disconnected_players_table.add_rows([
-            f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_last_seen)}{Fore.RESET}",
-            f"{Fore.RED}{extract_datetime_from_timestamp(player.datetime_first_seen)}{Fore.RESET}",
+            f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
+            f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
             f"{Fore.RED}{player.packets}{Fore.RESET}",
             f"{Fore.RED}{player.ip}{Fore.RESET}",
-            f"{Fore.RED}{port_list_creation(player)}{Fore.RESET}",
+            f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
             f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
             f"{Fore.RED}{player.city}{Fore.RESET}",
             f"{Fore.RED}{player.asn}{Fore.RESET}",
@@ -1894,9 +1890,9 @@ def stdout_render_core():
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
 
-    packet_timestamp = packet.frame.time_epoch
+    packet_datetime = packet.frame.datetime
 
-    packet_latency = datetime.now() - packet_timestamp
+    packet_latency = datetime.now() - packet_datetime
     tshark_latency.append(packet_latency)
     if packet_latency >= timedelta(seconds=Settings.PACKET_CAPTURE_OVERFLOW_TIMER):
         tshark_restarted_times += 1
@@ -1919,7 +1915,7 @@ def packet_callback(packet: Packet):
     player = PlayersRegistry.get_player(target__ip)
     if player is None:
         PlayersRegistry.add_player(
-            Player(packet_timestamp, target__ip, target__port)
+            Player(packet_datetime, target__ip, target__port)
         )
         return
 
@@ -1928,7 +1924,7 @@ def packet_callback(packet: Packet):
     if not player.datetime_left:
         player.rejoined = False
 
-        player.datetime_last_seen = packet_timestamp
+        player.datetime_last_seen = packet_datetime
 
         player.packets += 1
         player.pps_counter += 1
@@ -1942,7 +1938,7 @@ def packet_callback(packet: Packet):
     player.datetime_left = None
     player.rejoined = True
 
-    player.pps_t1 = packet_timestamp
+    player.pps_t1 = packet_datetime
     player.pps_counter = 0
     player.packets_per_second = 0
     player.is_pps_first_calculation = True

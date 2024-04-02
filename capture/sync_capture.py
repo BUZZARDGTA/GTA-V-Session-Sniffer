@@ -13,7 +13,7 @@ class TSharkCrashException(Exception):
 
 class Frame:
     def __init__(self, time_epoch: str):
-        self.time_epoch = converts_tshark_packet_timestamp_to_datetime_object(time_epoch)
+        self.datetime = converts_tshark_packet_timestamp_to_datetime_object(time_epoch)
 
 class IP:
     def __init__(self, src: str, dst: str):
