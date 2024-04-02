@@ -30,7 +30,6 @@ import textwrap
 import threading
 import subprocess
 import webbrowser
-from queue import Queue
 from pathlib import Path
 from types import FrameType
 from typing import Optional
@@ -787,11 +786,6 @@ def is_private_device_ipv4(ip_address: str):
         return False
 
     return True
-
-def is_item_in_queue(queue: Queue, item):
-    queue_list = list(queue.queue)
-
-    return item in queue_list
 
 def get_minimum_padding(var: str | int, max_padding: int, padding: int):
     current_padding = len(str(var))
@@ -1634,7 +1628,7 @@ def stdout_render_core():
                 field_names[i] += " \u2193"
                 break
 
-    def get_ip_infos_from_players(ip_lookup__queue: Queue):
+    def get_ip_infos_from_players():
         def fetch_ip_infos_from_player_with_retries(player: Player):
             retries = 2  # Number of retries for HTTP 429
             while retries > 0:
@@ -1652,34 +1646,41 @@ def stdout_render_core():
             return None
 
         while not exit_signal.is_set():
-            if ip_lookup__queue.empty():
-                time.sleep(1)
+            time.sleep(1)
+
+            players_connected: list[Player] = []
+            players_disconnected: list[Player] = []
+
+            for player in PlayersRegistry.iterate_players_from_registry():
+                if not None in (player.mobile, player.proxy, player.hosting):
+                    continue
+
+                if player.datetime_left:
+                    players_disconnected.append(player)
+                else:
+                    players_connected.append(player)
+
+            all_players: list[Player] = players_connected + players_disconnected
+            if not all_players:
                 continue
 
-            try:
-                player: Player = ip_lookup__queue.get_nowait()
-            except:
-                continue
+            for player in all_players:
+                response = fetch_ip_infos_from_player_with_retries(player)
+                time.sleep(0.1)
+                if response is None:
+                    continue
 
-            if not isinstance(player, Player):
-                continue
+                try:
+                    response_json = response.json()
+                except json.JSONDecodeError:
+                    continue
 
-            response = fetch_ip_infos_from_player_with_retries(player)
-            time.sleep(0.1)
-            if response is None:
-                continue
+                if not isinstance(response_json, dict):
+                    continue
 
-            try:
-                response_json = response.json()
-            except json.JSONDecodeError:
-                continue
-
-            if not isinstance(response_json, dict):
-                continue
-
-            player.mobile = response_json.get('mobile', 'N/A')
-            player.proxy = response_json.get('proxy', 'N/A')
-            player.hosting = response_json.get('hosting', 'N/A')
+                player.mobile = response_json.get('mobile', 'N/A')
+                player.proxy = response_json.get('proxy', 'N/A')
+                player.hosting = response_json.get('hosting', 'N/A')
 
     global ip_lookup_core__thread, global_pps_counter, tshark_latency
 
@@ -1695,10 +1696,9 @@ def stdout_render_core():
 
     global_pps_t1 = time.perf_counter()
     global_packets_per_second = 0
-    ip_lookup__queue = Queue()
 
     # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
-    ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players, args=(ip_lookup__queue,))
+    ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
     ip_lookup_core__thread.start()
 
     while not exit_signal.is_set():
@@ -1725,10 +1725,6 @@ def stdout_render_core():
 
             if player.city is None:
                 player.city = get_city_info(player.ip)
-
-            if None in (player.mobile, player.proxy, player.hosting):
-                if not is_item_in_queue(ip_lookup__queue, player):
-                    ip_lookup__queue.put_nowait(player)
 
             if player.datetime_left:
                 session_disconnected.append(player)
