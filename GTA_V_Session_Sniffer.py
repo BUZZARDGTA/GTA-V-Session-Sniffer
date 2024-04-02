@@ -144,6 +144,7 @@ class Settings:
         "Last Seen": "datetime_last_seen",
         "Packets": "packets",
         "PPS": "packets_per_second",
+        "Rejoins": "rejoins",
         "IP Address": "ip",
         "Ports": "ports",
         "Country": "country_name",
@@ -622,6 +623,7 @@ class Player:
         self.pps_counter = 0
         self.packets_per_second = 0
         self.is_pps_first_calculation = True
+        self.rejoins = 0
 
         self.ip = ip
 
@@ -641,9 +643,6 @@ class Player:
         self.mobile = None
         self.proxy = None
         self.hosting = None
-
-        self.just_joined = True
-        self.rejoined = None
 
 class PlayersRegistry:
     players_registry: dict[str, Player] = {}
@@ -1159,7 +1158,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 02/04/2024 (21:04)"
+VERSION = "v1.1.1 - 02/04/2024 (23:18)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1682,9 +1681,9 @@ def stdout_render_core():
     session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
     session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
 
-    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
+    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "Rejoins", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
     add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
-    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
+    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "Rejoins", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
     add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
@@ -1818,6 +1817,7 @@ def stdout_render_core():
             f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
             f"{Fore.GREEN}{player.packets}{Fore.RESET}",
             f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
+            f"{Fore.GREEN}{player.rejoins}{Fore.RESET}",
             f"{Fore.GREEN}{player.ip}{Fore.RESET}",
             f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
             f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
@@ -1837,6 +1837,7 @@ def stdout_render_core():
             f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
             f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
             f"{Fore.RED}{player.packets}{Fore.RESET}",
+            f"{Fore.RED}{player.rejoins}{Fore.RESET}",
             f"{Fore.RED}{player.ip}{Fore.RESET}",
             f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
             f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
@@ -1919,11 +1920,7 @@ def packet_callback(packet: Packet):
         )
         return
 
-    player.just_joined = False
-
     if not player.datetime_left:
-        player.rejoined = False
-
         player.datetime_last_seen = packet_datetime
 
         player.packets += 1
@@ -1936,7 +1933,7 @@ def packet_callback(packet: Packet):
         return
 
     player.datetime_left = None
-    player.rejoined = True
+    player.rejoins += 1
 
     player.pps_t1 = packet_datetime
     player.pps_counter = 0
