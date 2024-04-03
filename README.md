@@ -55,9 +55,9 @@ Therefore, if you've made any changes and wish to apply them, you'll need to res
 
 _If you are curious about all the settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
-### Resolving countrys, citys and asn fields.
+### Resolving Country, City and ASN fields.
 
-The script relies on MaxMind's GeoLite2 databases to resolve player information.<br />
+The script relies on [MaxMind’s GeoIP2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) to resolve player information.<br />
 Upon startup, it automatically attempts to check for updates and downloads the latest version from the [PrxyHunter/GeoLite2](https://github.com/PrxyHunter/GeoLite2) repository.
 
 In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.<br />
@@ -66,6 +66,11 @@ Then you will need to creates a new folder named "GeoLite2 Databases" within the
 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br />
 You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
+
+### Resolving Mobile, Proxy and Hosting fields.
+
+The script relies on the free [ip-api](https://ip-api.com/) API website to resolve player's "Mobile", "Proxy/VPN/Tor" and "Hosting/Data Center" fields.<br />
+This free and limited usage allows for a maximum resolution of (100 \* 15) = 1500 IPs per minute.
 
 ## Troubleshooting
 
@@ -98,13 +103,14 @@ These configurations help minimize the display of unrelated IPs.
 ### About Screen Refreshing
 
 Refreshing the display of the script positions your terminal's cursor at the very bottom of the script.<br />
-This problem is kind of resolved if you are using Windows Terminal from Windows 10 or 11.<br />
+However, if you are using Windows Terminal on Windows 10 or 11, this issue is somewhat resolved because the terminal sticks to the top of the page by scrolling there initially.<br />
 I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/) for an optimal experience.
 
 ## Tips and Tricks
 
 ### General Tips and Tricks
 
+- You can pause the output of the display by using the keyboard shortcut [CTRL + S] and resume it by using [CTRL + Q].
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
 - If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
   It has a very good IP Lookup that can also find out VPN, Mobile connections etc.<br />
