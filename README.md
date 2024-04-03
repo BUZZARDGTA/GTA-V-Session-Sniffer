@@ -110,7 +110,7 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 
 ### General Tips and Tricks
 
-- You can pause the output of the display by using the keyboard shortcut [CTRL + S] and resume it by using [CTRL + Q].
+- You can pause your terminal's output by using the keyboard shortcut [CTRL+S] and resume it by using [CTRL+Q].
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
 - If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
   It has a very good IP Lookup that can also find out VPN, Mobile connections etc.<br />
