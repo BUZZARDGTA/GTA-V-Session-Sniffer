@@ -149,7 +149,10 @@ class Settings:
         "Ports": "ports",
         "Country": "country_name",
         "City": "city",
-        "Asn": "asn"
+        "ASN": "asn",
+        "Mobile": "mobile",
+        "Proxy/VPN/Tor": "proxy",
+        "Hosting/Data Center": "hosting"
     }
 
     @classmethod
@@ -1158,7 +1161,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 02/04/2024 (23:18)"
+VERSION = "v1.1.1 - 03/04/2024 (20:17)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1623,67 +1626,91 @@ def stdout_render_core():
                 break
 
     def get_ip_infos_from_players():
-        def fetch_ip_infos_from_player_with_retries(player: Player):
-            retries = 2  # Number of retries for HTTP 429
-            while retries > 0:
-                try:
-                    response = s.get(f"http://ip-api.com/json/{player.ip}?fields=mobile,proxy,hosting", timeout=1)
-                except:
-                    return None
+        # Following values taken from https://ip-api.com/docs/api:batch the 03/04/2024.
+        MAX_REQUESTS = 15
+        MAX_THROTTLE_TIME = 60
+        MAX_BATCH_IP_API_IPS = 100
+        FIELDS_TO_LOOKUP = "status,message,mobile,proxy,hosting,query"
 
-                if response.status_code == 200:
-                    return response
-                elif response.status_code == 429:
-                    retries -= 1
-                    sleep_with_interrupt(61)
+        sleep_with_interrupt(3) # Initial sleep to wait for maximum batch of users before continuing.
 
-            return None
+        def fetch_ip_infos_from_player_with_retries():
+            data = [{"query": ip, "fields": FIELDS_TO_LOOKUP} for ip in all_players_to_lookup]
+
+            try:
+                response = s.post(
+                    "http://ip-api.com/batch",
+                    json=data,
+                    timeout=3
+                )
+            except:
+                return None
+
+            requests_remaining = int(response.headers.get("X-Rl", MAX_REQUESTS))
+            throttle_until = int(response.headers.get("X-Ttl", MAX_THROTTLE_TIME))
+
+            if requests_remaining <= 0:
+                sleep_with_interrupt(throttle_until)
+                return None
+
+            sleep_with_interrupt(min(throttle_until / requests_remaining, 1))  # We sleep x seconds (just in case) to avoid triggering a "429" status code.
+
+            if not response.status_code == 200:
+                return None
+
+            return response
 
         while not exit_signal.is_set():
-            time.sleep(1)
-
-            players_connected: list[Player] = []
-            players_disconnected: list[Player] = []
+            players_connected_to_lookup: list[str] = []
+            players_disconnected_to_lookup: list[str] = []
 
             for player in PlayersRegistry.iterate_players_from_registry():
+                if (len(players_connected_to_lookup) + len(players_disconnected_to_lookup)) == MAX_BATCH_IP_API_IPS:
+                    break
+
                 if not None in (player.mobile, player.proxy, player.hosting):
                     continue
 
                 if player.datetime_left:
-                    players_disconnected.append(player)
+                    players_disconnected_to_lookup.append(player.ip)
                 else:
-                    players_connected.append(player)
+                    players_connected_to_lookup.append(player.ip)
 
-            all_players: list[Player] = players_connected + players_disconnected
-            if not all_players:
+            all_players_to_lookup: list[str] = players_connected_to_lookup + players_disconnected_to_lookup
+            if len(all_players_to_lookup) == 0:
+                time.sleep(1) # If there are no new players to lookup, sleep for 1 second to reduce CPU usage.
                 continue
 
-            for player in all_players:
-                response = fetch_ip_infos_from_player_with_retries(player)
-                time.sleep(0.1)
-                if response is None:
+            response = fetch_ip_infos_from_player_with_retries()
+            if response is None:
+                continue
+
+            try:
+                iplookup_results: list[dict] = response.json()
+            except json.JSONDecodeError:
+                continue
+
+            if not isinstance(iplookup_results, list):
+                continue
+
+            for iplookup in iplookup_results:
+                player_to_lookup_from_players_registry = iplookup.get("query", None)
+                if player_to_lookup_from_players_registry is None:
                     continue
 
-                try:
-                    response_json = response.json()
-                except json.JSONDecodeError:
-                    continue
-
-                if not isinstance(response_json, dict):
-                    continue
-
-                player.mobile = response_json.get('mobile', 'N/A')
-                player.proxy = response_json.get('proxy', 'N/A')
-                player.hosting = response_json.get('hosting', 'N/A')
+                player_to_update: Player = PlayersRegistry.get_player(player_to_lookup_from_players_registry)
+                player_to_update.mobile = iplookup.get("mobile", "N/A")
+                player_to_update.proxy = iplookup.get("proxy", "N/A")
+                player_to_update.hosting = iplookup.get("hosting", "N/A")
 
     global ip_lookup_core__thread, global_pps_counter, tshark_latency
 
     session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
     session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
 
-    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "Rejoins", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
+    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "Rejoins", "IP Address", "Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor",  "Hosting/Data Center"]
     add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
-    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "Rejoins", "IP Address", "Ports", "Country", "City", "Asn", "Mobile (cellular) connection", "Proxy, VPN or Tor exit address", "Hosting, colocated or data center"]
+    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "Rejoins", "IP Address", "Ports", "Country", "City", "ASN", "Mobile ", "Proxy/VPN/Tor", "Hosting/Data Center"]
     add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
