@@ -55,6 +55,17 @@ Therefore, if you've made any changes and wish to apply them, you'll need to res
 
 _If you are curious about all the settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
+### Scan for a console
+
+In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
+
+1. Open the `"Settings.ini"` file.
+2. If not already done, set `<NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering in the "Capture network interface selection" screen at script's startup. (you can disable it later)
+3. Enable the `<ARP>` setting by setting its value to `True`. (This setting allows you to view all currently connected external devices within your local network in the script's "Capture network interface selection" screen)
+4. Ensure that your console is currently running and **connected to internet trough your PC's internet connection (Wired / Hotspot)**.
+5. Start the script and wait for it to enter in the "Capture network interface selection" screen.
+6. Then, you'll need to identify the console's IP and MAC Address and select it accordingly.
+
 ### Resolving Country, City and ASN fields.
 
 The script relies on [MaxMind’s GeoIP2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) to resolve player information.<br />
