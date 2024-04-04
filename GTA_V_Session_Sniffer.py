@@ -621,14 +621,15 @@ class PrintCacher:
 
 class Player:
     def __init__(self, packet_datetime: datetime, ip: str, port: int):
+        self.ip = ip
+
+        self.rejoins = 0
+
         self.packets = 1
         self.pps_t1 = packet_datetime
         self.pps_counter = 0
         self.packets_per_second = 0
         self.is_pps_first_calculation = True
-        self.rejoins = 0
-
-        self.ip = ip
 
         self.ports = [port]
         self.first_port = port
@@ -642,7 +643,6 @@ class Player:
         self.country_name = None
         self.city = None
         self.asn = None
-
         self.mobile = None
         self.proxy = None
         self.hosting = None
@@ -1923,14 +1923,11 @@ def packet_callback(packet: Packet):
         tshark_restarted_times += 1
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
-    source_address = packet.ip.src
-    destination_address = packet.ip.dst
-
-    if source_address == Settings.IP_ADDRESS:
-        target__ip = destination_address
+    if packet.ip.src == Settings.IP_ADDRESS:
+        target__ip = packet.ip.src
         target__port = packet.udp.dstport
-    elif destination_address == Settings.IP_ADDRESS:
-        target__ip = source_address
+    elif packet.ip.dst == Settings.IP_ADDRESS:
+        target__ip = packet.ip.dst
         target__port = packet.udp.srcport
     else:
         raise ValueError("Neither the source nor destination address matches the specified IP_ADDRESS.")
@@ -1970,6 +1967,8 @@ def packet_callback(packet: Packet):
         player.ports = [target__port]
         player.first_port = target__port
         player.last_port = target__port
+    else:
+        player.packets += 1
 
     return
 
