@@ -1924,10 +1924,10 @@ def packet_callback(packet: Packet):
         raise ValueError(PACKET_CAPTURE_OVERFLOW)
 
     if packet.ip.src == Settings.IP_ADDRESS:
-        target__ip = packet.ip.src
+        target__ip = packet.ip.dst
         target__port = packet.udp.dstport
     elif packet.ip.dst == Settings.IP_ADDRESS:
-        target__ip = packet.ip.dst
+        target__ip = packet.ip.src
         target__port = packet.udp.srcport
     else:
         raise ValueError("Neither the source nor destination address matches the specified IP_ADDRESS.")
