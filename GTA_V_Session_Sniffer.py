@@ -996,15 +996,6 @@ def npcap_or_winpcap_installed():
 
     return False
 
-def create_or_happen_to_variable(variable: str, operator: str, string_to_happen: str):
-    if not string_to_happen:
-        return variable
-
-    if variable:
-        return f"{variable}{operator}{string_to_happen}"
-    else:
-        return string_to_happen
-
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
         geolite2_version_file_path = geolite2_databases_folder_path / "version.json"
@@ -1161,7 +1152,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 03/04/2024 (20:17)"
+VERSION = "v1.1.1 - 04/04/2024 (16:42)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1496,21 +1487,22 @@ if not Settings.IP_ADDRESS == interfaces_options[user_interface_selection]["IP A
 if need_rewrite_settings:
     Settings.reconstruct_settings()
 
-bpf_filter = None
-display_filter = None
-display_filter_protocols_to_exclude = []
+capture_filter: list[str]  = [
+    f"((src host {Settings.IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {Settings.IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))",
+    "udp"
+]
+display_filter: list[str] = []
+excluded_protocols = []
 
-bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"((src host {Settings.IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {Settings.IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))")
-bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", "udp")
 if not Settings.VPN_MODE:
-    bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"not (broadcast or multicast)")
-bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", "not (portrange 0-1023 or port 5353)")
+    capture_filter.append(f"not (broadcast or multicast)")
+capture_filter.append("not (portrange 0-1023 or port 5353)")
 
 if Settings.PROGRAM_PRESET:
     if Settings.PROGRAM_PRESET == "GTA5":
-        display_filter = create_or_happen_to_variable(display_filter, " and ", "(frame.len>=71 and frame.len<=999)")
+        display_filter.append("(frame.len>=71 and frame.len<=999)")
     elif Settings.PROGRAM_PRESET == "Minecraft":
-        display_filter = create_or_happen_to_variable(display_filter, " and ", "(frame.len>=49 and frame.len<=1498)")
+        display_filter.append("(frame.len>=49 and frame.len<=1498)")
 
     # If the <PROGRAM_PRESET> setting is set, automatically blocks RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a <PROGRAM_PRESET>.
@@ -1519,25 +1511,30 @@ if Settings.PROGRAM_PRESET:
     # I know that eventually you will see their corresponding IPs time to time but I can guarantee that it does the job it is supposed to do.
     # It filters RTCP but some connections are STILL made out of it, but those are not RTCP ¯\_(ツ)_/¯.
     # And that's exactly why the "Discord" (`class ThirdPartyServers`) IP ranges Capture Filters are useful for.
-    display_filter_protocols_to_exclude.append("rtcp")
+    excluded_protocols.append("rtcp")
 
 if Settings.BLOCK_THIRD_PARTY_SERVERS:
+    ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
+    capture_filter.append(f"not (net {' or '.join(ip_ranges)})")
+
     # Here I'm trying to exclude various UDP protocols that are usefless for the srcipt.
     # But there can be a lot more, those are just a couples I could find on my own usage.
-    display_filter_protocols_to_exclude.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "llmnr"])
+    excluded_protocols.extend(["ssdp", "raknet", "dtls", "nbns", "pcp", "bt-dht", "uaudp", "classicstun", "dhcp", "mdns", "llmnr"])
 
-    ip_ranges = [ip_range for server in ThirdPartyServers for ip_range in server.value]
-    bpf_filter = create_or_happen_to_variable(bpf_filter, " and ", f"not (net {' or '.join(ip_ranges)})")
+if excluded_protocols:
+    display_filter.append(
+        f"not ({' or '.join(excluded_protocols)})"
+    )
 
-if display_filter_protocols_to_exclude:
-    display_filter = create_or_happen_to_variable(display_filter, " and ", f"not ({' or '.join(display_filter_protocols_to_exclude)})")
+CAPTURE_FILTER = " and ".join(capture_filter) if capture_filter else None
+DISPLAY_FILTER = " and ".join(display_filter) if display_filter else None
 
 while True:
     try:
         capture = PacketCapture(
             interface = Settings.INTERFACE_NAME,
-            capture_filter = bpf_filter,
-            display_filter = display_filter,
+            capture_filter = CAPTURE_FILTER,
+            display_filter = DISPLAY_FILTER,
             tshark_path = Settings.TSHARK_PATH
         )
     except TSharkNotFoundException:
