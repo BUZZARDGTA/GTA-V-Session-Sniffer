@@ -19,6 +19,7 @@ from capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
 import os
 import re
 import sys
+import ast
 import json
 import time
 import enum
@@ -118,6 +119,7 @@ class Msgbox(enum.IntFlag):
 class Settings:
     TSHARK_PATH = None
     STDOUT_SHOW_ADVERTISING = True
+    STDOUT_FIELDS_TO_HIDE = []
     STDOUT_FIELD_SHOW_SEEN_DATE = False
     STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY = "First Seen"
     STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
@@ -137,7 +139,9 @@ class Settings:
     PROGRAM_PRESET = None
     VPN_MODE = False
 
-    _allowed_settings_types = (Path, str, int, bool, float, type(None))
+    _allowed_settings_types = (type(None), Path, bool, list, str, float, int)
+
+    _valid_stdout_hidden_fields = ["Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]
 
     _stdout_fields_mapping = {
         "First Seen": "datetime_first_seen",
@@ -194,6 +198,12 @@ class Settings:
             ;;
             ;;<STDOUT_SHOW_ADVERTISING>
             ;;Determine if you want or not to show the developer's advertisements in the script's display.
+            ;;
+            ;;<STDOUT_FIELDS_TO_HIDE>
+            ;;Specifies a list of fields you wish to hide from the output.
+            ;;It can only hides field names that are not essential to the script's functionality.
+            ;;Valid values include any of the following field names:
+            ;;{Settings._valid_stdout_hidden_fields}
             ;;
             ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
             ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
@@ -378,6 +388,24 @@ class Settings:
                         Settings.STDOUT_SHOW_ADVERTISING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELDS_TO_HIDE":
+                    try:
+                        stdout_fields_to_hide = ast.literal_eval(setting_value)
+                    except ValueError:
+                        need_rewrite_settings = True
+                    else:
+                        if isinstance(stdout_fields_to_hide, list):
+                            # Filter out invalid field names from stdout_fields_to_hide
+                            filtered_stdout_fields_to_hide = [field_name for field_name in stdout_fields_to_hide if field_name in Settings._valid_stdout_hidden_fields]
+
+                            # Check if any invalid field names were removed
+                            if set(stdout_fields_to_hide) != set(filtered_stdout_fields_to_hide):
+                                need_rewrite_settings = True
+
+                            # Update STDOUT_FIELDS_TO_HIDE with the corrected list
+                            Settings.STDOUT_FIELDS_TO_HIDE = filtered_stdout_fields_to_hide
+                        else:
+                            need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_SHOW_SEEN_DATE":
                     try:
                         Settings.STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
@@ -1152,7 +1180,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 04/04/2024 (16:42)"
+VERSION = "v1.1.1 - 06/04/2024 (00:18)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1705,9 +1733,13 @@ def stdout_render_core():
     session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
     session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
 
-    connected_players_table__field_names = ["First Seen", "Packets", "PPS", "Rejoins", "IP Address", "Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor",  "Hosting/Data Center"]
+    connected_players_table__field_names = [field_name for field_name in
+                                            [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "Last Seen"]
+                                            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
     add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
-    disconnected_players_table__field_names = ["Last Seen", "First Seen", "Packets", "Rejoins", "IP Address", "Ports", "Country", "City", "ASN", "Mobile ", "Proxy/VPN/Tor", "Hosting/Data Center"]
+    disconnected_players_table__field_names = [field_name for field_name in
+                                            [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "PPS"]
+                                            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
     add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
 
     printer = PrintCacher()
@@ -1718,9 +1750,10 @@ def stdout_render_core():
     padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
     stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
 
-    # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
-    ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
-    ip_lookup_core__thread.start()
+    if not all(field_name in Settings.STDOUT_FIELDS_TO_HIDE for field_name in ["Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]):
+        # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
+        ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
+        ip_lookup_core__thread.start()
 
     while not exit_signal.is_set():
         session_connected__padding_country_name = 0
@@ -1738,13 +1771,13 @@ def stdout_render_core():
             ):
                player.datetime_left = player.datetime_last_seen
 
-            if player.asn is None:
+            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE and player.asn is None:
                 player.asn = get_asn_info(player.ip)
 
-            if player.country_name is None:
+            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE and player.country_name is None:
                 player.country_name, player.country_iso = get_country_info(player.ip)
 
-            if player.city is None:
+            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE and player.city is None:
                 player.city = get_city_info(player.ip)
 
             if player.datetime_left:
@@ -1837,40 +1870,59 @@ def stdout_render_core():
         connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
         connected_players_table.field_names = connected_players_table__field_names
         connected_players_table.align = "l"
-        connected_players_table.add_rows([
-            f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
-            f"{Fore.GREEN}{player.packets}{Fore.RESET}",
-            f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
-            f"{Fore.GREEN}{player.rejoins}{Fore.RESET}",
-            f"{Fore.GREEN}{player.ip}{Fore.RESET}",
-            f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
-            f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
-            f"{Fore.GREEN}{player.city}{Fore.RESET}",
-            f"{Fore.GREEN}{player.asn}{Fore.RESET}",
-            f"{Fore.GREEN}{player.mobile}{Fore.RESET}",
-            f"{Fore.GREEN}{player.proxy}{Fore.RESET}",
-            f"{Fore.GREEN}{player.hosting}{Fore.RESET}"
-        ] for player in session_connected)
+        for player in session_connected:
+            row = [
+                f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
+                f"{Fore.GREEN}{player.packets}{Fore.RESET}",
+                f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
+                f"{Fore.GREEN}{player.rejoins}{Fore.RESET}",
+                f"{Fore.GREEN}{player.ip}{Fore.RESET}"
+            ]
+            if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
+            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
+            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.city}{Fore.RESET}")
+            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.asn}{Fore.RESET}")
+            if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.mobile}{Fore.RESET}")
+            if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.proxy}{Fore.RESET}")
+            if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.GREEN}{player.hosting}{Fore.RESET}")
 
+            connected_players_table.add_row(row)
         disconnected_players_table = PrettyTable()
         disconnected_players_table.set_style(SINGLE_BORDER)
         disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
         disconnected_players_table.field_names = disconnected_players_table__field_names
         disconnected_players_table.align = "l"
-        disconnected_players_table.add_rows([
-            f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
-            f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
-            f"{Fore.RED}{player.packets}{Fore.RESET}",
-            f"{Fore.RED}{player.rejoins}{Fore.RESET}",
-            f"{Fore.RED}{player.ip}{Fore.RESET}",
-            f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}",
-            f"{Fore.RED}{player.country_name:<{session_disconnected__padding_country_name}} ({player.country_iso}){Fore.RESET}",
-            f"{Fore.RED}{player.city}{Fore.RESET}",
-            f"{Fore.RED}{player.asn}{Fore.RESET}",
-            f"{Fore.RED}{player.mobile}{Fore.RESET}",
-            f"{Fore.RED}{player.proxy}{Fore.RESET}",
-            f"{Fore.RED}{player.hosting}{Fore.RESET}"
-        ] for player in session_disconnected__stdout_counter)
+        for player in session_disconnected:
+            row = [
+                f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
+                f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
+                f"{Fore.RED}{player.packets}{Fore.RESET}",
+                f"{Fore.RED}{player.rejoins}{Fore.RESET}",
+                f"{Fore.RED}{player.ip}{Fore.RESET}"
+            ]
+            if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
+            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
+            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.city}{Fore.RESET}")
+            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.asn}{Fore.RESET}")
+            if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.mobile}{Fore.RESET}")
+            if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.proxy}{Fore.RESET}")
+            if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                row.append(f"{Fore.RED}{player.hosting}{Fore.RESET}")
+
+            disconnected_players_table.add_row(row)
 
         printer.cache_print("")
         printer.cache_print(connected_players_table.get_string())
