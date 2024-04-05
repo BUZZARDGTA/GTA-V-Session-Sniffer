@@ -55,6 +55,11 @@ Therefore, if you've made any changes and wish to apply them, you'll need to res
 
 _If you are curious about all the settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
 
+### Scan trough a VPN
+
+When using a VPN, make sure that you scan from your actual VPN interface.<br />
+Additionally, ensure that the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
+
 ### Scan for a console
 
 In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
@@ -124,9 +129,8 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - You can handly zoom in or out on your terminal's output by using the keyboard shortcut [CTRL] + [mouse scroll] or [CTRL] + [+], and [CTRL] + [-].
 - You can pause your terminal's output by using the keyboard shortcut [CTRL] + [S] and resume it with [CTRL] + [Q].
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
-- If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
-  It has a very good IP Lookup that can also find out VPN, Mobile connections etc.<br />
 - Using my other project [PC Blacklist Sniffer](https://github.com/Illegal-Services/PC-Blacklist-Sniffer) allows you to detect people you blacklisted from your sessions.
+- If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
 
 ### GTA V Tips and Tricks
 
