@@ -58,7 +58,7 @@ _If you are curious about all the settings that you can manually configure, you 
 ### Scan trough a VPN
 
 When using a VPN, make sure that you scan from your actual VPN interface.<br />
-Additionally, ensure that the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
+Additionally, ensure that in the `"Settings.ini"` file, the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
 
 ### Scan for a console
 
