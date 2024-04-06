@@ -26,14 +26,14 @@ import enum
 import socket
 import ctypes
 import signal
-import logging
 import textwrap
 import threading
+import traceback
 import subprocess
 import webbrowser
 from pathlib import Path
-from types import FrameType
-from typing import Optional
+from types import FrameType, TracebackType
+from typing import Optional, Literal
 from operator import attrgetter
 from ipaddress import IPv4Address
 from datetime import datetime, timedelta
@@ -44,13 +44,6 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
-
-logging.basicConfig(filename="debug.log",
-                    level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S")
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 class InvalidBooleanValueError(Exception):
     pass
@@ -115,6 +108,57 @@ class Msgbox(enum.IntFlag):
     MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
     MsgBoxRight = 524288  # Text is right-aligned.
     MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
+
+class Threads_ExceptionHandler:
+    """In Python, threads cannot be raised within the main source code. When raised, they operate independently,
+    and the main process continues execution without halting for the thread's completion. To overcome this limitation,
+    this class is designed to enhance thread management and provide additional functionality.
+
+    Attributes:
+        raising_function (str): The name of the function where the exception was raised.
+        raising_e_type (type): The type of the exception raised.
+        raising_e_value (Exception): The value of the exception raised.
+        raising_e_traceback (TracebackType): The traceback information of the exception raised.
+    """
+    raising_function = None
+    raising_e_type = None
+    raising_e_value = None
+    raising_e_traceback = None
+
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, e_type: type, e_value: Exception, e_traceback: TracebackType):
+        """Exit method called upon exiting the 'with' block.
+
+        Args:
+            e_type (type): The type of the exception raised.
+            e_value (Exception): The value of the exception raised.
+            e_traceback (TracebackType): The traceback information of the exception raised.
+
+        Returns:
+            bool: True to suppress the exception from propagating further.
+        """
+        if e_type:
+            Threads_ExceptionHandler.raising_e_type = e_type
+            Threads_ExceptionHandler.raising_e_value = e_value
+            Threads_ExceptionHandler.raising_e_traceback = e_traceback
+
+            tb = e_traceback
+            if not isinstance(tb, TracebackType):
+                traceback.print_exception(e_type, e_value, e_traceback)
+                sys.exit(0)
+            while tb.tb_next:
+                tb = tb.tb_next
+            # Set the failed function name
+            Threads_ExceptionHandler.raising_function = tb.tb_frame.f_code.co_name
+
+            threads_raised__signal.set()
+
+            return True  # Prevent exceptions from propagating
 
 class Settings:
     TSHARK_PATH = None
@@ -740,32 +784,6 @@ def create_unsafe_https_session():
 
     return session
 
-def signal_handler(sig: int, frame: FrameType):
-    if sig == 2: # means CTRL+C pressed
-        cleanup_before_exit()
-
-def cleanup_before_exit():
-    if exit_signal.is_set():
-        return
-    exit_signal.set()
-
-
-    for thread_name in [
-        "stdout_render_core__thread",
-        "ip_lookup_core__thread"
-    ]:
-        if thread_name in globals():
-            thread = globals().get(thread_name)
-            if (
-                isinstance(thread, threading.Thread)
-                and thread.is_alive()
-            ):
-                thread.join()
-
-    print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
-
-    sys.exit(0)
-
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
@@ -1004,14 +1022,6 @@ def get_asn_info(ip_address: str):
 def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
-def sleep_with_interrupt(seconds: int):
-    start_time = time.time()
-
-    while not exit_signal.is_set():
-        time.sleep(1)
-        if (time.time() - start_time) >= seconds:
-            break
-
 def npcap_or_winpcap_installed():
     service_names = ["npcap", "npf"]
 
@@ -1169,9 +1179,41 @@ def update_and_initialize_geolite2_readers():
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
+def terminate_current_script_process(method: Literal["SIGINT", "THREAD_RAISED"]):
+    if method == "SIGINT":
+        print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
+        if not any(thread_name in globals() for thread_name in ["stdout_render_core__thread", "ip_lookup_core__thread"]):
+            check_threads_exceptions__thread.join()
+            sys.exit(0)
+    elif method == "THREAD_RAISED":
+        traceback.print_exception(Threads_ExceptionHandler.raising_e_type, Threads_ExceptionHandler.raising_e_value, Threads_ExceptionHandler.raising_e_traceback)
+
+    pid = os.getpid() # Get the process ID (PID) of the current script
+    process = psutil.Process(pid)
+    process.terminate()
+
+def check_threads_exceptions():
+    while not keyboard_interrupt__signal.is_set():
+        if threads_raised__signal.is_set():
+            terminate_current_script_process("THREAD_RAISED")
+            break
+
+        time.sleep(0.1)
+
+def signal_handler(sig: int, frame: FrameType):
+    if sig == 2: # means CTRL+C pressed
+        if not keyboard_interrupt__signal.is_set():
+            keyboard_interrupt__signal.set()
+            terminate_current_script_process("SIGINT")
+
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
-exit_signal = threading.Event()
+keyboard_interrupt__signal = threading.Event()
+threads_raised__signal = threading.Event()
+
+# deepcode ignore MissingAPI: it's not requiered in this specififc script
+check_threads_exceptions__thread = threading.Thread(target=check_threads_exceptions)
+check_threads_exceptions__thread.start()
 
 if is_pyinstaller_compiled():
     SCRIPT_DIR = Path(sys.executable).parent
@@ -1180,7 +1222,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 06/04/2024 (00:18)"
+VERSION = "v1.1.1 - 06/04/2024 (23:59)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1586,78 +1628,15 @@ if not capture.tshark_path == Settings.TSHARK_PATH:
     Settings.TSHARK_PATH = capture.tshark_path
     Settings.reconstruct_settings()
 
-tshark_latency = []
-
-def stdout_render_core():
-    def calculate_padding_width(total_width: int, *lengths: int):
-        """
-        Calculate the padding width based on the total width and the lengths of provided strings.
-
-        Args:
-        - total_width (int): Total width available for padding
-        - *args (int): Integrers for which lengths are used to calculate padding width
-
-        Returns:
-        - padding_width (int): Calculated padding width
-        """
-        # Calculate the total length of all strings
-        total_length = sum(length for length in lengths)
-
-        # Calculate the padding width
-        padding_width = max(0, (total_width - total_length) // 2)
-
-        return padding_width
-
-    def format_player_datetime(datetime_object: datetime):
-        if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
-            formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
-        else:
-            formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
-
-        return formatted_datetime
-
-    def format_player_pps(is_pps_first_calculation: bool, packets_per_second: int):
-        if packets_per_second == 0:
-            if is_pps_first_calculation:
-                pps_color = Fore.GREEN
-            else:
-                pps_color = Fore.RED
-        elif packets_per_second == 1:
-            pps_color = Fore.YELLOW
-        else:
-            pps_color = Fore.GREEN
-
-        return f"{pps_color}{packets_per_second}{Fore.RESET}"
-
-    def format_player_ports_list(ports_list: list[int], first_port: int, last_port: int):
-        formatted_ports = []
-
-        for port in ports_list:
-            if port == first_port == last_port:
-                formatted_ports.append(f"[{UNDERLINE}{port}{UNDERLINE_RESET}]")
-            elif port == first_port:
-                formatted_ports.append(f"[{port}]")
-            elif port == last_port:
-                formatted_ports.append(f"{UNDERLINE}{port}{UNDERLINE_RESET}")
-            else:
-                formatted_ports.append(str(port))
-
-        return ", ".join(formatted_ports)
-
-    def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
-        for i, field in enumerate(field_names):
-            if field == target_field:
-                field_names[i] += " \u2193"
-                break
-
-    def get_ip_infos_from_players():
+def get_ip_infos_from_players():
+    with Threads_ExceptionHandler():
         # Following values taken from https://ip-api.com/docs/api:batch the 03/04/2024.
         MAX_REQUESTS = 15
         MAX_THROTTLE_TIME = 60
         MAX_BATCH_IP_API_IPS = 100
         FIELDS_TO_LOOKUP = "status,message,mobile,proxy,hosting,query"
 
-        sleep_with_interrupt(3) # Initial sleep to wait for maximum batch of users before continuing.
+        time.sleep(3) # Initial sleep to wait for maximum batch of users before continuing.
 
         def fetch_ip_infos_from_player_with_retries():
             data = [{"query": ip, "fields": FIELDS_TO_LOOKUP} for ip in all_players_to_lookup]
@@ -1675,17 +1654,17 @@ def stdout_render_core():
             throttle_until = int(response.headers.get("X-Ttl", MAX_THROTTLE_TIME))
 
             if requests_remaining <= 0:
-                sleep_with_interrupt(throttle_until)
+                time.sleep(throttle_until)
                 return None
 
-            sleep_with_interrupt(min(throttle_until / requests_remaining, 1))  # We sleep x seconds (just in case) to avoid triggering a "429" status code.
+            time.sleep(min(throttle_until / requests_remaining, 1))  # We sleep x seconds (just in case) to avoid triggering a "429" status code.
 
             if not response.status_code == 200:
                 return None
 
             return response
 
-        while not exit_signal.is_set():
+        while True:
             players_connected_to_lookup: list[str] = []
             players_disconnected_to_lookup: list[str] = []
 
@@ -1728,241 +1707,296 @@ def stdout_render_core():
                 player_to_update.proxy = iplookup.get("proxy", "N/A")
                 player_to_update.hosting = iplookup.get("hosting", "N/A")
 
-    global ip_lookup_core__thread, global_pps_counter, tshark_latency
+tshark_latency = []
 
-    session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
-    session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
+def stdout_render_core():
+    with Threads_ExceptionHandler():
+        def calculate_padding_width(total_width: int, *lengths: int):
+            """
+            Calculate the padding width based on the total width and the lengths of provided strings.
 
-    connected_players_table__field_names = [field_name for field_name in
-                                            [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "Last Seen"]
-                                            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
-    add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
-    disconnected_players_table__field_names = [field_name for field_name in
-                                            [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "PPS"]
-                                            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
-    add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
+            Args:
+            - total_width (int): Total width available for padding
+            - *args (int): Integrers for which lengths are used to calculate padding width
 
-    printer = PrintCacher()
+            Returns:
+            - padding_width (int): Calculated padding width
+            """
+            # Calculate the total length of all strings
+            total_length = sum(length for length in lengths)
 
-    global_pps_t1 = time.perf_counter()
-    global_packets_per_second = 0
-    is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-    padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
-    stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+            # Calculate the padding width
+            padding_width = max(0, (total_width - total_length) // 2)
 
-    if not all(field_name in Settings.STDOUT_FIELDS_TO_HIDE for field_name in ["Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]):
-        # deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
-        ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
-        ip_lookup_core__thread.start()
+            return padding_width
 
-    while not exit_signal.is_set():
-        session_connected__padding_country_name = 0
-        session_disconnected__padding_country_name = 0
-        session_connected: list[Player] = []
-        session_disconnected: list[Player] = []
-
-        date_time_now = datetime.now()
-        time_perf_counter = time.perf_counter()
-
-        for player in PlayersRegistry.iterate_players_from_registry():
-            if (
-                not player.datetime_left
-                and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=Settings.PLAYER_DISCONNECTED_TIMER)
-            ):
-               player.datetime_left = player.datetime_last_seen
-
-            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE and player.asn is None:
-                player.asn = get_asn_info(player.ip)
-
-            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE and player.country_name is None:
-                player.country_name, player.country_iso = get_country_info(player.ip)
-
-            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE and player.city is None:
-                player.city = get_city_info(player.ip)
-
-            if player.datetime_left:
-                session_disconnected.append(player)
+        def format_player_datetime(datetime_object: datetime):
+            if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
+                formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
             else:
-                session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
+                formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
 
-                player_time_delta: timedelta = (date_time_now - player.pps_t1)
-                if player_time_delta >= timedelta(seconds=Settings.STDOUT_FIELD_PPS_TIMER):
-                    player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
-                    player.pps_counter = 0
-                    player.pps_t1 = date_time_now
-                    player.is_pps_first_calculation = False
+            return formatted_datetime
 
-                session_connected.append(player)
-
-        session_connected = sorted(session_connected, key=attrgetter(session_connected_sorted_key))
-        session_disconnected = sorted(session_disconnected, key=attrgetter(session_disconnected_sorted_key))
-
-        if Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY == "First Seen":
-            session_disconnected__stdout_counter = session_disconnected[:Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS]
-        else:
-            session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
-
-        for player in session_disconnected__stdout_counter:
-            session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
-
-        if (
-            Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
-            or Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
-        ):
-            len_session_disconnected_message = str(len(session_disconnected))
-        else:
-            len_session_disconnected_message = f"showing {Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
-
-        printer.cache_print("")
-
-        if Settings.STDOUT_SHOW_ADVERTISING:
-            printer.cache_print("-" * 109)
-            printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-            printer.cache_print("  * https://illegal-services.com/")
-            printer.cache_print("  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
-            printer.cache_print("  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
-            printer.cache_print("")
-            printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-            printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
-            printer.cache_print("")
-
-        printer.cache_print(f"-" * 109)
-        printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
-        printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-        printer.cache_print(f"-   " * 28)
-        printer.cache_print(stdout__scanning_on_network_interface)
-        tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
-        tshark_latency = []
-
-        # Convert the average latency to seconds and round it to 1 decimal place
-        average_latency_seconds = tshark_average_latency.total_seconds()
-        average_latency_rounded = round(average_latency_seconds, 1)
-
-        if tshark_average_latency >= timedelta(seconds=0.90 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
-            latency_color = Fore.RED
-        elif tshark_average_latency >= timedelta(seconds=0.75 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
-            latency_color = Fore.YELLOW
-        else:
-            latency_color = Fore.GREEN
-
-        global_pps_t2 = time_perf_counter
-        seconds_elapsed = global_pps_t2 - global_pps_t1
-        if seconds_elapsed >= Settings.STDOUT_GLOBAL_PPS_TIMER:
-            global_packets_per_second = round(global_pps_counter / seconds_elapsed)
-            global_pps_counter = 0
-            global_pps_t1 = global_pps_t2
-
-        # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
-        # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
-        if global_packets_per_second >= 3000: # Check if PPS exceeds 3000
-            pps_color = Fore.RED
-        elif global_packets_per_second >= 1500: # Check if PPS exceeds 1500
-            pps_color = Fore.YELLOW
-        else:
-            pps_color = Fore.GREEN
-
-        color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
-        padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(Settings.PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_packets_per_second)))
-        printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_packets_per_second}{Fore.RESET}")
-        printer.cache_print(f"-" * 109)
-        connected_players_table = PrettyTable()
-        connected_players_table.set_style(SINGLE_BORDER)
-        connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-        connected_players_table.field_names = connected_players_table__field_names
-        connected_players_table.align = "l"
-        for player in session_connected:
-            row = [
-                f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
-                f"{Fore.GREEN}{player.packets}{Fore.RESET}",
-                f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
-                f"{Fore.GREEN}{player.rejoins}{Fore.RESET}",
-                f"{Fore.GREEN}{player.ip}{Fore.RESET}"
-            ]
-            if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
-            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
-            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.city}{Fore.RESET}")
-            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.asn}{Fore.RESET}")
-            if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.mobile}{Fore.RESET}")
-            if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.proxy}{Fore.RESET}")
-            if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.GREEN}{player.hosting}{Fore.RESET}")
-
-            connected_players_table.add_row(row)
-        disconnected_players_table = PrettyTable()
-        disconnected_players_table.set_style(SINGLE_BORDER)
-        disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-        disconnected_players_table.field_names = disconnected_players_table__field_names
-        disconnected_players_table.align = "l"
-        for player in session_disconnected:
-            row = [
-                f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
-                f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
-                f"{Fore.RED}{player.packets}{Fore.RESET}",
-                f"{Fore.RED}{player.rejoins}{Fore.RESET}",
-                f"{Fore.RED}{player.ip}{Fore.RESET}"
-            ]
-            if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
-            if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
-            if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.city}{Fore.RESET}")
-            if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.asn}{Fore.RESET}")
-            if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.mobile}{Fore.RESET}")
-            if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.proxy}{Fore.RESET}")
-            if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                row.append(f"{Fore.RED}{player.hosting}{Fore.RESET}")
-
-            disconnected_players_table.add_row(row)
-
-        printer.cache_print("")
-        printer.cache_print(connected_players_table.get_string())
-        printer.cache_print(disconnected_players_table.get_string())
-        printer.cache_print("")
-
-        cls()
-        printer.flush_cache()
-
-        refreshing_rate_t1 = time_perf_counter
-        printed_text__flag = False
-        while not exit_signal.is_set():
-            refreshing_rate_t2 = time.perf_counter()
-
-            seconds_elapsed = refreshing_rate_t2 - refreshing_rate_t1
-            if seconds_elapsed <= Settings.STDOUT_REFRESHING_TIMER:
-                seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
-                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                    seconds_left = round(seconds_left, 1)
-                    sleep = 0.1
+        def format_player_pps(is_pps_first_calculation: bool, packets_per_second: int):
+            if packets_per_second == 0:
+                if is_pps_first_calculation:
+                    pps_color = Fore.GREEN
                 else:
-                    seconds_left = round(seconds_left)
-                    sleep = 1
-                print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
-                printed_text__flag = True
+                    pps_color = Fore.RED
+            elif packets_per_second == 1:
+                pps_color = Fore.YELLOW
+            else:
+                pps_color = Fore.GREEN
 
-                if exit_signal.is_set():
-                    break
-                time.sleep(sleep)
-                if exit_signal.is_set():
-                    break
-                continue
+            return f"{pps_color}{packets_per_second}{Fore.RESET}"
 
-            refreshing_rate_t1 = refreshing_rate_t2
-            break
-        if (
-            exit_signal.is_set()
-            and printed_text__flag
-        ):
-            print("\033[K" + "\033[F", end="\r")
+        def format_player_ports_list(ports_list: list[int], first_port: int, last_port: int):
+            formatted_ports = []
+
+            for port in ports_list:
+                if port == first_port == last_port:
+                    formatted_ports.append(f"[{UNDERLINE}{port}{UNDERLINE_RESET}]")
+                elif port == first_port:
+                    formatted_ports.append(f"[{port}]")
+                elif port == last_port:
+                    formatted_ports.append(f"{UNDERLINE}{port}{UNDERLINE_RESET}")
+                else:
+                    formatted_ports.append(str(port))
+
+            return ", ".join(formatted_ports)
+
+        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
+            for i, field in enumerate(field_names):
+                if field == target_field:
+                    field_names[i] += " \u2193"
+                    break
+
+        global ip_lookup_core__thread, global_pps_counter, tshark_latency
+
+        session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY]
+        session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY]
+
+        connected_players_table__field_names = [field_name for field_name in
+                                                [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "Last Seen"]
+                                                if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
+        add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_CONNECTED_PLAYERS_SORTED_BY)
+        disconnected_players_table__field_names = [field_name for field_name in
+                                                    [field_name for field_name in Settings._stdout_fields_mapping.keys() if not field_name == "PPS"]
+                                                    if field_name not in Settings.STDOUT_FIELDS_TO_HIDE]
+        add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY)
+
+        printer = PrintCacher()
+        global_pps_t1 = time.perf_counter()
+        global_packets_per_second = 0
+        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+        padding_width = calculate_padding_width(109, 44, len(str(Settings.IP_ADDRESS)), len(str(Settings.INTERFACE_NAME)), len(str(is_arp_enabled)))
+        stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+
+        if not all(field_name in Settings.STDOUT_FIELDS_TO_HIDE for field_name in ["Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]):
+            # deepcode ignore MissingAPI: it's not requiered in this specififc script
+            ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
+            ip_lookup_core__thread.start()
+
+        while True:
+            session_connected__padding_country_name = 0
+            session_disconnected__padding_country_name = 0
+            session_connected: list[Player] = []
+            session_disconnected: list[Player] = []
+
+            date_time_now = datetime.now()
+            time_perf_counter = time.perf_counter()
+
+            for player in PlayersRegistry.iterate_players_from_registry():
+                if (
+                    not player.datetime_left
+                    and (date_time_now - player.datetime_last_seen) >= timedelta(seconds=Settings.PLAYER_DISCONNECTED_TIMER)
+                ):
+                    player.datetime_left = player.datetime_last_seen
+
+                if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE and player.asn is None:
+                    player.asn = get_asn_info(player.ip)
+
+                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE and player.country_name is None:
+                    player.country_name, player.country_iso = get_country_info(player.ip)
+
+                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE and player.city is None:
+                    player.city = get_city_info(player.ip)
+
+                if player.datetime_left:
+                    session_disconnected.append(player)
+                else:
+                    session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
+
+                    player_time_delta: timedelta = (date_time_now - player.pps_t1)
+                    if player_time_delta >= timedelta(seconds=Settings.STDOUT_FIELD_PPS_TIMER):
+                        player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
+                        player.pps_counter = 0
+                        player.pps_t1 = date_time_now
+                        player.is_pps_first_calculation = False
+
+                    session_connected.append(player)
+
+            session_connected = sorted(session_connected, key=attrgetter(session_connected_sorted_key))
+            session_disconnected = sorted(session_disconnected, key=attrgetter(session_disconnected_sorted_key))
+
+            if Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY == "First Seen":
+                session_disconnected__stdout_counter = session_disconnected[:Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS]
+            else:
+                session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
+
+            for player in session_disconnected__stdout_counter:
+                session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
+
+            if (
+                Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
+                or Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
+            ):
+                len_session_disconnected_message = str(len(session_disconnected))
+            else:
+                len_session_disconnected_message = f"showing {Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
+
+            printer.cache_print("")
+
+            if Settings.STDOUT_SHOW_ADVERTISING:
+                printer.cache_print("-" * 109)
+                printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
+                printer.cache_print("  * https://illegal-services.com/")
+                printer.cache_print("  * https://github.com/Illegal-Services/PC-Blacklist-Sniffer")
+                printer.cache_print("  * https://github.com/Illegal-Services/PS3-Blacklist-Sniffer")
+                printer.cache_print("")
+                printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
+                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+                printer.cache_print("")
+
+            printer.cache_print(f"-" * 109)
+            printer.cache_print(f"                             Welcome in {TITLE_VERSION}")
+            printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+            printer.cache_print(f"-   " * 28)
+            printer.cache_print(stdout__scanning_on_network_interface)
+            tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
+            tshark_latency = []
+
+            # Convert the average latency to seconds and round it to 1 decimal place
+            average_latency_seconds = tshark_average_latency.total_seconds()
+            average_latency_rounded = round(average_latency_seconds, 1)
+
+            if tshark_average_latency >= timedelta(seconds=0.90 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
+                latency_color = Fore.RED
+            elif tshark_average_latency >= timedelta(seconds=0.75 * Settings.PACKET_CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
+                latency_color = Fore.YELLOW
+            else:
+                latency_color = Fore.GREEN
+
+            global_pps_t2 = time_perf_counter
+            seconds_elapsed = global_pps_t2 - global_pps_t1
+            if seconds_elapsed >= Settings.STDOUT_GLOBAL_PPS_TIMER:
+                global_packets_per_second = round(global_pps_counter / seconds_elapsed)
+                global_pps_counter = 0
+                global_pps_t1 = global_pps_t2
+
+            # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
+            # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
+            if global_packets_per_second >= 3000: # Check if PPS exceeds 3000
+                pps_color = Fore.RED
+            elif global_packets_per_second >= 1500: # Check if PPS exceeds 1500
+                pps_color = Fore.YELLOW
+            else:
+                pps_color = Fore.GREEN
+
+            color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
+            padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(Settings.PACKET_CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_packets_per_second)))
+            printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.PACKET_CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_packets_per_second}{Fore.RESET}")
+            printer.cache_print(f"-" * 109)
+            connected_players_table = PrettyTable()
+            connected_players_table.set_style(SINGLE_BORDER)
+            connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
+            connected_players_table.field_names = connected_players_table__field_names
+            connected_players_table.align = "l"
+            for player in session_connected:
+                row = [
+                    f"{Fore.GREEN}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
+                    f"{Fore.GREEN}{player.packets}{Fore.RESET}",
+                    f"{Fore.GREEN}{format_player_pps(player.is_pps_first_calculation, player.packets_per_second)}{Fore.RESET}",
+                    f"{Fore.GREEN}{player.rejoins}{Fore.RESET}",
+                    f"{Fore.GREEN}{player.ip}{Fore.RESET}"
+                ]
+                if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
+                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
+                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.city}{Fore.RESET}")
+                if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.asn}{Fore.RESET}")
+                if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.mobile}{Fore.RESET}")
+                if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.proxy}{Fore.RESET}")
+                if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.GREEN}{player.hosting}{Fore.RESET}")
+
+                connected_players_table.add_row(row)
+            disconnected_players_table = PrettyTable()
+            disconnected_players_table.set_style(SINGLE_BORDER)
+            disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
+            disconnected_players_table.field_names = disconnected_players_table__field_names
+            disconnected_players_table.align = "l"
+            for player in session_disconnected:
+                row = [
+                    f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
+                    f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
+                    f"{Fore.RED}{player.packets}{Fore.RESET}",
+                    f"{Fore.RED}{player.rejoins}{Fore.RESET}",
+                    f"{Fore.RED}{player.ip}{Fore.RESET}"
+                ]
+                if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{format_player_ports_list(player.ports, player.first_port, player.last_port)}{Fore.RESET}")
+                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.country_name:<{session_connected__padding_country_name}} ({player.country_iso}){Fore.RESET}")
+                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.city}{Fore.RESET}")
+                if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.asn}{Fore.RESET}")
+                if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.mobile}{Fore.RESET}")
+                if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.proxy}{Fore.RESET}")
+                if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{Fore.RED}{player.hosting}{Fore.RESET}")
+
+                disconnected_players_table.add_row(row)
+
+            printer.cache_print("")
+            printer.cache_print(connected_players_table.get_string())
+            printer.cache_print(disconnected_players_table.get_string())
+            printer.cache_print("")
+
+            cls()
+            printer.flush_cache()
+
+            refreshing_rate_t1 = time_perf_counter
+            while True:
+                refreshing_rate_t2 = time.perf_counter()
+                seconds_elapsed = refreshing_rate_t2 - refreshing_rate_t1
+
+                if seconds_elapsed <= Settings.STDOUT_REFRESHING_TIMER:
+                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
+
+                    if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
+                        seconds_left = round(seconds_left, 1)
+                        sleep = 0.1
+                    else:
+                        seconds_left = round(seconds_left)
+                        sleep = 1
+
+                    print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
+
+                    time.sleep(sleep)
+
+                    refreshing_rate_t1 = refreshing_rate_t2
+                else:
+                    break
 
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
@@ -2031,7 +2065,7 @@ PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 tshark_restarted_times = 0
 global_pps_counter = 0
 
-# deepcode ignore MissingAPI: The .join() method is indeed in cleanup_before_exit()
+# deepcode ignore MissingAPI: it's not requiered in this specififc script
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
@@ -2041,7 +2075,5 @@ while True:
     except ValueError as e:
         if str(e) == PACKET_CAPTURE_OVERFLOW:
             continue
-    except Exception as e:
-        if not exit_signal.is_set():
-            logger.debug(f"EXCEPTION: capture.apply_on_packets() [{exit_signal}], [{str(e)}], [{type(e).__name__}]")
+        else:
             raise
