@@ -148,9 +148,6 @@ class Threads_ExceptionHandler:
             Threads_ExceptionHandler.raising_e_traceback = e_traceback
 
             tb = e_traceback
-            if not isinstance(tb, TracebackType):
-                traceback.print_exception(e_type, e_value, e_traceback)
-                sys.exit(0)
             while tb.tb_next:
                 tb = tb.tb_next
             # Set the failed function name
@@ -1222,7 +1219,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 06/04/2024 (23:59)"
+VERSION = "v1.1.1 - 07/04/2024 (00:13)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1993,10 +1990,9 @@ def stdout_render_core():
                     print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
 
                     time.sleep(sleep)
+                    continue
 
-                    refreshing_rate_t1 = refreshing_rate_t2
-                else:
-                    break
+                break
 
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
