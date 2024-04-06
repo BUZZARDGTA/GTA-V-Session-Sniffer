@@ -126,8 +126,8 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 
 ### General Tips and Tricks
 
-- You can handly zoom in or out on your terminal's output by using the keyboard shortcut [CTRL] + [mouse scroll] or [CTRL] + [+], and [CTRL] + [-].
-- You can pause your terminal's output by using the keyboard shortcut [CTRL] + [S] and resume it with [CTRL] + [Q].
+- You can handly zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
+- You can pause your terminal's output by using the keyboard shortcut `[CTRL] + [S]` and resume it with `[CTRL] + [Q]`.
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
 - Using my other project [PC Blacklist Sniffer](https://github.com/Illegal-Services/PC-Blacklist-Sniffer) allows you to detect people you blacklisted from your sessions.
 - If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
