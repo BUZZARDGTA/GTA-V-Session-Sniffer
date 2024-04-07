@@ -153,7 +153,7 @@ class Threads_ExceptionHandler:
             # Set the failed function name
             Threads_ExceptionHandler.raising_function = tb.tb_frame.f_code.co_name
 
-            threads_raised__signal.set()
+            terminate_current_script_process("THREAD_RAISED")
 
             return True  # Prevent exceptions from propagating
 
@@ -1184,41 +1184,51 @@ def update_and_initialize_geolite2_readers():
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
-def terminate_current_script_process(method: Literal["SIGINT", "THREAD_RAISED"]):
-    if method == "SIGINT":
+def terminate_current_script_process(terminate_method: Literal["EXIT", "SIGINT", "THREAD_RAISED"]):
+    if terminate_method == "EXIT":
+        if exit__signal.is_set():
+            return
+        exit__signal.set()
+
+    elif terminate_method == "SIGINT":
+        if keyboard_interrupt__signal.is_set():
+            return
+        keyboard_interrupt__signal.set()
+
         print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
-        if not any(thread_name in globals() for thread_name in ["stdout_render_core__thread", "ip_lookup_core__thread"]):
-            check_threads_exceptions__thread.join()
-            sys.exit(0)
-    elif method == "THREAD_RAISED":
+
+    elif terminate_method == "THREAD_RAISED":
+        if threads_raised__signal.is_set():
+            return
+        threads_raised__signal.set()
+
         traceback.print_exception(Threads_ExceptionHandler.raising_e_type, Threads_ExceptionHandler.raising_e_value, Threads_ExceptionHandler.raising_e_traceback)
 
-    pid = os.getpid() # Get the process ID (PID) of the current script
-    process = psutil.Process(pid)
-    process.terminate()
+    exit_gracefully = True
 
-def check_threads_exceptions():
-    while not keyboard_interrupt__signal.is_set():
-        if threads_raised__signal.is_set():
-            terminate_current_script_process("THREAD_RAISED")
-            break
+    for thread_name in ["stdout_render_core__thread", "ip_lookup_core__thread"]:
+        if thread_name in globals():
+            thread = globals()[thread_name]
+            if isinstance(thread, threading.Thread):
+                if thread.is_alive():
+                    exit_gracefully = False
 
-        time.sleep(0.1)
+    if exit_gracefully:
+        sys.exit(0)
+    else:
+        pid = os.getpid() # Get the process ID (PID) of the current script
+        process = psutil.Process(pid)
+        process.terminate()
 
 def signal_handler(sig: int, frame: FrameType):
     if sig == 2: # means CTRL+C pressed
-        if not keyboard_interrupt__signal.is_set():
-            keyboard_interrupt__signal.set()
-            terminate_current_script_process("SIGINT")
+        terminate_current_script_process("SIGINT")
 
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
+exit__signal = threading.Event()
 keyboard_interrupt__signal = threading.Event()
 threads_raised__signal = threading.Event()
-
-# deepcode ignore MissingAPI: it's not requiered in this specififc script
-check_threads_exceptions__thread = threading.Thread(target=check_threads_exceptions)
-check_threads_exceptions__thread.start()
 
 if is_pyinstaller_compiled():
     SCRIPT_DIR = Path(sys.executable).parent
@@ -1227,7 +1237,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.2 - 07/04/2024 (10:56)"
+VERSION = "v1.1.2 - 07/04/2024 (11:45)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1278,7 +1288,7 @@ if not is_pyinstaller_compiled():
         msgbox_title = TITLE
         errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
         if errorlevel != 6:
-            sys.exit(0)
+            terminate_current_script_process("EXIT")
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -1316,7 +1326,7 @@ else:
             errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
             if errorlevel == 6:
                 webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-                sys.exit(0)
+                terminate_current_script_process("EXIT")
     else:
         error_updating__flag = True
 
@@ -1333,7 +1343,7 @@ if error_updating__flag:
     errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
     if errorlevel == 6:
         webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-        sys.exit(0)
+        terminate_current_script_process("EXIT")
 
 cls()
 title(f"Checking that \"Npcap\" or \"WinpCap\" driver is installed on your system - {TITLE}")
@@ -1355,7 +1365,7 @@ while True:
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
         if errorlevel == 2:
-            sys.exit(0)
+            terminate_current_script_process("EXIT")
 
 cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
@@ -1625,7 +1635,7 @@ while True:
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
         errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
         if errorlevel == 2:
-            sys.exit(0)
+            terminate_current_script_process("EXIT")
     else:
         break
 
@@ -1799,7 +1809,7 @@ def stdout_render_core():
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
 
         if not all(field_name in Settings.STDOUT_FIELDS_TO_HIDE for field_name in ["Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]):
-            # deepcode ignore MissingAPI: it's not requiered in this specififc script
+            # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
             ip_lookup_core__thread = threading.Thread(target=get_ip_infos_from_players)
             ip_lookup_core__thread.start()
 
@@ -2072,7 +2082,7 @@ PACKET_CAPTURE_OVERFLOW = "Packet capture time exceeded 3 seconds."
 tshark_restarted_times = 0
 global_pps_counter = 0
 
-# deepcode ignore MissingAPI: it's not requiered in this specififc script
+# deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
 stdout_render_core__thread = threading.Thread(target=stdout_render_core)
 stdout_render_core__thread.start()
 
