@@ -35,7 +35,7 @@ from pathlib import Path
 from types import FrameType, TracebackType
 from typing import Optional, Literal
 from operator import attrgetter
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, AddressValueError
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
 
@@ -814,7 +814,7 @@ def is_hex(string: str):
 def is_ipv4_address(ip_address: str):
     try:
         return IPv4Address(ip_address).version == 4
-    except:
+    except AddressValueError:
         return False
 
 def is_mac_address(mac_address: str):
@@ -823,7 +823,7 @@ def is_mac_address(mac_address: str):
 def is_private_device_ipv4(ip_address: str):
     try:
         ipv4_obj = IPv4Address(ip_address)
-    except ValueError:
+    except AddressValueError:
         return False
 
     if (
@@ -1237,7 +1237,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.2 - 07/04/2024 (11:45)"
+VERSION = "v1.1.3 - 07/04/2024 (12:31)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1662,7 +1662,7 @@ def get_ip_infos_from_players():
                     json=data,
                     timeout=3
                 )
-            except:
+            except Exception:
                 return None
 
             requests_remaining = int(response.headers.get("X-Rl", MAX_REQUESTS))
