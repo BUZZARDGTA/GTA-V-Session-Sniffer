@@ -790,6 +790,14 @@ def title(title: str):
 def cls():
     print("\033c", end="")
 
+def take(n: int, iterable: list):
+    """Return first n items of the iterable as a list."""
+    return iterable[:n]
+
+def tail(n: int, iterable: list):
+    """Return last n items of the iterable as a list."""
+    return iterable[-n:]
+
 def plural(variable: int):
     return "s" if variable > 1 else ""
 
@@ -1219,7 +1227,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.1 - 07/04/2024 (00:13)"
+VERSION = "v1.1.2 - 07/04/2024 (10:02)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1825,7 +1833,7 @@ def stdout_render_core():
                 else:
                     session_connected__padding_country_name = get_minimum_padding(player.country_name, session_connected__padding_country_name, 27)
 
-                    player_time_delta: timedelta = (date_time_now - player.pps_t1)
+                    player_time_delta = (date_time_now - player.pps_t1)
                     if player_time_delta >= timedelta(seconds=Settings.STDOUT_FIELD_PPS_TIMER):
                         player.packets_per_second = round(player.pps_counter / player_time_delta.total_seconds())
                         player.pps_counter = 0
@@ -1834,24 +1842,27 @@ def stdout_render_core():
 
                     session_connected.append(player)
 
-            session_connected = sorted(session_connected, key=attrgetter(session_connected_sorted_key))
-            session_disconnected = sorted(session_disconnected, key=attrgetter(session_disconnected_sorted_key))
+            session_connected.sort(key=attrgetter(session_connected_sorted_key))
+            session_disconnected.sort(key=attrgetter(session_disconnected_sorted_key))
 
-            if Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY == "First Seen":
-                session_disconnected__stdout_counter = session_disconnected[:Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS]
-            else:
-                session_disconnected__stdout_counter = session_disconnected[-Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS:]
+            session_disconnected_all = session_disconnected
 
-            for player in session_disconnected__stdout_counter:
+            if Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS > 0:
+                if Settings.STDOUT_FIELD_SESSION_DISCONNECTED_PLAYERS_SORTED_BY == "First Seen":
+                    session_disconnected = take(Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, session_disconnected)
+                else:
+                    session_disconnected = tail(Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS, session_disconnected)
+
+            for player in session_disconnected:
                 session_disconnected__padding_country_name = get_minimum_padding(player.country_name, session_disconnected__padding_country_name, 27)
 
             if (
                 Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS == 0
-                or Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected)
+                or Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS >= len(session_disconnected_all)
             ):
                 len_session_disconnected_message = str(len(session_disconnected))
             else:
-                len_session_disconnected_message = f"showing {Settings.STDOUT_COUNTER_SESSION_DISCONNECTED_PLAYERS}/{len(session_disconnected)}"
+                len_session_disconnected_message = f"showing {len(session_disconnected)}/{len(session_disconnected_all)}"
 
             printer.cache_print("")
 
@@ -1941,8 +1952,8 @@ def stdout_render_core():
             disconnected_players_table.align = "l"
             for player in session_disconnected:
                 row = [
-                    f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
                     f"{Fore.RED}{format_player_datetime(player.datetime_first_seen)}{Fore.RESET}",
+                    f"{Fore.RED}{format_player_datetime(player.datetime_last_seen)}{Fore.RESET}",
                     f"{Fore.RED}{player.packets}{Fore.RESET}",
                     f"{Fore.RED}{player.rejoins}{Fore.RESET}",
                     f"{Fore.RED}{player.ip}{Fore.RESET}"
@@ -1982,14 +1993,14 @@ def stdout_render_core():
 
                     if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
                         seconds_left = round(seconds_left, 1)
-                        sleep = 0.1
+                        sleep_seconds = 0.1
                     else:
                         seconds_left = round(seconds_left)
-                        sleep = 1
+                        sleep_seconds = 1
 
                     print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
 
-                    time.sleep(sleep)
+                    time.sleep(sleep_seconds)
                     continue
 
                 break
