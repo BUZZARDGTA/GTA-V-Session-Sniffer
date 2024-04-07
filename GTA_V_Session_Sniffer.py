@@ -1227,7 +1227,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.2 - 07/04/2024 (10:02)"
+VERSION = "v1.1.2 - 07/04/2024 (10:56)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 HEADERS = {
@@ -1302,14 +1302,14 @@ else:
     if response.status_code == 200:
         error_updating__flag = False
         current_version = Version(VERSION)
-        latest_version = Version(response.text)
+        latest_version = Version(response.text.strip().rstrip())
         if Updater(current_version).check_for_update(latest_version):
             msgbox_title = TITLE
             msgbox_text = f"""
                 New version found. Do you want to update ?
 
                 Current version: {current_version}
-                Latest version : {latest_version}
+                Latest version: {latest_version}
             """
             msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
             msgbox_style = Msgbox.YesNo | Msgbox.Question
