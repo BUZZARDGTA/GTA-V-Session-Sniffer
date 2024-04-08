@@ -33,7 +33,7 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 |                                                          CMD console                                                           |
 | :----------------------------------------------------------------------------------------------------------------------------: |
-| ![CMD console](https://github.com/Illegal-Services/GTA-V-Session-Sniffer/assets/62464560/0e22b851-83a8-42a9-828f-a07ce9b11891) |
+| ![CMD console](https://github.com/Illegal-Services/GTA-V-Session-Sniffer/assets/62464560/442d49ab-e240-44eb-921c-cf2ae9ffbb64) |
 
 ## Configuration
 
