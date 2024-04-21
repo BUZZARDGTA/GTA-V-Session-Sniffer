@@ -2,7 +2,7 @@
 
 ## Description
 
-Compatible with both PC and all consoles (Playstation and Xbox).<br />
+Compatible with both PC and all consoles (PlayStation and Xbox).<br />
 Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
 
 To be clear, the script does not explicitly indicate which IP corresponds to which in-game username.<br />
@@ -27,7 +27,7 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 - The script has a configuration file that allows for more advanced customization of its behavior.
 - You can use the script without a modded video game or cracked program.
-- The script is entierly **FREE TO USE** and **OPEN SOURCE**.
+- The script is entirely **FREE TO USE** and **OPEN SOURCE**.
 
 ## Showcase
 
@@ -65,10 +65,10 @@ Additionally, ensure that in the `"Settings.ini"` file, the setting `<NETWORK_IN
 In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
 
 1. Open the `"Settings.ini"` file.
-2. If not already done, set `<NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering in the "Capture network interface selection" screen at script's startup. (you can disable it later)
+2. If not already done, set `<NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering the "Capture network interface selection" screen at script's startup. (you can disable it later)
 3. Enable the `<ARP>` setting by setting its value to `True`. (This setting allows you to view all currently connected external devices within your local network in the script's "Capture network interface selection" screen)
-4. Ensure that your console is currently running and **connected to internet trough your PC's internet connection (Wired / Hotspot)**.
-5. Start the script and wait for it to enter in the "Capture network interface selection" screen.
+4. Ensure that your console is currently running and **connected to internet through your PC's internet connection (Wired / Hotspot)**.
+5. Start the script and wait for it to enter the "Capture network interface selection" screen.
 6. Then, you'll need to identify the console's IP and MAC Address and select it accordingly.
 
 ### Resolving Country, City and ASN fields.
@@ -78,7 +78,7 @@ Upon startup, it automatically attempts to check for updates and downloads the l
 
 In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.<br />
 You can obtain copies of these databases by signing up for GeoLite2 on the [MaxMind](https://www.maxmind.com/) official website and downloading them from there.<br />
-Then you will need to creates a new folder named "GeoLite2 Databases" within the script's dir, and place the database files there.
+Then you will need to create a new folder named "GeoLite2 Databases" within the script's directory, and place the database files there.
 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br />
 You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
@@ -126,17 +126,17 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 
 ### General Tips and Tricks
 
-- You can handly zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
+- You can handily zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
 - You can pause your terminal's output by using the keyboard shortcut `[CTRL] + [S]` and resume it with `[CTRL] + [Q]`.
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
 - Using my other project [PC Blacklist Sniffer](https://github.com/Illegal-Services/PC-Blacklist-Sniffer) allows you to detect people you blacklisted from your sessions.
-- If you want to know more informations about a specific IP or Port, I'd recommend you to checkout the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
+- If you want to know more information about a specific IP or Port, I'd recommend you to check out the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
 
 ### GTA V Tips and Tricks
 
 #### Obtaining / Resolving someones IP address
 
-- The GTA V game port is `6672`; unfortunately I don't have any clue what the other ports means.
+- The GTA V game port is `6672`; unfortunately, I don't have any clue what the other ports mean.
 - If somebody joins the session, you can obtain their IP address from the most recent entry in "connected players" list.
 - If somebody leaves the session, you can obtain their IP address from the most recent entry in "disconnected players" list.
 - One way to obtain someone's IP address is to save all entries from "connected players" list during the current session while they are connected to your session.<br />
