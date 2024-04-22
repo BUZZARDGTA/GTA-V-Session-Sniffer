@@ -18,7 +18,6 @@ if exist "requirements.txt" (
 for %%A in (
     colorama
     geoip2
-    mac-vendor-lookup
     prettytable
     psutil
     requests

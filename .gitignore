@@ -1,6 +1,12 @@
 /.devfolder
-/capture/__pycache__
+/.vscode
+/Modules/capture/__pycache__/
+/Modules/oui_lookup/__pycache__/
 /GeoLite2 Databases
+*.pyc
+.dccache
 Settings.ini
 debug.log
-.dccache
+Blacklist.ini
+blacklist.log
+debug.txt

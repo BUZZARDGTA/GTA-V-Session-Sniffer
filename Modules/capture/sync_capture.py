@@ -22,8 +22,8 @@ class IP:
 
 class UDP:
     def __init__(self, srcport: str, dstport: str):
-        self.srcport = int(srcport)
-        self.dstport = int(dstport)
+        self.srcport = int(srcport) if srcport else None
+        self.dstport = int(dstport) if dstport else None
 
 class Packet:
     def __init__(self, fields: list):
@@ -100,7 +100,7 @@ def get_tshark_path(tshark_path: Path = None):
         user_tshark_path = None
 
         if tshark_path.is_file():
-            if tshark_path.name.endswith("tshark.exe"):
+            if tshark_path.name == "tshark.exe":
                 user_tshark_path = tshark_path
         elif tshark_path.is_dir():
             if (tshark_path / "tshark.exe").is_file():
@@ -120,6 +120,6 @@ def get_tshark_path(tshark_path: Path = None):
             return path
 
     raise TSharkNotFoundException(
-        f"TShark not found. Try adding its location to the configuration file.\n"
-        f"Searched these paths: {', '.join(f'\"{path}\"' for path in possible_paths)}"
+          "TShark not found. Try adding its location to the configuration file.\n"
+        fR"Searched these paths: {', '.join(f'\"{path}\"' for path in possible_paths)}"
     )
