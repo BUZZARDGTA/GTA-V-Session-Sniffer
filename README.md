@@ -149,14 +149,6 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - Most of the time, when joining a new session, the host is typically the player whose "First Seen" field in the connected players output shows the oldest date and time.
 - If you're playing on PC and want to obtain someone's IP address, if they are indexed on this website, you can try using [gtaresolver.com](https://gtaresolver.com/) website to resolve someone's IP address from their in-game username.
 
-## Lexicon
-
-### Session Split
-
-The person hosting the session suddenly loses internet access. (examples: DDoS, Crash, Freeze)<br />
-A new host will be automatically selected from the players who are already in the session.<br />
-During this new host selection process, some players may be kicked out of the lobby, leaving them alone in their new session.
-
 ## Contact Support
 
 If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
