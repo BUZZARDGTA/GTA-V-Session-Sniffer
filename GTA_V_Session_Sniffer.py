@@ -188,7 +188,6 @@ class Settings:
     STDOUT_REFRESHING_TIMER = 3
     BLACKLIST_ENABLED = True
     BLACKLIST_NOTIFICATIONS = True
-    BLACKLIST_NOTIFICATIONS_TIMER: Literal[False] | float = False
     BLACKLIST_VOICE_NOTIFICATIONS: Literal["Male", "Female", False] = "Male"
     BLACKLIST_PROTECTION: Literal["Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC", False] = False
     BLACKLIST_PROTECTION_EXIT_PROCESS_PATH = None
@@ -329,11 +328,6 @@ class Settings:
             ;;
             ;;<BLACKLIST_NOTIFICATIONS>
             ;;Determine if you want or not to display a notification when a blacklisted user is detected.
-            ;;
-            ;;<BLACKLIST_NOTIFICATIONS_TIMER>
-            ;;The time interval in seconds during which notifications will be displayed when a blacklisted user is detected.
-            ;;Valid values include any number greater than or equal to 3.
-            ;;Set it to \"False\" value to disable this setting.
             ;;
             ;;<BLACKLIST_VOICE_NOTIFICATIONS>
             ;;This setting determines the voice that will play when a blacklisted player is detected or when they disconnect.
@@ -584,19 +578,6 @@ class Settings:
                         Settings.BLACKLIST_NOTIFICATIONS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_NOTIFICATIONS_TIMER":
-                    try:
-                        Settings.BLACKLIST_NOTIFICATIONS_TIMER, need_rewrite_current_setting = custom_str_to_bool(setting_value, only_match_against=False)
-                    except InvalidBooleanValueError:
-                        try:
-                            blacklist_notifications_timer = float(setting_value)
-                        except (ValueError, TypeError):
-                            need_rewrite_settings = True
-                        else:
-                            if blacklist_notifications_timer >= 3.0:
-                                Settings.BLACKLIST_NOTIFICATIONS_TIMER = blacklist_notifications_timer
-                            else:
-                                need_rewrite_settings = True
                 elif setting_name == "BLACKLIST_VOICE_NOTIFICATIONS":
                     try:
                         Settings.BLACKLIST_VOICE_NOTIFICATIONS, need_rewrite_current_setting = custom_str_to_bool(setting_value, only_match_against=False)
@@ -820,6 +801,7 @@ class Player_Blacklist:
 class Player:
     def __init__(self, packet_datetime: datetime, ip: str, port: int):
         self.ip = ip
+        self.two_take_one__usernames = []
 
         self.rejoins = 0
         self.packets = 1
@@ -1010,6 +992,20 @@ def take(n: int, iterable: list):
 def tail(n: int, iterable: list):
     """Return last n items of the iterable as a list."""
     return iterable[-n:]
+
+def concat_lists_no_duplicates(list1: list, list2: list):
+    # Combine the lists
+    combined_list = list1 + list2
+
+    # Remove duplicates while preserving order
+    unique_list = []
+    seen = set()
+    for item in combined_list:
+        if item not in seen:
+            unique_list.append(item)
+            seen.add(item)
+
+    return unique_list
 
 def plural(variable: int):
     return "s" if variable > 1 else ""
@@ -1521,6 +1517,7 @@ TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
 BLACKLIST_LOGGING_PATH = Path("blacklist.log")
+TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:125.0) Gecko/20100101 Firefox/125.0"
 }
@@ -1547,9 +1544,9 @@ if not is_pyinstaller_compiled():
         return outdated_packages
 
     third_party_packages = {
-        "psutil": "5.9.8",
-        "requests": "2.31.0",
-        "urllib3": "2.2.1",
+        "psutil": "6.0.0",
+        "requests": "2.32.3",
+        "urllib3": "2.2.2",
         "WMI": "1.5.1"
     }
 
@@ -2047,10 +2044,7 @@ def blacklist_sniffer_core():
                         continue
 
                     blacklist_notifaction_t2 = datetime.now()
-                    if player.blacklist.notification_t1 is None or (
-                        Settings.BLACKLIST_NOTIFICATIONS_TIMER
-                        and (blacklist_notifaction_t2 - player.blacklist.notification_t1) >= timedelta(seconds=Settings.BLACKLIST_NOTIFICATIONS_TIMER)
-                    ):
+                    if player.blacklist.notification_t1 is None:
                         player.blacklist.notification_t1 = blacklist_notifaction_t2
                         blacklist_show_messagebox(player)
 
@@ -2230,7 +2224,7 @@ def stdout_render_core():
 
         return formatted_datetime
 
-    def format_player_usernames(player_usernames: list):
+    def format_player_usernames(player_usernames: list[str]):
         if player_usernames:
             if len(player_usernames) > 1:
                 player_usernames = f"{', '.join(player_usernames)}"
@@ -2335,6 +2329,15 @@ def stdout_render_core():
             time_perf_counter = time.perf_counter()
 
             for player in PlayersRegistry.iterate_players_from_registry():
+                if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
+                    for username in re.findall(
+                        r"^user:(?P<username>[\w._-]{1,16}), ip:%s, scid:\d{1,9}, timestamp:\d{10}$" % re.escape(player.ip),
+                        Path(TWO_TAKE_ONE__PLUGIN__LOG_PATH).read_text(encoding="utf-8"),
+                        re.MULTILINE
+                    ):
+                        if username not in player.two_take_one__usernames:
+                            player.two_take_one__usernames.append(username)
+
                 if (
                     not player.datetime.left
                     and (date_time_now - player.datetime.last_seen) >= timedelta(seconds=Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER)
@@ -2477,7 +2480,7 @@ def stdout_render_core():
                 row = []
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
                 if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.blacklist.usernames)}{player_reset}")
+                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one__usernames, player.blacklist.usernames))}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
@@ -2518,7 +2521,7 @@ def stdout_render_core():
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
                 row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
                 if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.blacklist.usernames)}{player_reset}")
+                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one__usernames, player.blacklist.usernames))}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.ip}{player_reset}")
