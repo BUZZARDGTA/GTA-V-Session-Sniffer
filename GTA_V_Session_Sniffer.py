@@ -2331,7 +2331,7 @@ def stdout_render_core():
             for player in PlayersRegistry.iterate_players_from_registry():
                 if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
                     for username in re.findall(
-                        r"^user:(?P<username>[\w._-]{1,16}), ip:%s, scid:\d{1,9}, timestamp:\d{10}$" % re.escape(player.ip),
+                        r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:%s, timestamp:\d{10}$" % re.escape(player.ip),
                         Path(TWO_TAKE_ONE__PLUGIN__LOG_PATH).read_text(encoding="utf-8"),
                         re.MULTILINE
                     ):
