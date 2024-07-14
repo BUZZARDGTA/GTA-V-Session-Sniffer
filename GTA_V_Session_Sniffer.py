@@ -1072,25 +1072,27 @@ def get_interface_info(interface_index: str):
     interfaces: list[_wmi_object] = c.Win32_NetworkAdapter(InterfaceIndex=interface_index)
     if not isinstance(interfaces, list):
         raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
-    for interface in interfaces:
-        if not isinstance(interface, _wmi_object):
-            raise TypeError(f"Expected '_wmi_object' object, got '{type(interface)}'")
-
-    if len(interfaces) != 1:
+    if not interfaces:
+        return None
+    if len(interfaces) > 1:
         raise ValueError(
             "\nERROR:\n"
             "         Developer didn't expect this scenario to be possible.\n"
             "\nINFOS:\n"
-            "         \"WMI\" Python's module did not return a single interface for a given interface Index.\n"
+            "         \"WMI\" Python's module returned more then one interface for a given interface Index.\n"
             "\nDEBUG:\n"
             f"         interface_index: {interface_index}\n"
             f"         interfaces: {interfaces}\n"
             f"         len(interfaces): {len(interfaces)}"
         )
 
-    return interfaces[0]
+    interface = interfaces[0]
+    if not isinstance(interface, _wmi_object):
+        raise TypeError(f"Expected '_wmi_object' object, got '{type(interface)}'")
 
-def get_organization_name(mac_address: str):
+    return interface
+
+def get_organization_name(mac_address: str | None):
     if mac_address is None:
         return None
 
@@ -1132,6 +1134,8 @@ def get_and_parse_arp_cache():
         ):
             interface_index = hex_to_int(parts[3])
             interface_info = get_interface_info(interface_index)
+            if not interface_info:
+                continue
 
             interface_name: str | None = interface_info.NetConnectionID
             if not isinstance(interface_name, str):
