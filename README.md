@@ -160,7 +160,7 @@ You can also contact me privately via:
 
 - Email: BUZZARDGTA@protonmail.com
 - Discord: waitingforharukatoaddme
-- Telegram: [@mathieudummy](https://t.me/mathieudummy)
+- Telegram: [@waitingforharukatoaddme](https://t.me/waitingforharukatoaddme)
 
 ## Requirements
 
