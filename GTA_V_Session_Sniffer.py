@@ -1952,7 +1952,7 @@ def blacklist_sniffer_core():
             #### Blacklisted user detected at {player.blacklist.time} ####
             User{plural(len(player.blacklist.usernames))}: {', '.join(player.blacklist.usernames)}
             IP: {player.ip}
-            Ports: {', '.join(map(str, player.ports.list))}
+            Port{plural(len(player.ports.list))}: {', '.join(map(str, player.ports.list))}
             Country Code: {player.iplookup.maxmind.country_iso}
             Detection Type: {player.blacklist.detection_type}
             ############# IP Lookup ##############
@@ -2605,7 +2605,11 @@ def packet_callback(packet: Packet):
             "         Developer didn't expect this scenario to be possible.\n"
             "\nINFOS:\n"
             "         A player port was not found.\n"
+            "         This situation already happened to me, but at this time I had not the `target__ip` info from the packet, so it was useless.\n"
+            "         Note for the future:\n"
+            "         If `target__ip` is a false positive (not a player), always `continue` on a packet with no port.\n"
             "\nDEBUG:\n"
+            f"         target__ip: {target__ip}\n"
             f"         target__port: {target__port}"
         )
 
