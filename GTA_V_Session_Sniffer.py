@@ -1548,6 +1548,9 @@ if not is_pyinstaller_compiled():
         return outdated_packages
 
     third_party_packages = {
+        "colorama": "0.4.6",
+        "geoip2": "4.8.0",
+        "prettytable": "3.10.2",
         "psutil": "6.0.0",
         "requests": "2.32.3",
         "urllib3": "2.2.2",

@@ -2,8 +2,8 @@
 
 colorama==0.4.6
 geoip2==4.8.0
-prettytable==3.10.0
-psutil==5.9.8
-requests==2.31.0
-urllib3==2.2.1
+prettytable==3.10.2
+psutil==6.0.0
+requests==2.32.3
+urllib3==2.2.2
 WMI==1.5.1
