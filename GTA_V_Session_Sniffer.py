@@ -1,3 +1,10 @@
+# -----------------------------------------------------
+# 📚 Local Python Libraries (Included with Project) 📚
+# -----------------------------------------------------
+from Modules.capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
+from Modules.oui_lookup.oui_lookup import MacLookup
+from Modules.https_utils.unsafe_https import create_unsafe_https_session
+
 # --------------------------------------------
 # 📦 External/Third-party Python Libraries 📦
 # --------------------------------------------
@@ -10,8 +17,6 @@ import geoip2.database
 from colorama import Fore, Back, Style
 from wmi import _wmi_namespace, _wmi_object
 from prettytable import PrettyTable, SINGLE_BORDER
-from Modules.capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
-from Modules.oui_lookup.oui_lookup import MacLookup
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -47,6 +52,7 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
 
+
 class InvalidBooleanValueError(Exception):
     pass
 
@@ -59,6 +65,36 @@ class InvalidFileError(Exception):
 
 class PacketCaptureOverflow(Exception):
     pass
+
+class ScriptCrashedUnderControl(Exception):
+    pass
+
+class ScriptControl:
+    _lock = threading.Lock()
+    _crashed = False
+    _message = ""
+
+    @classmethod
+    def set_crashed(cls, message=""):
+        with cls._lock:
+            cls._crashed = True
+            cls._message = message
+
+    @classmethod
+    def reset_crashed(cls):
+        with cls._lock:
+            cls._crashed = False
+            cls._message = ""
+
+    @classmethod
+    def has_crashed(cls):
+        with cls._lock:
+            return cls._crashed
+
+    @classmethod
+    def get_message(cls):
+        with cls._lock:
+            return cls._message
 
 class Version:
     def __init__(self, version: str):
@@ -236,7 +272,7 @@ class Settings:
 
     def reconstruct_settings():
         print("\nCorrect reconstruction of \"Settings.ini\" ...")
-        text = f"""
+        text = textwrap.dedent(f"""
             ;;-----------------------------------------------------------------------------
             ;;Lines starting with \";\" or \"#\" symbols are commented lines.
             ;;
@@ -350,8 +386,7 @@ class Settings:
             ;;the <BLACKLIST_PROTECTION> setting is set to the \"Restart_Process\" value.
             ;;Please note that UWP apps are not supported.
             ;;-----------------------------------------------------------------------------
-        """
-        text = textwrap.dedent(text.removeprefix("\n"))
+        """.removeprefix("\n"))
         for setting_name, setting_value in Settings.iterate_over_settings():
             text += f"{setting_name}={setting_value}\n"
         SETTINGS_PATH.write_text(text, encoding="utf-8")
@@ -923,52 +958,6 @@ class SessionHost:
             SessionHost.player = potential_session_host_player
             SessionHost.search_player = False
 
-def create_unsafe_https_session():
-    # Standard Python Libraries
-    import ssl
-    from ssl import SSLContext
-
-    # Third-party library imports
-    import urllib3
-    from urllib3.poolmanager import PoolManager
-    from urllib3.util import create_urllib3_context
-    from urllib3.exceptions import InsecureRequestWarning
-
-
-    # Workaround unsecure request warnings
-    urllib3.disable_warnings(InsecureRequestWarning)
-
-
-    # Allow custom ssl context for adapters
-    class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
-        def __init__(self, ssl_context: SSLContext | None = None, **kwargs):
-            self.ssl_context = ssl_context
-            super().__init__(**kwargs)
-
-        def init_poolmanager(self, connections:int, maxsize:int, block=False):
-            self.poolmanager = PoolManager(
-                num_pools=connections,
-                maxsize=maxsize,
-                block=block,
-                ssl_context=self.ssl_context,
-            )
-
-
-    context = create_urllib3_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    # Work around unsecure ciphers being rejected
-    context.set_ciphers("DEFAULT@SECLEVEL=0")
-    # Work around legacy renegotiation being disabled
-    context.options |= ssl.OP_LEGACY_SERVER_CONNECT
-
-    session = requests.session()
-    session.mount("https://", CustomSSLContextHTTPAdapter(context))
-    session.headers.update(HEADERS)
-    session.verify = False
-
-    return session
-
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
@@ -1075,16 +1064,21 @@ def get_interface_info(interface_index: str):
     if not interfaces:
         return None
     if len(interfaces) > 1:
-        raise ValueError(
-            "\nERROR:\n"
-            "         Developer didn't expect this scenario to be possible.\n"
-            "\nINFOS:\n"
-            "         \"WMI\" Python's module returned more then one interface for a given interface Index.\n"
-            "\nDEBUG:\n"
-            f"         interface_index: {interface_index}\n"
-            f"         interfaces: {interfaces}\n"
-            f"         len(interfaces): {len(interfaces)}"
-        )
+        crash_text = textwrap.dedent(f"""
+            ERROR:
+                   Developer didn't expect this scenario to be possible.
+
+            INFOS:
+                   \"WMI\" Python's module returned more then one
+                   interface for a given interface Index.
+
+            DEBUG:
+                   interface_index: {interface_index}
+                   interfaces: {interfaces}
+                   len(interfaces): {len(interfaces)}
+        """.removeprefix("\n").removesuffix("\n"))
+        init_script_crash_under_control(crash_text)
+        raise ScriptCrashedUnderControl
 
     interface = interfaces[0]
     if not isinstance(interface, _wmi_object):
@@ -1139,17 +1133,21 @@ def get_and_parse_arp_cache():
 
             interface_name: str | None = interface_info.NetConnectionID
             if not isinstance(interface_name, str):
-                if interface_name is None:
-                    raise TypeError(
-                        "\nERROR:\n"
-                        "         Developer didn't expect this scenario to be possible.\n"
-                        "\nINFOS:\n"
-                        "         \"WMI\" Python module returned \"None\" for the interface name when a string was expected.\n"
-                        "\nDEBUG:\n"
-                        f"         interface_index: {interface_index}\n"
-                        f"         interface_name: {interface_name}"
-                    )
-                raise TypeError(f"Expected 'str', got '{type(interface_name)}'")
+                crash_text = textwrap.dedent(f"""
+                    ERROR:
+                           Developer didn't expect this scenario to be possible.
+
+                    INFOS:
+                           The "WMI" Python module returned an unexpected
+                           type for the interface name; expected 'str'.
+
+                    DEBUG:
+                           type(interface_name).__name__: {type(interface_name).__name__}
+                           interface_index: {interface_index}
+                           interface_name: {interface_name}
+                """.removeprefix("\n").removesuffix("\n"))
+                init_script_crash_under_control(crash_text)
+                raise ScriptCrashedUnderControl
 
             interface_ip_address = parts[1]
 
@@ -1180,14 +1178,20 @@ def get_and_parse_arp_cache():
 
 def format_mac_address(mac_address: str):
     if not is_mac_address(mac_address):
-        raise ValueError(
-            "\nERROR:\n"
-            "         Developer didn't expect this scenario to be possible.\n"
-            "\nINFOS:\n"
-            "         It seems like a MAC address does not follow \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\" format."
-            "\nDEBUG:\n"
-            f"         mac_address: {mac_address}"
-        )
+        crash_text = textwrap.dedent(f"""
+            ERROR:
+                   Developer didn't expect this scenario to be possible.
+
+            INFOS:
+                   It seems like a MAC address does not follow
+                   \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
+                   format.
+
+            DEBUG:
+                   mac_address: {mac_address}
+        """.removeprefix("\n").removesuffix("\n"))
+        init_script_crash_under_control(crash_text)
+        raise ScriptCrashedUnderControl
 
     # deepcode ignore AttributeLoadOnNone: It's impossible for 'mac_address' to be 'None' at this point. If it were 'None', a TypeError would have been raised earlier in the code, most likely from the 'is_mac_address()' function.
     return mac_address.replace("-", ":").upper()
@@ -1364,22 +1368,22 @@ def update_and_initialize_geolite2_readers():
     exception__initialize_geolite2_readers, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = initialize_geolite2_readers()
 
     show_error = False
-    msgbox_text = ""
+    msgbox_message = ""
 
     if update_geolite2_databases__dict["exception"]:
-        msgbox_text += f"Exception Error: {update_geolite2_databases__dict['exception']}\n\n"
+        msgbox_message += f"Exception Error: {update_geolite2_databases__dict['exception']}\n\n"
         show_error = True
     if update_geolite2_databases__dict["url"]:
-        msgbox_text += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"."
+        msgbox_message += f"Error: Failed fetching url: \"{update_geolite2_databases__dict['url']}\"."
         if update_geolite2_databases__dict["http_code"]:
-            msgbox_text += f" (http_code: {update_geolite2_databases__dict['http_code']})"
-        msgbox_text += "\nImpossible to keep Maxmind's GeoLite2 IP to Country, City and ASN resolutions feature up-to-date.\n\n"
+            msgbox_message += f" (http_code: {update_geolite2_databases__dict['http_code']})"
+        msgbox_message += "\nImpossible to keep Maxmind's GeoLite2 IP to Country, City and ASN resolutions feature up-to-date.\n\n"
         show_error = True
 
     if exception__initialize_geolite2_readers:
-        msgbox_text += f"Exception Error: {exception__initialize_geolite2_readers}\n\n"
-        msgbox_text += "Now disabling MaxMind's GeoLite2 IP to Country, City and ASN resolutions feature.\n"
-        msgbox_text += "Countrys, Citys and ASN from players won't shows up from the players fields."
+        msgbox_message += f"Exception Error: {exception__initialize_geolite2_readers}\n\n"
+        msgbox_message += "Now disabling MaxMind's GeoLite2 IP to Country, City and ASN resolutions feature.\n"
+        msgbox_message += "Countrys, Citys and ASN from players won't shows up from the players fields."
         geoip2_enabled = False
         show_error = True
     else:
@@ -1387,9 +1391,9 @@ def update_and_initialize_geolite2_readers():
 
     if show_error:
         msgbox_title = TITLE
-        msgbox_text = msgbox_text.rstrip("\n")
+        msgbox_message = msgbox_message.rstrip("\n")
         msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
-        show_message_box(msgbox_title, msgbox_text, msgbox_style)
+        show_message_box(msgbox_title, msgbox_message, msgbox_style)
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
@@ -1499,9 +1503,26 @@ def terminate_current_script_process(terminate_method: Literal["EXIT", "SIGINT",
         process = psutil.Process(pid)
         process.terminate()
 
+def init_script_crash_under_control(crash_text: str):
+    ScriptControl.set_crashed(f"\n\n{crash_text}\n")
+
+    msgbox_title = TITLE
+    msgbox_message = crash_text
+    msgbox_style = Msgbox.OKOnly | Msgbox.Critical
+
+    crash_alert__thread = threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style))
+    crash_alert__thread.start()
+
+    time.sleep(1)
+
+    print(ScriptControl.get_message())
+
+    crash_alert__thread.join()
+
 def signal_handler(sig: int, frame: FrameType):
     if sig == 2: # means CTRL+C pressed
-        terminate_current_script_process("SIGINT")
+        if not ScriptControl.has_crashed(): # Block CTRL+C if script is already crashing under control
+            terminate_current_script_process("SIGINT")
 
 colorama.init(autoreset=True)
 signal.signal(signal.SIGINT, signal_handler)
@@ -1522,9 +1543,6 @@ SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
 BLACKLIST_LOGGING_PATH = Path("blacklist.log")
 TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:125.0) Gecko/20100101 Firefox/125.0"
-}
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_INI_PARSER_PATTERN = re.compile(r"^(?P<key>[^=]+)=(?P<value>[^;#]+)")
@@ -1559,21 +1577,21 @@ if not is_pyinstaller_compiled():
 
     outdated_packages: list[tuple[str, str, str]] = check_packages_version(third_party_packages)
     if outdated_packages:
-        msgbox_text = "Your following packages are not up to date:\n\n"
-        msgbox_text += f"Package Name: Installed version --> Required version\n"
+        msgbox_message = "Your following packages are not up to date:\n\n"
+        msgbox_message += f"Package Name: Installed version --> Required version\n"
 
         # Iterate over outdated packages and add each package's information to the message box text
         for package_name, installed_version, required_version in outdated_packages:
-            msgbox_text += f"{package_name}: {installed_version} --> {required_version}\n"
+            msgbox_message += f"{package_name}: {installed_version} --> {required_version}\n"
 
         # Add additional message box text
-        msgbox_text += f"\nKeeping your packages synced with \"{TITLE}\" ensures smooth script execution and prevents compatibility issues."
-        msgbox_text += "\n\nDo you want to ignore this warning and continue with script execution?"
+        msgbox_message += f"\nKeeping your packages synced with \"{TITLE}\" ensures smooth script execution and prevents compatibility issues."
+        msgbox_message += "\n\nDo you want to ignore this warning and continue with script execution?"
 
         # Show message box
         msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
         msgbox_title = TITLE
-        errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
         if errorlevel != 6:
             terminate_current_script_process("EXIT")
 
@@ -1601,15 +1619,14 @@ else:
         latest_version = Version(response.text.strip().rstrip())
         if Updater(current_version).check_for_update(latest_version):
             msgbox_title = TITLE
-            msgbox_text = f"""
+            msgbox_message = textwrap.dedent(f"""
                 New version found. Do you want to update ?
 
                 Current version: {current_version}
                 Latest version: {latest_version}
-            """
-            msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+            """.removeprefix("\n").removesuffix("\n"))
             msgbox_style = Msgbox.YesNo | Msgbox.Question
-            errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
             if errorlevel == 6:
                 webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
                 terminate_current_script_process("EXIT")
@@ -1618,15 +1635,15 @@ else:
 
 if error_updating__flag:
     msgbox_title = TITLE
-    msgbox_text = f"""
+    msgbox_message = f"""
         ERROR: {TITLE} Failed updating itself.
 
         Do you want to open the \"{TITLE}\" project download page ?
         You can then download and run the latest version from there.
     """
-    msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
     msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
-    errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
     if errorlevel == 6:
         webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
         terminate_current_script_process("EXIT")
@@ -1640,15 +1657,15 @@ while True:
     else:
         webbrowser.open("https://nmap.org/npcap/")
         msgbox_title = TITLE
-        msgbox_text = f"""
+        msgbox_message = f"""
             ERROR: {TITLE} could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
 
             Opening the \"Npcap\" project download page for you.
             You can then download and install it from there and press \"Retry\".
         """
-        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+        msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
-        errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
         if errorlevel == 2:
             terminate_current_script_process("EXIT")
 
@@ -1670,7 +1687,7 @@ geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_read
 cls()
 title(f"Initializing MacLookup module - {TITLE}")
 print(f"\nInitializing MacLookup module ...\n")
-mac_lookup = MacLookup()
+mac_lookup = MacLookup(bypass_fetch_error=True)
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
@@ -1698,17 +1715,20 @@ for interface, stats in net_io_stats.items():
         continue
 
     if len(mac_addresses) > 1:
-        raise ValueError(
-            "\nERROR:\n"
-            "         Developer didn't expect this scenario to be possible.\n"
-            "\nINFOS:\n"
-            "         It seems like an IP address has not been found within a network interface,\n"
-            "         or multiple MAC addresses have been found for this one.\n"
-            "\nDEBUG:\n"
-            f"         interface: {interface}\n"
-            f"         ip_addresses: {ip_addresses}\n"
-            f"         mac_addresses: {mac_addresses}"
-        )
+        crash_text = textwrap.dedent(f"""
+            ERROR:
+                   Developer didn't expect this scenario to be possible.
+
+            INFOS:
+                   The IP address has multiple MAC addresses.
+
+            DEBUG:
+                   interface: {interface}
+                   ip_addresses: {ip_addresses}
+                   mac_addresses: {mac_addresses}
+        """.removeprefix("\n").removesuffix("\n"))
+        init_script_crash_under_control(crash_text)
+        raise ScriptCrashedUnderControl
 
     ip_addresses = [ip for ip in ip_addresses if is_private_device_ipv4(ip)]
     if not ip_addresses:
@@ -1914,15 +1934,14 @@ while True:
     except TSharkNotFoundException:
         webbrowser.open("https://www.wireshark.org/download.html")
         msgbox_title = TITLE
-        msgbox_text = f"""
+        msgbox_message = textwrap.dedent(f"""
             ERROR: Could not detect \"Tshark\" installed on your system.
 
             Opening the \"Tshark\" project download page for you.
             You can then download and install it from there and press \"Retry\".
-        """
-        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
+        """.removeprefix("\n").removesuffix("\n"))
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
-        errorlevel = show_message_box(msgbox_title, msgbox_text, msgbox_style)
+        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
         if errorlevel == 2:
             terminate_current_script_process("EXIT")
     else:
@@ -1934,7 +1953,7 @@ if not capture.tshark_path == Settings.CAPTURE_TSHARK_PATH:
 
 def blacklist_sniffer_core():
     def create_blacklist_file():
-        text = f"""
+        text = textwrap.dedent(f"""
             ;;-----------------------------------------------------------------------
             ;;Lines starting with \";\" or \"#\" symbols are commented lines.
             ;;
@@ -1943,12 +1962,12 @@ def blacklist_sniffer_core():
             ;;Your blacklist MUST be formatted in the following way in order to work:
             ;;<USERNAME>=<IP ADDRESS>
             ;;-----------------------------------------------------------------------
-        """
-        text = textwrap.dedent(text.removeprefix("\n"))
+        """.removeprefix("\n"))
         BLACKLIST_PATH.write_text(text, encoding="utf-8")
 
     def blacklist_show_messagebox(player: Player):
-        msgbox_text = f"""
+        msgbox_title = TITLE
+        msgbox_message = textwrap.indent(textwrap.dedent(f"""
             #### Blacklisted user detected at {player.blacklist.time} ####
             User{plural(len(player.blacklist.usernames))}: {', '.join(player.blacklist.usernames)}
             IP: {player.ip}
@@ -1966,13 +1985,10 @@ def blacklist_sniffer_core():
             Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
             Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
             Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
-        """
-        msgbox_title = TITLE
-        msgbox_text = textwrap.dedent(msgbox_text).removeprefix("\n").removesuffix("\n")
-        msgbox_text = textwrap.indent(msgbox_text, "    ")
+        """.removeprefix("\n").removesuffix("\n")), "    ")
         msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
         # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_text, msgbox_style)).start()
+        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style)).start()
 
     def text_to_speech(connection_type: Literal["connected", "disconnected"]):
         file_path = Path(f"{TTS_PATH}/{VOICE_NAME} ({connection_type}).wav")
@@ -1987,6 +2003,9 @@ def blacklist_sniffer_core():
 
     with Threads_ExceptionHandler():
         while True:
+            if ScriptControl.has_crashed():
+                return
+
             start_time = datetime.now()
 
             try:
@@ -2098,6 +2117,9 @@ def iplookup_core():
 
         first_exec = True
         while True:
+            if ScriptControl.has_crashed():
+                return
+
             if not first_exec:
                 time.sleep(1)
             else:
@@ -2327,6 +2349,9 @@ def stdout_render_core():
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.CAPTURE_IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
 
         while True:
+            if ScriptControl.has_crashed():
+                return
+
             session_connected__padding_country_name = 0
             session_disconnected__padding_country_name = 0
             session_connected: list[Player] = []
@@ -2425,7 +2450,7 @@ def stdout_render_core():
                 printer.cache_print("  * https://illegal-services.com/")
                 printer.cache_print("")
                 printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/mathieudummy")
+                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
                 printer.cache_print("")
 
             printer.cache_print(f"-" * 109)
@@ -2599,19 +2624,27 @@ def packet_callback(packet: Packet):
     else:
         raise ValueError("Neither the source nor destination address matches the specified <CAPTURE_IP_ADDRESS>.")
 
-    if target__port is None:
-        raise ValueError(
-            "\nERROR:\n"
-            "         Developer didn't expect this scenario to be possible.\n"
-            "\nINFOS:\n"
-            "         A player port was not found.\n"
-            "         This situation already happened to me, but at this time I had not the `target__ip` info from the packet, so it was useless.\n"
-            "         Note for the future:\n"
-            "         If `target__ip` is a false positive (not a player), always `continue` on a packet with no port.\n"
-            "\nDEBUG:\n"
-            f"         target__ip: {target__ip}\n"
-            f"         target__port: {target__port}"
-        )
+    if not target__port:
+        crash_text = textwrap.dedent(f"""
+            ERROR:
+                   Developer didn't expect this scenario to be possible.
+
+            INFOS:
+                   A player port was not found.
+                   This situation already happened to me,
+                   but at this time I had not the `target__ip` info
+                   from the packet, so it was useless.
+
+                   Note for the future:
+                   If `target__ip` is a false positive (not a player),
+                   always `continue` on a packet with no port.
+
+            DEBUG:
+                   target__ip: {target__ip}
+                   target__port: {target__port}
+        """.removeprefix("\n").removesuffix("\n"))
+        init_script_crash_under_control(crash_text)
+        raise ScriptCrashedUnderControl
 
     global_pps_counter += 1
 

@@ -1,5 +1,9 @@
+# Local library imports
+from Modules.https_utils.unsafe_https import create_unsafe_https_session
+
+# Standard Python Libraries
 import re
-import requests
+
 
 OUI_URL = "https://standards-oui.ieee.org/oui/oui.txt"
 RE_SANITIZED_MAC_ADDRESS_LOOKUP_PATTERN = re.compile(r"^[0-9A-F]{6,12}$")
@@ -7,13 +11,23 @@ RE_NEW_MAC_ENTRY_PATTERN = re.compile(
     r"^(?P<OUI_OR_MAL>[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}) {3}\(hex\)\t{2}(?P<ORGANIZATION_NAME>.*)\r\n(?P<COMPANY_ID>[0-9A-Fa-f]{6}) {5}\(base 16\)\t{2}(?P<ORGANIZATION_NAME_BIS>.*)\r\n\t{4}(?P<ADDRESS_LINE_1>.*)\r\n\t{4}(?P<ADDRESS_LINE_2>.*)\r\n\t{4}(?P<ADDRESS_COUNTRY_ISO_CODE>.*)",
     re.M
 )
+s = create_unsafe_https_session()
+
+
+class FetchError(Exception):
+    pass
 
 class InvalidMacError(Exception):
     pass
 
 class MacLookup():
-    def __init__(self):
-        self.oui_db = fetch_and_parse_oui_db()
+    def __init__(self, bypass_fetch_error=False):
+        try:
+            self.oui_db = fetch_and_parse_oui_db()
+        except FetchError:
+            if not bypass_fetch_error:
+                raise
+            self.oui_db = {}
 
     def lookup(self, mac_address: str):
         sanitized_mac = clean_mac_address(mac_address)
@@ -49,7 +63,10 @@ def fetch_and_parse_oui_db():
     def strip_tuple(tuple_to_strip: tuple):
         return tuple(map(str.strip, tuple_to_strip))
 
-    response = requests.get(OUI_URL)
+    try:
+        response = s.get(OUI_URL)
+    except Exception as e:
+        raise FetchError("Failed to retrieve data from OUI URL.") from e
 
     oui_db: dict[str, list] = {}
 
