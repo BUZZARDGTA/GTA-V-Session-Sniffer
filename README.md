@@ -60,13 +60,13 @@ _If you are curious about all the settings that you can manually configure, you 
 ### Scan trough a VPN
 
 When using a VPN, make sure that you scan from your actual VPN interface.<br />
-Additionally, ensure that in the `"Settings.ini"` file, the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
+Additionally, ensure that in the `Settings.ini` file, the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
 
 ### Scan for a console
 
 In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
 
-1. Open the `"Settings.ini"` file.
+1. Open the `Settings.ini` file.
 2. If not already done, set `<NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering the "Capture network interface selection" screen at script's startup. (you can disable it later)
 3. Enable the `<ARP>` setting by setting its value to `True`. (This setting allows you to view all currently connected external devices within your local network in the script's "Capture network interface selection" screen)
 4. Ensure that your console is currently running and **connected to internet through your PC's internet connection (Wired / Hotspot)**.
