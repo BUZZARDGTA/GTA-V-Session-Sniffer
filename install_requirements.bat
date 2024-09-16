@@ -21,6 +21,7 @@ for %%A in (
     prettytable
     psutil
     requests
+    rich
     urllib3
     WMI
 ) do (
