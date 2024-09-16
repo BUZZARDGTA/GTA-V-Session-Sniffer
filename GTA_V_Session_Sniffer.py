@@ -32,6 +32,7 @@ import errno
 import socket
 import ctypes
 import signal
+import logging
 import textwrap
 import winsound
 import threading
@@ -45,12 +46,54 @@ from operator import attrgetter
 from ipaddress import IPv4Address, AddressValueError
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
+from rich.console import Console
+from rich.traceback import Traceback
+from rich.text import Text
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     print("To use this script, your Python version must be 3.9 or higher.")
     print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
+
+logging.basicConfig(
+    level=logging.ERROR,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M",
+    handlers=[
+        logging.FileHandler("error.log")
+        # rich.traceback does it nicer ---> logging.StreamHandler(sys.stdout)
+    ]
+)
+
+def log_and_display_exception(exc_type, exc_value, exc_traceback):
+    """Log and display the exception with rich formatting."""
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+    console = Console()
+
+    traceback_message = Traceback.from_exception(exc_type, exc_value, exc_traceback)
+
+    # Create a single Text object with rich markup
+    error_message = Text.from_markup(
+        "\n\n\nAn error occurred. [bold]Please kindly report it to [link=https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues]https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues[/link][/bold]."
+        "\n\n\nPress [yellow]{ANY KEY}[/yellow] to exit ...",
+        style="white"
+    )
+
+    console.print(traceback_message)
+    console.print(error_message)
+    input()
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """Handles exceptions for the main script. (not threads)"""
+    if issubclass(exc_type, KeyboardInterrupt):
+        return
+
+    log_and_display_exception(exc_type, exc_value, exc_traceback)
+    sys.exit(1)
+
+sys.excepthook = handle_exception
 
 
 class InvalidBooleanValueError(Exception):
@@ -749,7 +792,7 @@ class ThirdPartyServers(enum.Enum):
     GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
-    GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16"]
+    GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16", "40.74.0.0/18"]
     PS5_Amazon = ["52.40.62.0/25"]
     MinecraftBedrockEdition_PC_and_PS3_Microsoft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
@@ -1485,7 +1528,7 @@ def terminate_current_script_process(terminate_method: Literal["EXIT", "SIGINT",
             return
         threads_raised__signal.set()
 
-        traceback.print_exception(Threads_ExceptionHandler.raising_e_type, Threads_ExceptionHandler.raising_e_value, Threads_ExceptionHandler.raising_e_traceback)
+        log_and_display_exception(Threads_ExceptionHandler.raising_e_type, Threads_ExceptionHandler.raising_e_value, Threads_ExceptionHandler.raising_e_traceback)
 
     exit_gracefully = True
 
@@ -1497,7 +1540,7 @@ def terminate_current_script_process(terminate_method: Literal["EXIT", "SIGINT",
                     exit_gracefully = False
 
     if exit_gracefully:
-        sys.exit(0)
+        sys.exit(1) if terminate_method == "THREAD_RAISED" else sys.exit(0)
     else:
         pid = os.getpid() # Get the process ID (PID) of the current script
         process = psutil.Process(pid)
@@ -1537,7 +1580,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.3 - 22/04/2024 (10:05)"
+VERSION = "v1.1.4 - 16/09/2024 (17:21)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
