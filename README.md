@@ -5,7 +5,7 @@
 Compatible with both PC and all consoles (PlayStation and Xbox).<br />
 Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
 
-To be clear, the script does not explicitly indicate which IP corresponds to which in-game username.<br />
+To be clear, the script does not explicitly indicate which IP corresponds to which in-game username\*.<br />
 This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen consoles.
 
 - Scan players who:
@@ -13,14 +13,16 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
   - Are currently connected.
   - Have left your session.
 
-**Officially Tested and Supported Video Games\*:**
+**Officially Tested and Supported Video Games\*\*:**
 
 | Supported Video Games               | Officially Tested Platforms |
 | :---------------------------------- | :-------------------------: |
 | Grand Theft Auto 5                  |      PC, Xbox One, PS5      |
 | Minecraft Bedrock Edition (Friends) |           PC, PS3           |
 
-\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br />
+\*_Since v1.1.4, you can now view usernames in real-time on PC with 2Take1 Mod Menu and [GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua).<br />_
+
+\*\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br />
 But please note that additional servers (e.g., game servers) won't be filtered from the script's output if they are not indexed within the list above_
 
 ## Advantages
@@ -31,7 +33,7 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 ## Showcase
 
-|                                                          CMD console                                                           |
+|                                                         Console Output                                                         |
 | :----------------------------------------------------------------------------------------------------------------------------: |
 | ![CMD console](https://github.com/Illegal-Services/GTA-V-Session-Sniffer/assets/62464560/bced180a-c4a6-4bba-929d-9a265f91dcf9)
 
