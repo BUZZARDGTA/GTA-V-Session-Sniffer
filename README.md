@@ -80,7 +80,7 @@ Upon startup, it automatically attempts to check for updates and downloads the l
 
 In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.<br />
 You can obtain copies of these databases by signing up for GeoLite2 on the [MaxMind](https://www.maxmind.com/) official website and downloading them from there.<br />
-Then you will need to create a new folder named "GeoLite2 Databases" within the script's directory, and place the database files there.
+Then you will need to create a new folder named `GeoLite2 Databases` within the script's directory, and place the database files there.
 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br />
 You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
