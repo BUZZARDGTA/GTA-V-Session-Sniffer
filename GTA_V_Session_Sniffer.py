@@ -36,7 +36,6 @@ import logging
 import textwrap
 import winsound
 import threading
-import traceback
 import subprocess
 import webbrowser
 from pathlib import Path
@@ -74,7 +73,6 @@ def log_and_display_exception(exc_type, exc_value, exc_traceback):
 
     traceback_message = Traceback.from_exception(exc_type, exc_value, exc_traceback)
 
-    # Create a single Text object with rich markup
     error_message = Text.from_markup(
         "\n\n\nAn error occurred. [bold]Please kindly report it to [link=https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues]https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues[/link][/bold]."
         "\n\n\nPress [yellow]{ANY KEY}[/yellow] to exit ...",
@@ -1026,7 +1024,6 @@ def tail(n: int, iterable: list):
     return iterable[-n:]
 
 def concat_lists_no_duplicates(list1: list, list2: list):
-    # Combine the lists
     combined_list = list1 + list2
 
     # Remove duplicates while preserving order
@@ -1580,7 +1577,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.4 - 16/09/2024 (17:21)"
+VERSION = "v1.1.5 - 16/09/2024 (19:06)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
