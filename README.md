@@ -41,7 +41,7 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 ### Prerequisites / Dependencies
 
-Before proceeding, ensure you are using Windows 8 or above.
+Before proceeding, ensure you are using Windows 10 or above.
 
 Additionally, make sure you have [Wireshark](https://www.wireshark.org/) installed on your system.
 
@@ -166,7 +166,7 @@ You can also contact me privately via:
 
 ## Requirements
 
-- [Windows](https://www.microsoft.com/windows) 8 / 8.1 / 10 or 11 (x86/x64)
+- [Windows](https://www.microsoft.com/windows) 10 or 11 (x86/x64)
 - [Wireshark](https://www.wireshark.org/)
 - _optional:_ [MaxMind GeoLite2](https://www.maxmind.com/)
 - [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
