@@ -17,6 +17,9 @@ import geoip2.database
 from colorama import Fore, Back, Style
 from wmi import _wmi_namespace, _wmi_object
 from prettytable import PrettyTable, SINGLE_BORDER
+from rich.console import Console
+from rich.traceback import Traceback
+from rich.text import Text
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -45,9 +48,6 @@ from operator import attrgetter
 from ipaddress import IPv4Address, AddressValueError
 from datetime import datetime, timedelta
 from json.decoder import JSONDecodeError
-from rich.console import Console
-from rich.traceback import Traceback
-from rich.text import Text
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
