@@ -131,8 +131,7 @@ I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/win
 - You can handily zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
 - You can pause your terminal's output by using the keyboard shortcut `[CTRL] + [S]` and resume it with `[CTRL] + [Q]`.
 - The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
-- Using my other project [PC Blacklist Sniffer](https://github.com/Illegal-Services/PC-Blacklist-Sniffer) allows you to detect people you blacklisted from your sessions.
-- If you want to know more information about a specific IP or Port, I'd recommend you to check out the [Illegal Services](https://illegal-services.com/) application IP Lookup / Port Scanning.<br />
+- If you want to know more information about a specific IP or Port, I'd recommend you to check out the [Illegal Services/IP Address Lookup](https://illegal-services.com/Bookmarks%20Toolbar/Illegal%20Services/IP%20Address%20Lookup/index.html) and [Illegal Services/IP Port Scanning](https://illegal-services.com/Bookmarks%20Toolbar/Illegal%20Services/IP%20Port%20Scanning/index.html).<br />
 
 ### GTA V Tips and Tricks
 
