@@ -60,15 +60,15 @@ _If you are curious about all the settings that you can manually configure, you 
 ### Scan trough a VPN
 
 When using a VPN, make sure that you scan from your actual VPN interface.<br />
-Additionally, ensure that in the `Settings.ini` file, the setting `<NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
+Additionally, ensure that in the `Settings.ini` file, the setting `<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
 
 ### Scan for a console
 
 In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
 
 1. Open the `Settings.ini` file.
-2. If not already done, set `<NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering the "Capture network interface selection" screen at script's startup. (you can disable it later)
-3. Enable the `<ARP>` setting by setting its value to `True`. (This setting allows you to view all currently connected external devices within your local network in the script's "Capture network interface selection" screen)
+2. If not already done, set `<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>` to `True` value, so that it forces entering the "Capture network interface selection" screen at script's startup. (you can disable it later)
+3. Enable the `<CAPTURE_ARP>` setting by setting its value to `True`. (This setting allows you to view all currently connected external devices within your local network in the script's "Capture network interface selection" screen)
 4. Ensure that your console is currently running and **connected to internet through your PC's internet connection (Wired / Hotspot)**.
 5. Start the script and wait for it to enter the "Capture network interface selection" screen.
 6. Then, you'll need to identify the console's IP and MAC Address and select it accordingly.
@@ -114,8 +114,8 @@ I have made efforts to minimize this occurrence by optimizing the `CAPTURE_FILTE
 If you have other Peer-To-Peer applications running, such as a BitTorrent client, it may contribute to this issue.<br />
 To mitigate this, I recommend closing all other Peer-To-Peer applications while using the script.
 
-Furthermore, you can enhance the filtering process by setting `<BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.<br />
-You can also, adjust `<PROGRAM_PRESET>` to correspond to the program you are scanning.<br />
+Furthermore, you can enhance the filtering process by setting `<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.<br />
+You can also, adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.<br />
 These configurations help minimize the display of unrelated IPs.
 
 ### About Screen Refreshing
