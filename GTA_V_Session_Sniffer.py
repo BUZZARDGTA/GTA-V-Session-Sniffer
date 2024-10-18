@@ -1,7 +1,7 @@
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
-from Modules.capture.sync_capture import PacketCapture, Packet, TSharkNotFoundException
+from Modules.capture.capture import PacketCapture, Packet, TSharkNotFoundException
 from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.https_utils.unsafe_https import create_unsafe_https_session
 
@@ -74,7 +74,7 @@ def log_and_display_exception(exc_type, exc_value, exc_traceback):
     traceback_message = Traceback.from_exception(exc_type, exc_value, exc_traceback)
 
     error_message = Text.from_markup(
-        "\n\n\nAn error occurred. [bold]Please kindly report it to [link=https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues]https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues[/link][/bold]."
+        "\n\n\nAn error occurred. [bold]Please kindly report it to [link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link][/bold]."
         "\n\n\nPress [yellow]{ANY KEY}[/yellow] to exit ...",
         style="white"
     )
@@ -154,7 +154,7 @@ class Version:
             self._date_time = datetime.strptime(version[9:19], "%d/%m/%Y")
 
     def __str__(self):
-        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f' ({self.time})' if self.time else ''}"
+        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f" ({self.time})" if self.time else ""}"
 
 class Updater:
     def __init__(self, current_version: Version):
@@ -260,7 +260,7 @@ class Settings:
     STDOUT_FIELD_SHOW_SEEN_DATE = False
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "First Seen"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
-    STDOUT_DISCONNECTED_PLAYERS_TIMER = 6.0
+    STDOUT_DISCONNECTED_PLAYERS_TIMER = 16.0
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
     STDOUT_REFRESHING_TIMER = 3
     BLACKLIST_ENABLED = True
@@ -787,11 +787,12 @@ class ThirdPartyServers(enum.Enum):
     PC_Valve = ["155.133.248.0/24", "162.254.197.0/24", "185.25.180.0/23", "185.25.182.0/24"] # Valve = Steam
     PC_Google = ["34.0.192.0/19", "34.0.240.0/20", "35.214.128.0/17"]
     PC_multicast = ["224.0.0.0/4"]
+    PC_UK_Ministry_of_Defence = ["25.58.230.47/32"]
+    PC_Others = ["113.117.15.193/32"]
     GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
     GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
-    GTAV_PC_BattleEye = ["51.89.99.255/32"]
-    PC_IDK = ["113.117.15.193/32"]
+    GTAV_PC_BattlEye = ["51.89.97.102/32", "51.89.99.255/32"]
     GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16", "40.74.0.0/18"]
     PS5_Amazon = ["52.40.62.0/25"]
     MinecraftBedrockEdition_PC_and_PS3_Microsoft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
@@ -809,22 +810,40 @@ class PrintCacher:
 
 class Player_PPS:
     def __init__(self, packet_datetime: datetime):
+        self._initialize(packet_datetime)
+
+    def _initialize(self, packet_datetime: datetime):
         self.t1 = packet_datetime
         self.counter = 0
         self.rate = 0
         self.is_first_calculation = True
 
+    def reset(self, packet_datetime: datetime):
+        self._initialize(packet_datetime)
+
 class Player_Ports:
     def __init__(self, port: int):
+        self._initialize(port)
+
+    def _initialize(self, port: int):
         self.list = [port]
         self.first = port
         self.last = port
 
+    def reset(self, port: int):
+        self._initialize(port)
+
 class Player_DateTime:
     def __init__(self, packet_datetime: datetime):
+        self._initialize(packet_datetime)
+
+    def _initialize(self, packet_datetime: datetime):
         self.first_seen = packet_datetime
         self.last_seen = packet_datetime
         self.left = None
+
+    def reset(self, packet_datetime: datetime):
+        self._initialize(packet_datetime)
 
 class MaxMind_GeoLite2:
     def __init__(self):
@@ -877,10 +896,12 @@ class Player_Blacklist:
         self.processed_protection = False
 
 class Player:
-    def __init__(self, packet_datetime: datetime, ip: str, port: int):
+    def __init__(self, ip: str, port: int, packet_datetime: datetime):
+        self._initialize(ip, port, packet_datetime)
+
+    def _initialize(self, ip: str, port: int, packet_datetime: datetime):
         self.ip = ip
         self.two_take_one__usernames = []
-
         self.rejoins = 0
         self.packets = 1
 
@@ -889,6 +910,12 @@ class Player:
         self.datetime = Player_DateTime(packet_datetime)
         self.iplookup = Player_IPLookup()
         self.blacklist = Player_Blacklist()
+
+    def reset(self, port: int, packet_datetime: datetime):
+        self.packets = 1
+        #self.pps.reset(packet_datetime)
+        self.ports.reset(port)
+        self.datetime.reset(packet_datetime)
 
 class PlayersRegistry:
     players_registry: dict[str, Player] = {}
@@ -1282,6 +1309,20 @@ def get_asn_info(ip_address: str):
 def show_message_box(title: str, message: str, style: Msgbox):
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
+def get_tshark_version():
+    if Settings.CAPTURE_TSHARK_PATH is None:
+        return None
+
+    try:
+        result = subprocess.check_output([Settings.CAPTURE_TSHARK_PATH, '--version'], text=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    else:
+        return result.splitlines()[0]
+
+def tshark_required_version_installed():
+    return bool(get_tshark_version() == WIRESHARK_RECOMMENDED_VERSION)
+
 def npcap_or_winpcap_installed():
     service_names = ["npcap", "npf"]
 
@@ -1579,7 +1620,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.5 - 16/09/2024 (20:02)"
+VERSION = "v1.1.6 - 18/10/2024 (18:00)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
@@ -1588,7 +1629,53 @@ TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Tak
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_INI_PARSER_PATTERN = re.compile(r"^(?P<key>[^=]+)=(?P<value>[^;#]+)")
+WIRESHARK_RECOMMENDED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
+WIRESHARK_RECOMMENDED_DL = "https://www.wireshark.org/download.html"
+
 s = create_unsafe_https_session()
+
+cls()
+title(f"Searching for a new update - {TITLE}")
+print("\nSearching for a new update ...\n")
+try:
+    response = s.get("https://raw.githubusercontent.com/BUZZARDGTA/GTA-V-Session-Sniffer/version/version.txt")
+except:
+    error_updating__flag = True
+else:
+    if response.status_code == 200:
+        error_updating__flag = False
+        current_version = Version(VERSION)
+        latest_version = Version(response.text.strip().rstrip())
+        if Updater(current_version).check_for_update(latest_version):
+            msgbox_title = TITLE
+            msgbox_message = textwrap.dedent(f"""
+                New version found. Do you want to update ?
+
+                Current version: {current_version}
+                Latest version: {latest_version}
+            """.removeprefix("\n").removesuffix("\n"))
+            msgbox_style = Msgbox.YesNo | Msgbox.Question
+            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+            if errorlevel == 6:
+                webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
+                terminate_current_script_process("EXIT")
+    else:
+        error_updating__flag = True
+
+if error_updating__flag:
+    msgbox_title = TITLE
+    msgbox_message = f"""
+        ERROR: {TITLE} Failed updating itself.
+
+        Do you want to open the \"{TITLE}\" project download page ?
+        You can then download and run the latest version from there.
+    """
+    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
+    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
+    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+    if errorlevel == 6:
+        webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
+        terminate_current_script_process("EXIT")
 
 cls()
 if not is_pyinstaller_compiled():
@@ -1610,10 +1697,10 @@ if not is_pyinstaller_compiled():
     third_party_packages = {
         "colorama": "0.4.6",
         "geoip2": "4.8.0",
-        "prettytable": "3.10.2",
+        "prettytable": "3.11.0",
         "psutil": "6.0.0",
         "requests": "2.32.3",
-        "urllib3": "2.2.2",
+        "urllib3": "2.2.3",
         "WMI": "1.5.1"
     }
 
@@ -1648,68 +1735,22 @@ else:
     UNDERLINE_RESET = "_"
 
 cls()
-title(f"Searching for a new update - {TITLE}")
-print("\nSearching for a new update ...\n")
-try:
-    response = s.get("https://raw.githubusercontent.com/Illegal-Services/GTA-V-Session-Sniffer/version/version.txt")
-except:
-    error_updating__flag = True
-else:
-    if response.status_code == 200:
-        error_updating__flag = False
-        current_version = Version(VERSION)
-        latest_version = Version(response.text.strip().rstrip())
-        if Updater(current_version).check_for_update(latest_version):
-            msgbox_title = TITLE
-            msgbox_message = textwrap.dedent(f"""
-                New version found. Do you want to update ?
-
-                Current version: {current_version}
-                Latest version: {latest_version}
-            """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.YesNo | Msgbox.Question
-            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-            if errorlevel == 6:
-                webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-                terminate_current_script_process("EXIT")
-    else:
-        error_updating__flag = True
-
-if error_updating__flag:
-    msgbox_title = TITLE
-    msgbox_message = f"""
-        ERROR: {TITLE} Failed updating itself.
-
-        Do you want to open the \"{TITLE}\" project download page ?
-        You can then download and run the latest version from there.
-    """
-    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
-    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == 6:
-        webbrowser.open("https://github.com/Illegal-Services/GTA-V-Session-Sniffer")
-        terminate_current_script_process("EXIT")
-
-cls()
 title(f"Checking that \"Npcap\" or \"WinpCap\" driver is installed on your system - {TITLE}")
 print("\nChecking that \"Npcap\" or \"WinpCap\" driver is installed on your system ...\n")
-while True:
-    if npcap_or_winpcap_installed():
-        break
-    else:
-        webbrowser.open("https://nmap.org/npcap/")
-        msgbox_title = TITLE
-        msgbox_message = f"""
-            ERROR: {TITLE} could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
+while not npcap_or_winpcap_installed():
+    webbrowser.open("https://nmap.org/npcap/")
+    msgbox_title = TITLE
+    msgbox_message = f"""
+        ERROR: {TITLE} could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
 
-            Opening the \"Npcap\" project download page for you.
-            You can then download and install it from there and press \"Retry\".
-        """
-        msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-        msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
-        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-        if errorlevel == 2:
-            terminate_current_script_process("EXIT")
+        Opening the \"Npcap\" project download page for you.
+        You can then download and install it from there and press \"Retry\".
+    """
+    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
+    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
+    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+    if errorlevel == 2:
+        terminate_current_script_process("EXIT")
 
 cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
@@ -1720,6 +1761,24 @@ if Settings.BLACKLIST_VOICE_NOTIFICATIONS:
         VOICE_NAME = "Liam"
     elif Settings.BLACKLIST_VOICE_NOTIFICATIONS == "Female":
         VOICE_NAME = "Jane"
+
+cls()
+title(f"Checking that \"Tshark\" is installed on your system - {TITLE}")
+print("\nChecking that \"Tshark\" is installed on your system ...\n")
+while not tshark_required_version_installed():
+    webbrowser.open(WIRESHARK_RECOMMENDED_DL)
+    msgbox_title = TITLE
+    msgbox_message = f"""
+        ERROR: {TITLE} could not detect \"Tshark\" ({WIRESHARK_RECOMMENDED_VERSION}) installed on your system.
+
+        Opening the \"Wireshark\" project download page for you.
+        You can then download and install it from there and press \"Retry\".
+    """
+    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
+    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
+    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+    if errorlevel == 2:
+        terminate_current_script_process("EXIT")
 
 cls()
 title(f"Initializing and updating MaxMind's GeoLite2 Country, City and ASN databases - {TITLE}")
@@ -1936,7 +1995,7 @@ capture_filter.append("not (portrange 0-1023 or port 5353)")
 
 if Settings.CAPTURE_PROGRAM_PRESET:
     if Settings.CAPTURE_PROGRAM_PRESET == "GTA5":
-        display_filter.append("(frame.len>=71 and frame.len<=999)")
+        display_filter.append("(frame.len>=71 and frame.len<=1032)")
     elif Settings.CAPTURE_PROGRAM_PRESET == "Minecraft":
         display_filter.append("(frame.len>=49 and frame.len<=1498)")
 
@@ -1974,12 +2033,12 @@ while True:
             tshark_path = Settings.CAPTURE_TSHARK_PATH
         )
     except TSharkNotFoundException:
-        webbrowser.open("https://www.wireshark.org/download.html")
+        webbrowser.open(WIRESHARK_RECOMMENDED_DL)
         msgbox_title = TITLE
         msgbox_message = textwrap.dedent(f"""
             ERROR: Could not detect \"Tshark\" installed on your system.
 
-            Opening the \"Tshark\" project download page for you.
+            Opening the \"Wireshark\" project download page for you.
             You can then download and install it from there and press \"Retry\".
         """.removeprefix("\n").removesuffix("\n"))
         msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
@@ -1994,56 +2053,56 @@ if not capture.tshark_path == Settings.CAPTURE_TSHARK_PATH:
     Settings.reconstruct_settings()
 
 def blacklist_sniffer_core():
-    def create_blacklist_file():
-        text = textwrap.dedent(f"""
-            ;;-----------------------------------------------------------------------
-            ;;Lines starting with \";\" or \"#\" symbols are commented lines.
-            ;;
-            ;;This is the blacklist file for \"GTA V Session Sniffer\" configuration.
-            ;;
-            ;;Your blacklist MUST be formatted in the following way in order to work:
-            ;;<USERNAME>=<IP ADDRESS>
-            ;;-----------------------------------------------------------------------
-        """.removeprefix("\n"))
-        BLACKLIST_PATH.write_text(text, encoding="utf-8")
-
-    def blacklist_show_messagebox(player: Player):
-        msgbox_title = TITLE
-        msgbox_message = textwrap.indent(textwrap.dedent(f"""
-            #### Blacklisted user detected at {player.blacklist.time} ####
-            User{plural(len(player.blacklist.usernames))}: {', '.join(player.blacklist.usernames)}
-            IP: {player.ip}
-            Port{plural(len(player.ports.list))}: {', '.join(map(str, player.ports.list))}
-            Country Code: {player.iplookup.maxmind.country_iso}
-            Detection Type: {player.blacklist.detection_type}
-            ############# IP Lookup ##############
-            Continent: {player.iplookup.ipapi.continent}
-            Country: {player.iplookup.maxmind.country}
-            City: {player.iplookup.maxmind.city}
-            Organization: {player.iplookup.ipapi.org}
-            ISP: {player.iplookup.ipapi.isp}
-            AS: {player.iplookup.ipapi.asnumber}
-            AS Name: {player.iplookup.maxmind.asn}
-            Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
-            Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
-            Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
-        """.removeprefix("\n").removesuffix("\n")), "    ")
-        msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
-        # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style)).start()
-
-    def text_to_speech(connection_type: Literal["connected", "disconnected"]):
-        file_path = Path(f"{TTS_PATH}/{VOICE_NAME} ({connection_type}).wav")
-
-        if not file_path.exists():
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
-                str(file_path.absolute()))
-        if not file_path.is_file():
-            raise InvalidFileError(str(file_path.absolute()))
-
-        winsound.PlaySound(file_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
-
     with Threads_ExceptionHandler():
+        def create_blacklist_file():
+            text = textwrap.dedent(f"""
+                ;;-----------------------------------------------------------------------
+                ;;Lines starting with \";\" or \"#\" symbols are commented lines.
+                ;;
+                ;;This is the blacklist file for \"GTA V Session Sniffer\" configuration.
+                ;;
+                ;;Your blacklist MUST be formatted in the following way in order to work:
+                ;;<USERNAME>=<IP ADDRESS>
+                ;;-----------------------------------------------------------------------
+            """.removeprefix("\n"))
+            BLACKLIST_PATH.write_text(text, encoding="utf-8")
+
+        def blacklist_show_messagebox(player: Player):
+            msgbox_title = TITLE
+            msgbox_message = textwrap.indent(textwrap.dedent(f"""
+                #### Blacklisted user detected at {player.blacklist.time} ####
+                User{plural(len(player.blacklist.usernames))}: {', '.join(player.blacklist.usernames)}
+                IP: {player.ip}
+                Port{plural(len(player.ports.list))}: {', '.join(map(str, player.ports.list))}
+                Country Code: {player.iplookup.maxmind.country_iso}
+                Detection Type: {player.blacklist.detection_type}
+                ############# IP Lookup ##############
+                Continent: {player.iplookup.ipapi.continent}
+                Country: {player.iplookup.maxmind.country}
+                City: {player.iplookup.maxmind.city}
+                Organization: {player.iplookup.ipapi.org}
+                ISP: {player.iplookup.ipapi.isp}
+                AS: {player.iplookup.ipapi.asnumber}
+                AS Name: {player.iplookup.maxmind.asn}
+                Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
+                Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
+                Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
+            """.removeprefix("\n").removesuffix("\n")), "    ")
+            msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
+            # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
+            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style)).start()
+
+        def play_sound(connection_type: Literal["connected", "disconnected"]):
+            file_path = Path(f"{TTS_PATH}/{VOICE_NAME} ({connection_type}).wav")
+
+            if not file_path.exists():
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
+                    str(file_path.absolute()))
+            if not file_path.is_file():
+                raise InvalidFileError(str(file_path.absolute()))
+
+            winsound.PlaySound(file_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+
         while True:
             if ScriptControl.has_crashed():
                 return
@@ -2084,7 +2143,7 @@ def blacklist_sniffer_core():
                         Settings.BLACKLIST_VOICE_NOTIFICATIONS
                         and player.blacklist.notification_t1
                     ):
-                        text_to_speech("disconnected")
+                        play_sound("disconnected")
 
                     player.blacklist.notification_t1 = Player_Blacklist().notification_t1
                     player.blacklist.processed_logging = Player_Blacklist().processed_logging
@@ -2098,13 +2157,12 @@ def blacklist_sniffer_core():
                     Settings.BLACKLIST_VOICE_NOTIFICATIONS
                     and player.blacklist.notification_t1 is None
                 ):
-                    text_to_speech("connected")
+                    play_sound("connected")
 
                 if not player.blacklist.processed_logging:
                     player.blacklist.processed_logging = True
                     with BLACKLIST_LOGGING_PATH.open("a", encoding="utf-8") as f:
                         newline = "\n" if is_file_need_newline_ending(BLACKLIST_LOGGING_PATH) else ""
-                        # TODO
                         f.write(f"{newline}User{plural(len(player.blacklist.usernames))}:{', '.join(player.blacklist.usernames)} | IP:{player.ip} | Ports:{', '.join(map(str, player.ports.list))} | Time:{player.blacklist.date_time} | Country:{player.iplookup.maxmind.country} | Detection Type: {player.blacklist.detection_type}\n")
 
                 if Settings.BLACKLIST_NOTIFICATIONS:
@@ -2141,16 +2199,17 @@ def blacklist_sniffer_core():
                 time.sleep(remaining_sleep_time)
 
 def iplookup_core():
-    def throttle_until():
-        requests_remaining = int(response.headers["X-Rl"])
-        throttle_until = int(response.headers["X-Ttl"])
-
-        if requests_remaining <= 1:
-            time.sleep(throttle_until)
-        else:
-            time.sleep(throttle_until / requests_remaining)  # We sleep x seconds (just in case) to avoid triggering a "429" status code.
-
     with Threads_ExceptionHandler():
+        def throttle_until():
+            requests_remaining = int(response.headers["X-Rl"])
+            throttle_until = int(response.headers["X-Ttl"])
+
+            if requests_remaining <= 1:
+                time.sleep(throttle_until)
+            else:
+                time.sleep(throttle_until / requests_remaining)  # We sleep x seconds (just in case) to avoid triggering a "429" status code.
+
+
         # Following values taken from https://ip-api.com/docs/api:batch the 03/04/2024.
         MAX_REQUESTS = 15
         MAX_THROTTLE_TIME = 60
@@ -2268,94 +2327,94 @@ def iplookup_core():
 tshark_latency = []
 
 def stdout_render_core():
-    def calculate_padding_width(total_width: int, *lengths: int):
-        """
-        Calculate the padding width based on the total width and the lengths of provided strings.
-
-        Args:
-        - total_width (int): Total width available for padding
-        - *args (int): Integrers for which lengths are used to calculate padding width
-
-        Returns:
-        - padding_width (int): Calculated padding width
-        """
-        # Calculate the total length of all strings
-        total_length = sum(length for length in lengths)
-
-        # Calculate the padding width
-        padding_width = max(0, (total_width - total_length) // 2)
-
-        return padding_width
-
-    def format_player_datetime(datetime_object: datetime):
-        if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
-            formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
-        else:
-            formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
-
-        return formatted_datetime
-
-    def format_player_usernames(player_usernames: list[str]):
-        if player_usernames:
-            if len(player_usernames) > 1:
-                player_usernames = f"{', '.join(player_usernames)}"
-            else:
-                player_usernames = player_usernames[0]
-        else:
-            player_usernames = "N/A"
-
-        return f"{player_color}{player_usernames}{player_reset}"
-
-    def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
-        if pps_rate == 0:
-            if is_pps_first_calculation:
-                pps_color = player_color
-            else:
-                pps_color = Fore.RED
-        elif pps_rate == 1:
-            pps_color = Fore.YELLOW
-        else:
-            pps_color = player_color
-
-        return f"{pps_color}{pps_rate}{Fore.RESET}"
-
-    def format_player_ip(player_ip: str):
-        if (
-            SessionHost.player
-            and SessionHost.player.ip == player_ip
-        ):
-            return f"{player_ip} 👑"
-        else:
-            return player_ip
-
-    def format_player_ports_list(ports_list: list[int], last_port: int, first_port: int):
-        formatted_ports = []
-
-        if len(ports_list) == 1:
-            return str(last_port)
-
-        for port in reversed(ports_list):
-            if not (
-                port == last_port
-                or port == first_port
-            ):
-                formatted_ports.append(str(port))
-
-        if last_port == first_port:
-            formatted_ports.insert(0, f"[{UNDERLINE}{last_port}{UNDERLINE_RESET}]")  # Insert last port at the beginning
-        else:
-            formatted_ports.insert(0, f"{UNDERLINE}{last_port}{UNDERLINE_RESET}")  # Insert last port at the beginning
-            formatted_ports.append(f"[{first_port}]")  # Append first port at the end
-
-        return ", ".join(formatted_ports)
-
-    def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
-        for i, field in enumerate(field_names):
-            if field == target_field:
-                field_names[i] += " \u2193"
-                break
-
     with Threads_ExceptionHandler():
+        def calculate_padding_width(total_width: int, *lengths: int):
+            """
+            Calculate the padding width based on the total width and the lengths of provided strings.
+
+            Args:
+            - total_width (int): Total width available for padding
+            - *args (int): Integrers for which lengths are used to calculate padding width
+
+            Returns:
+            - padding_width (int): Calculated padding width
+            """
+            # Calculate the total length of all strings
+            total_length = sum(length for length in lengths)
+
+            # Calculate the padding width
+            padding_width = max(0, (total_width - total_length) // 2)
+
+            return padding_width
+
+        def format_player_datetime(datetime_object: datetime):
+            if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
+                formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
+            else:
+                formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
+
+            return formatted_datetime
+
+        def format_player_usernames(player_usernames: list[str]):
+            if player_usernames:
+                if len(player_usernames) > 1:
+                    player_usernames = f"{', '.join(player_usernames)}"
+                else:
+                    player_usernames = player_usernames[0]
+            else:
+                player_usernames = "N/A"
+
+            return f"{player_color}{player_usernames}{player_reset}"
+
+        def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
+            if pps_rate == 0:
+                if is_pps_first_calculation:
+                    pps_color = player_color
+                else:
+                    pps_color = Fore.RED
+            elif pps_rate == 1:
+                pps_color = Fore.YELLOW
+            else:
+                pps_color = player_color
+
+            return f"{pps_color}{pps_rate}{Fore.RESET}"
+
+        def format_player_ip(player_ip: str):
+            if (
+                SessionHost.player
+                and SessionHost.player.ip == player_ip
+            ):
+                return f"{player_ip} 👑"
+            else:
+                return player_ip
+
+        def format_player_ports_list(ports_list: list[int], last_port: int, first_port: int):
+            formatted_ports = []
+
+            if len(ports_list) == 1:
+                return str(last_port)
+
+            for port in reversed(ports_list):
+                if not (
+                    port == last_port
+                    or port == first_port
+                ):
+                    formatted_ports.append(str(port))
+
+            if last_port == first_port:
+                formatted_ports.insert(0, f"[{UNDERLINE}{last_port}{UNDERLINE_RESET}]")  # Insert last port at the beginning
+            else:
+                formatted_ports.insert(0, f"{UNDERLINE}{last_port}{UNDERLINE_RESET}")  # Insert last port at the beginning
+                formatted_ports.append(f"[{first_port}]")  # Append first port at the end
+
+            return ", ".join(formatted_ports)
+
+        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
+            for i, field in enumerate(field_names):
+                if field == target_field:
+                    field_names[i] += " \u2193"
+                    break
+
         global iplookup_core__thread, global_pps_counter, tshark_latency
 
         session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
@@ -2398,15 +2457,13 @@ def stdout_render_core():
             session_disconnected__padding_country_name = 0
             session_connected: list[Player] = []
             session_disconnected: list[Player] = []
-
-            date_time_now = datetime.now()
-            time_perf_counter = time.perf_counter()
+            main_loop__t1 = time.perf_counter()
 
             for player in PlayersRegistry.iterate_players_from_registry():
                 if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
                     for username in re.findall(
                         r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:%s, timestamp:\d{10}$" % re.escape(player.ip),
-                        Path(TWO_TAKE_ONE__PLUGIN__LOG_PATH).read_text(encoding="utf-8"),
+                        TWO_TAKE_ONE__PLUGIN__LOG_PATH.read_text(encoding="utf-8"),
                         re.MULTILINE
                     ):
                         if username not in player.two_take_one__usernames:
@@ -2414,7 +2471,7 @@ def stdout_render_core():
 
                 if (
                     not player.datetime.left
-                    and (date_time_now - player.datetime.last_seen) >= timedelta(seconds=Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER)
+                    and (datetime.now() - player.datetime.last_seen).total_seconds() >= Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER
                 ):
                     player.datetime.left = player.datetime.last_seen
 
@@ -2433,11 +2490,10 @@ def stdout_render_core():
                 else:
                     session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.country, session_connected__padding_country_name, 27)
 
-                    player_time_delta = (date_time_now - player.pps.t1)
-                    if player_time_delta >= timedelta(seconds=1):
-                        player.pps.rate = round(player.pps.counter / player_time_delta.total_seconds())
+                    if (player_timedelta := (datetime.now() - player.pps.t1)).total_seconds() >= 1.0:
+                        player.pps.rate = round(player.pps.counter / player_timedelta.total_seconds())
                         player.pps.counter = 0
-                        player.pps.t1 = date_time_now
+                        player.pps.t1 = datetime.now()
                         player.pps.is_first_calculation = False
 
                     session_connected.append(player)
@@ -2489,7 +2545,7 @@ def stdout_render_core():
             if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
                 printer.cache_print("-" * 109)
                 printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-                printer.cache_print("  * https://illegal-services.com/")
+                printer.cache_print("  * https://github.com/BUZZARDGTA")
                 printer.cache_print("")
                 printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
                 printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
@@ -2514,19 +2570,18 @@ def stdout_render_core():
             else:
                 latency_color = Fore.GREEN
 
-            global_pps_t2 = time_perf_counter
-            seconds_elapsed = global_pps_t2 - global_pps_t1
+            seconds_elapsed = time.perf_counter() - global_pps_t1
             if seconds_elapsed >= 1:
                 global_pps_rate = round(global_pps_counter / seconds_elapsed)
                 global_pps_counter = 0
-                global_pps_t1 = global_pps_t2
+                global_pps_t1 = time.perf_counter()
 
             # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
             # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
             # Also these values averagely indicates the max performances my script can run at during my testings. Luckely it's just enough to process GTA V game.
-            if global_pps_rate >= 3000: # Check if PPS exceeds 3000
+            if global_pps_rate >= 3000:
                 pps_color = Fore.RED
-            elif global_pps_rate >= 1500: # Check if PPS exceeds 1500
+            elif global_pps_rate >= 1500:
                 pps_color = Fore.YELLOW
             else:
                 pps_color = Fore.GREEN
@@ -2535,6 +2590,7 @@ def stdout_render_core():
             padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
             printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
             printer.cache_print(f"-" * 109)
+
             connected_players_table = PrettyTable()
             connected_players_table.set_style(SINGLE_BORDER)
             connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
@@ -2573,8 +2629,8 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
                 if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
-
                 connected_players_table.add_row(row)
+
             disconnected_players_table = PrettyTable()
             disconnected_players_table.set_style(SINGLE_BORDER)
             disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
@@ -2613,7 +2669,6 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
                 if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
-
                 disconnected_players_table.add_row(row)
 
             printer.cache_print("")
@@ -2624,27 +2679,25 @@ def stdout_render_core():
             cls()
             printer.flush_cache()
 
-            refreshing_rate_t1 = time_perf_counter
-            while True:
-                refreshing_rate_t2 = time.perf_counter()
-                seconds_elapsed = refreshing_rate_t2 - refreshing_rate_t1
+            def display_refresh_message(seconds_elapsed: Optional[float] = None):
+                if seconds_elapsed is None:
+                    seconds_left = Settings.STDOUT_REFRESHING_TIMER
+                else:
+                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 1)
 
-                if seconds_elapsed <= Settings.STDOUT_REFRESHING_TIMER:
-                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 0)
+                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
+                    seconds_left = round(seconds_left, 1)
+                    sleep_seconds = 0.1
+                else:
+                    seconds_left = round(seconds_left)
+                    sleep_seconds = 1
 
-                    if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                        seconds_left = round(seconds_left, 1)
-                        sleep_seconds = 0.1
-                    else:
-                        seconds_left = round(seconds_left)
-                        sleep_seconds = 1
+                print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
+                time.sleep(sleep_seconds)
 
-                    print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
-
-                    time.sleep(sleep_seconds)
-                    continue
-
-                break
+            display_refresh_message()
+            while (seconds_elapsed := time.perf_counter() - main_loop__t1) < Settings.STDOUT_REFRESHING_TIMER:
+                display_refresh_message(seconds_elapsed)
 
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
@@ -2658,15 +2711,15 @@ def packet_callback(packet: Packet):
         raise PacketCaptureOverflow("Packet capture time exceeded 3 seconds.")
 
     if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
-        target__ip = packet.ip.dst
-        target__port = packet.udp.dstport
+        target_ip = packet.ip.dst
+        target_port = packet.udp.dstport
     elif packet.ip.dst == Settings.CAPTURE_IP_ADDRESS:
-        target__ip = packet.ip.src
-        target__port = packet.udp.srcport
+        target_ip = packet.ip.src
+        target_port = packet.udp.srcport
     else:
         raise ValueError("Neither the source nor destination address matches the specified <CAPTURE_IP_ADDRESS>.")
 
-    if not target__port:
+    if not target_port:
         crash_text = textwrap.dedent(f"""
             ERROR:
                    Developer didn't expect this scenario to be possible.
@@ -2674,59 +2727,47 @@ def packet_callback(packet: Packet):
             INFOS:
                    A player port was not found.
                    This situation already happened to me,
-                   but at this time I had not the `target__ip` info
+                   but at this time I had not the `target_ip` info
                    from the packet, so it was useless.
 
                    Note for the future:
-                   If `target__ip` is a false positive (not a player),
+                   If `target_ip` is a false positive (not a player),
                    always `continue` on a packet with no port.
 
             DEBUG:
-                   target__ip: {target__ip}
-                   target__port: {target__port}
+                   target_ip: {target_ip}
+                   target_port: {target_port}
         """.removeprefix("\n").removesuffix("\n"))
         init_script_crash_under_control(crash_text)
         raise ScriptCrashedUnderControl
 
     global_pps_counter += 1
 
-    player = PlayersRegistry.get_player(target__ip)
+    player = PlayersRegistry.get_player(target_ip)
     if player is None:
         PlayersRegistry.add_player(
-            Player(packet_datetime, target__ip, target__port)
+            Player(target_ip, target_port, packet_datetime)
         )
         return
 
-    if not player.datetime.left:
-        player.datetime.last_seen = packet_datetime
+    # No matter what:
+    player.datetime.last_seen = packet_datetime
 
-        player.packets += 1
-        player.pps.counter += 1
+    if player.datetime.left: # player left, rejoined now.
+        player.datetime.left = None
+        player.rejoins += 1
 
-        if target__port not in player.ports.list:
-            player.ports.list.append(target__port)
-        player.ports.last = target__port
+        if Settings.STDOUT_RESET_INFOS_ON_CONNECTED:
+            player.reset(target_port, packet_datetime)
+            return
 
-        return
+    # player connected, has not been reset, do the usual stuff
+    player.packets += 1
+    player.pps.counter += 1
 
-    player.datetime.left = None
-    player.rejoins += 1
-
-    player.pps.t1 = packet_datetime
-    player.pps.counter = 0
-    player.pps.rate = 0
-    player.pps.is_first_calculation = True
-
-    if Settings.STDOUT_RESET_INFOS_ON_CONNECTED:
-        player.packets = 1
-
-        player.ports.list = [target__port]
-        player.ports.first = target__port
-        player.ports.last = target__port
-    else:
-        player.packets += 1
-
-    return
+    if target_port not in player.ports.list:
+        player.ports.list.append(target_port)
+    player.ports.last = target_port
 
 cls()
 title(TITLE)

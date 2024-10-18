@@ -64,6 +64,36 @@ class PacketCapture:
         ]
         self._tshark__process = None
 
+    def live_capture(self, callback: Callable[[Packet], None], timeout: int | float):
+        import time
+        import queue
+        import threading
+
+        packets_queue = queue.Queue()
+
+        def read_packets():
+            for packet in self._capture_packets():
+                packets_queue.put(packet)
+
+        stdout_thread = threading.Thread(target=read_packets, daemon=True)
+        stdout_thread.start()
+
+        start_time = time.time()
+
+        while True:
+            time_elapsed = time.time() - start_time
+            if time_elapsed >= timeout:
+                if packets_queue.empty():
+                    callback("None")
+                else:
+                    while not packets_queue.empty():
+                        packet = packets_queue.get()
+                        callback(packet)
+
+                start_time = time.time()
+
+            time.sleep(0.1)
+
     def apply_on_packets(self, callback: Callable[[Packet], None]):
         for packet in self._capture_packets():
             callback(packet)
