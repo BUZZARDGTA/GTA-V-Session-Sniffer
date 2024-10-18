@@ -1320,9 +1320,6 @@ def get_tshark_version():
     else:
         return result.splitlines()[0]
 
-def tshark_required_version_installed():
-    return bool(get_tshark_version() == WIRESHARK_RECOMMENDED_VERSION)
-
 def npcap_or_winpcap_installed():
     service_names = ["npcap", "npf"]
 
@@ -1475,7 +1472,7 @@ def update_and_initialize_geolite2_readers():
     if show_error:
         msgbox_title = TITLE
         msgbox_message = msgbox_message.rstrip("\n")
-        msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation
+        msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
         show_message_box(msgbox_title, msgbox_message, msgbox_style)
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
@@ -1591,7 +1588,7 @@ def init_script_crash_under_control(crash_text: str):
 
     msgbox_title = TITLE
     msgbox_message = crash_text
-    msgbox_style = Msgbox.OKOnly | Msgbox.Critical
+    msgbox_style = Msgbox.OKOnly | Msgbox.Critical | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
 
     crash_alert__thread = threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style))
     crash_alert__thread.start()
@@ -1620,7 +1617,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.6 - 18/10/2024 (18:00)"
+VERSION = "v1.1.7 - 18/10/2024 (22:55)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
@@ -1629,21 +1626,21 @@ TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Tak
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_INI_PARSER_PATTERN = re.compile(r"^(?P<key>[^=]+)=(?P<value>[^;#]+)")
-WIRESHARK_RECOMMENDED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
-WIRESHARK_RECOMMENDED_DL = "https://www.wireshark.org/download.html"
+WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
+WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
 
 s = create_unsafe_https_session()
 
 cls()
 title(f"Searching for a new update - {TITLE}")
 print("\nSearching for a new update ...\n")
+error_updating__flag = False
 try:
     response = s.get("https://raw.githubusercontent.com/BUZZARDGTA/GTA-V-Session-Sniffer/version/version.txt")
 except:
     error_updating__flag = True
 else:
     if response.status_code == 200:
-        error_updating__flag = False
         current_version = Version(VERSION)
         latest_version = Version(response.text.strip().rstrip())
         if Updater(current_version).check_for_update(latest_version):
@@ -1654,7 +1651,7 @@ else:
                 Current version: {current_version}
                 Latest version: {latest_version}
             """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.YesNo | Msgbox.Question
+            msgbox_style = Msgbox.YesNo | Msgbox.Question | Msgbox.MsgBoxSetForeground
             errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
             if errorlevel == 6:
                 webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
@@ -1665,13 +1662,13 @@ else:
 if error_updating__flag:
     msgbox_title = TITLE
     msgbox_message = f"""
-        ERROR: {TITLE} Failed updating itself.
+        ERROR: Failed to check for updates.
 
         Do you want to open the \"{TITLE}\" project download page ?
         You can then download and run the latest version from there.
     """
     msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
+    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
     errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
     if errorlevel == 6:
         webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
@@ -1698,7 +1695,7 @@ if not is_pyinstaller_compiled():
         "colorama": "0.4.6",
         "geoip2": "4.8.0",
         "prettytable": "3.11.0",
-        "psutil": "6.0.0",
+        "psutil": "6.1.0",
         "requests": "2.32.3",
         "urllib3": "2.2.3",
         "WMI": "1.5.1"
@@ -1718,7 +1715,7 @@ if not is_pyinstaller_compiled():
         msgbox_message += "\n\nDo you want to ignore this warning and continue with script execution?"
 
         # Show message box
-        msgbox_style = Msgbox.YesNo | Msgbox.Exclamation
+        msgbox_style = Msgbox.YesNo | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
         msgbox_title = TITLE
         errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
         if errorlevel != 6:
@@ -1741,13 +1738,13 @@ while not npcap_or_winpcap_installed():
     webbrowser.open("https://nmap.org/npcap/")
     msgbox_title = TITLE
     msgbox_message = f"""
-        ERROR: {TITLE} could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
+        ERROR: Could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
 
         Opening the \"Npcap\" project download page for you.
         You can then download and install it from there and press \"Retry\".
     """
     msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
+    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
     errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
     if errorlevel == 2:
         terminate_current_script_process("EXIT")
@@ -1763,19 +1760,31 @@ if Settings.BLACKLIST_VOICE_NOTIFICATIONS:
         VOICE_NAME = "Jane"
 
 cls()
-title(f"Checking that \"Tshark\" is installed on your system - {TITLE}")
-print("\nChecking that \"Tshark\" is installed on your system ...\n")
-while not tshark_required_version_installed():
-    webbrowser.open(WIRESHARK_RECOMMENDED_DL)
+title(f"Checking that \"Tshark (Wireshark) v4.2.8\" is installed on your system - {TITLE}")
+print("\nChecking that \"Tshark (Wireshark) v4.2.8\" is installed on your system ...\n")
+while not (tshark_version := get_tshark_version()) == WIRESHARK_REQUIERED_VERSION:
+    webbrowser.open(WIRESHARK_REQUIERED_DL)
     msgbox_title = TITLE
-    msgbox_message = f"""
-        ERROR: {TITLE} could not detect \"Tshark\" ({WIRESHARK_RECOMMENDED_VERSION}) installed on your system.
 
-        Opening the \"Wireshark\" project download page for you.
-        You can then download and install it from there and press \"Retry\".
-    """
+    if tshark_version is None:
+        msgbox_message = f"""
+            ERROR: Could not detect \"TShark (Wireshark) v4.2.8\" installed on your system.
+
+            Opening the \"Wireshark\" project download page for you.
+            You can then download and install it from there and press \"Retry\".
+        """
+    else:
+        msgbox_message = f"""
+            ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
+
+            Installed version: {tshark_version}
+            Requiered version: {WIRESHARK_REQUIERED_VERSION}
+
+            Opening the \"Wireshark\" project download page for you.
+            You can then download and install it from there and press \"Retry\".
+        """
     msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
+    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
     errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
     if errorlevel == 2:
         terminate_current_script_process("EXIT")
@@ -2033,15 +2042,15 @@ while True:
             tshark_path = Settings.CAPTURE_TSHARK_PATH
         )
     except TSharkNotFoundException:
-        webbrowser.open(WIRESHARK_RECOMMENDED_DL)
+        webbrowser.open(WIRESHARK_REQUIERED_DL)
         msgbox_title = TITLE
         msgbox_message = textwrap.dedent(f"""
-            ERROR: Could not detect \"Tshark\" installed on your system.
+            ERROR: Could not detect \"TShark (Wireshark) 4.2.8\" installed on your system.
 
             Opening the \"Wireshark\" project download page for you.
             You can then download and install it from there and press \"Retry\".
         """.removeprefix("\n").removesuffix("\n"))
-        msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation
+        msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
         errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
         if errorlevel == 2:
             terminate_current_script_process("EXIT")
