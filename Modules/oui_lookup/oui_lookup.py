@@ -1,4 +1,4 @@
-# Local library imports
+# Local Python Libraries (Included with Project)
 from Modules.https_utils.unsafe_https import create_unsafe_https_session
 
 # Standard Python Libraries

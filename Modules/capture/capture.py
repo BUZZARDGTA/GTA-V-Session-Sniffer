@@ -1,12 +1,12 @@
-import os
+# Local Python Libraries (Included with Project)
+from Modules.capture.utils import get_tshark_path
+
+# Standard Python Libraries
 import subprocess
 from pathlib import Path
 from typing import Callable
 from datetime import datetime
 
-
-class TSharkNotFoundException(Exception):
-    pass
 
 class TSharkCrashException(Exception):
     pass
@@ -112,44 +112,6 @@ class PacketCapture:
 
             yield from (Packet(fields) for fields in map(process_tshark_stdout, process.stdout))
 
+
 def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
     return datetime.fromtimestamp(timestamp=float(packet_frame_time_epoch))
-
-def get_tshark_path(tshark_path: Path = None):
-    """Finds the path of the tshark executable.
-
-    If the user has provided a path it will be used
-    Otherwise default locations will be searched.
-
-    :param tshark_path: Path of the tshark binary
-    :raises TSharkNotFoundException in case TShark is not found in any location.
-    """
-    possible_paths: list[Path] = []
-
-    if tshark_path is not None:
-        user_tshark_path = None
-
-        if tshark_path.is_file():
-            if tshark_path.name == "tshark.exe":
-                user_tshark_path = tshark_path
-        elif tshark_path.is_dir():
-            if (tshark_path / "tshark.exe").is_file():
-                user_tshark_path = tshark_path / "tshark.exe"
-
-        if user_tshark_path:
-            possible_paths.insert(0, user_tshark_path)
-
-    for env in ("ProgramFiles", "ProgramFiles(x86)"):
-        env_path = os.getenv(env)
-        if env_path is not None:
-            program_files = Path(env_path)
-            possible_paths.append(program_files / "Wireshark" / "tshark.exe")
-
-    for path in possible_paths:
-        if path.exists():
-            return path
-
-    raise TSharkNotFoundException(
-          "TShark not found. Try adding its location to the configuration file.\n"
-        fR"Searched these paths: {', '.join(f'\"{path}\"' for path in possible_paths)}"
-    )

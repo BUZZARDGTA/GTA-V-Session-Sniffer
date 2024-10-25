@@ -1,7 +1,8 @@
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
-from Modules.capture.capture import PacketCapture, Packet, TSharkNotFoundException
+from Modules.capture.capture import PacketCapture, Packet
+from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
 from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.https_utils.unsafe_https import create_unsafe_https_session
 
@@ -42,12 +43,14 @@ import threading
 import subprocess
 import webbrowser
 from pathlib import Path
-from types import FrameType, TracebackType
-from typing import Optional, Literal
 from operator import attrgetter
-from ipaddress import IPv4Address, AddressValueError
 from datetime import datetime, timedelta
+from traceback import TracebackException
 from json.decoder import JSONDecodeError
+from types import FrameType, TracebackType
+from typing import Optional, Literal, Union, Type
+from ipaddress import IPv4Address, AddressValueError
+from dataclasses import dataclass
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 9:
@@ -65,33 +68,96 @@ logging.basicConfig(
     ]
 )
 
-def log_and_display_exception(exc_type, exc_value, exc_traceback):
-    """Log and display the exception with rich formatting."""
-    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
-    console = Console()
+@dataclass
+class ExceptionInfo:
+    exc_type: Type[BaseException]
+    exc_value: BaseException
+    exc_traceback: Optional[TracebackType]
 
-    traceback_message = Traceback.from_exception(exc_type, exc_value, exc_traceback)
+def terminate_script(
+        terminate_method: Literal["EXIT", "SIGINT", "THREAD_RAISED"],
+        msgbox_crash_text: Optional[str] = None,
+        stdout_crash_text: Optional[str] = None,
+        exception_info: Optional[ExceptionInfo] = None,
+        terminate_gracefully = True,
+        force_terminate_errorlevel: Union[int, Literal[False]] = False
+    ):
 
-    error_message = Text.from_markup(
-        "\n\n\nAn error occurred. [bold]Please kindly report it to [link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link][/bold]."
-        "\n\n\nPress [yellow]{ANY KEY}[/yellow] to exit ...",
-        style="white"
-    )
+    def should_terminate_gracefully():
+        if terminate_gracefully is False:
+            return False
 
-    console.print(traceback_message)
-    console.print(error_message)
-    input()
+        for thread_name in ["stdout_render_core__thread", "iplookup_core__thread", "blacklist_sniffer_core__thread"]:
+            if thread_name in globals():
+                thread = globals()[thread_name]
+                if isinstance(thread, threading.Thread):
+                    if thread.is_alive():
+                        return False
 
-def handle_exception(exc_type, exc_value, exc_traceback):
+        # TODO: Gracefully exit the script even when the `cature` module is running.
+        if "capture" in globals():
+            if capture is not None and isinstance(capture, PacketCapture):
+                return False
+
+        return True
+
+    ScriptControl.set_crashed(None if stdout_crash_text is None else f"\n\n{stdout_crash_text}\n")
+
+    if exception_info:
+        logging.error("Uncaught exception", exc_info=(exception_info.exc_type, exception_info.exc_value, exception_info.exc_traceback))
+
+        console = Console()
+
+        traceback_message = Traceback.from_exception(exception_info.exc_type, exception_info.exc_value, exception_info.exc_traceback)
+        console.print(traceback_message)
+
+        error_message = Text.from_markup(
+            "\n\n\nAn unexpected (uncaught) error occurred. [bold]Please kindly report it to: [link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link][/bold].",
+            style="white"
+        )
+        console.print(error_message)
+
+    if stdout_crash_text is not None:
+        print(ScriptControl.get_message())
+
+    if msgbox_crash_text is not None:
+        msgbox_title = TITLE
+        msgbox_message = msgbox_crash_text
+        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Critical | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+
+        show_message_box(msgbox_title, msgbox_message, msgbox_style)
+        time.sleep(1)
+
+    time.sleep(3)
+
+    if should_terminate_gracefully():
+        if force_terminate_errorlevel is False:
+            errorlevel = 1 if terminate_method == "THREAD_RAISED" else 0
+        else:
+            errorlevel = force_terminate_errorlevel
+        sys.exit(errorlevel)
+
+    pid = os.getpid() # Get the process ID (PID) of the current script
+    process = psutil.Process(pid)
+    process.terminate()
+
+def handle_exception(exc_type: Type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackException]):
     """Handles exceptions for the main script. (not threads)"""
     if issubclass(exc_type, KeyboardInterrupt):
         return
 
-    log_and_display_exception(exc_type, exc_value, exc_traceback)
-    sys.exit(1)
+    exception_info = ExceptionInfo(exc_type, exc_value, exc_traceback)
+    terminate_script("EXIT", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to: https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
+
+def signal_handler(sig: int, frame: FrameType):
+    if sig == 2: # means CTRL+C pressed
+        if not ScriptControl.has_crashed(): # Block CTRL+C if script is already crashing under control
+            print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
+            terminate_script("SIGINT")
 
 sys.excepthook = handle_exception
+signal.signal(signal.SIGINT, signal_handler)
 
 
 class InvalidBooleanValueError(Exception):
@@ -107,16 +173,13 @@ class InvalidFileError(Exception):
 class PacketCaptureOverflow(Exception):
     pass
 
-class ScriptCrashedUnderControl(Exception):
-    pass
-
 class ScriptControl:
     _lock = threading.Lock()
     _crashed = False
-    _message = ""
+    _message = None
 
     @classmethod
-    def set_crashed(cls, message=""):
+    def set_crashed(cls, message: Optional[str] = None):
         with cls._lock:
             cls._crashed = True
             cls._message = message
@@ -125,7 +188,7 @@ class ScriptControl:
     def reset_crashed(cls):
         with cls._lock:
             cls._crashed = False
-            cls._message = ""
+            cls._message = None
 
     @classmethod
     def has_crashed(cls):
@@ -170,30 +233,42 @@ class Updater:
                 return True
         return False
 
-class Msgbox(enum.IntFlag):
-    # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
-    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw
-    # https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/msgbox-function
-    OKOnly = 0  # Display OK button only.
-    OKCancel = 1  # Display OK and Cancel buttons.
-    AbortRetryIgnore = 2  # Display Abort, Retry, and Ignore buttons.
-    YesNoCancel = 3  # Display Yes, No, and Cancel buttons.
-    YesNo = 4  # Display Yes and No buttons.
-    RetryCancel = 5  # Display Retry and Cancel buttons.
-    Critical = 16  # Display Critical Message icon.
-    Question = 32  # Display Warning Query icon.
-    Exclamation = 48  # Display Warning Message icon.
-    Information = 64  # Display Information Message icon.
-    DefaultButton1 = 0  # First button is default.
-    DefaultButton2 = 256  # Second button is default.
-    DefaultButton3 = 512  # Third button is default.
-    DefaultButton4 = 768  # Fourth button is default.
-    ApplicationModal = 0  # Application modal; the user must respond to the message box before continuing work in the current application.
-    SystemModal = 4096  # System modal; all applications are suspended until the user responds to the message box.
-    MsgBoxHelpButton = 16384  # Adds Help button to the message box.
-    MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
-    MsgBoxRight = 524288  # Text is right-aligned.
-    MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
+class Msgbox:
+    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw#return-value
+    class ReturnValues(enum.IntEnum):
+        IDABORT = 3 # The Abort button was selected.
+        IDCANCEL = 2 # The Cancel button was selected.
+        IDCONTINUE = 11 # The Continue button was selected.
+        IDIGNORE = 5 # The Ignore button was selected.
+        IDNO = 7 # The No button was selected.
+        IDOK = 1 # The OK button was selected.
+        IDRETRY = 4 # The Retry button was selected.
+        IDTRYAGAIN = 10 # The Try Again button was selected.
+        IDYES = 6 # The Yes button was selected.
+
+    class Style(enum.IntFlag):
+        # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw
+        # https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/msgbox-function
+        OKOnly = 0  # Display OK button only.
+        OKCancel = 1  # Display OK and Cancel buttons.
+        AbortRetryIgnore = 2  # Display Abort, Retry, and Ignore buttons.
+        YesNoCancel = 3  # Display Yes, No, and Cancel buttons.
+        YesNo = 4  # Display Yes and No buttons.
+        RetryCancel = 5  # Display Retry and Cancel buttons.
+        Critical = 16  # Display Critical Message icon.
+        Question = 32  # Display Warning Query icon.
+        Exclamation = 48  # Display Warning Message icon.
+        Information = 64  # Display Information Message icon.
+        DefaultButton1 = 0  # First button is default.
+        DefaultButton2 = 256  # Second button is default.
+        DefaultButton3 = 512  # Third button is default.
+        DefaultButton4 = 768  # Fourth button is default.
+        ApplicationModal = 0  # Application modal; the user must respond to the message box before continuing work in the current application.
+        SystemModal = 4096  # System modal; all applications are suspended until the user responds to the message box.
+        MsgBoxHelpButton = 16384  # Adds Help button to the message box.
+        MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
+        MsgBoxRight = 524288  # Text is right-aligned.
+        MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class Threads_ExceptionHandler:
     """In Python, threads cannot be raised within the main source code. When raised, they operate independently,
@@ -202,14 +277,14 @@ class Threads_ExceptionHandler:
 
     Attributes:
         raising_function (str): The name of the function where the exception was raised.
-        raising_e_type (type): The type of the exception raised.
-        raising_e_value (Exception): The value of the exception raised.
-        raising_e_traceback (TracebackType): The traceback information of the exception raised.
+        raising_exc_type (type): The type of the exception raised.
+        raising_exc_value (Exception): The value of the exception raised.
+        raising_exc_traceback (TracebackType): The traceback information of the exception raised.
     """
     raising_function = None
-    raising_e_type = None
-    raising_e_value = None
-    raising_e_traceback = None
+    raising_exc_type = None
+    raising_exc_value = None
+    raising_exc_traceback = None
 
     def __init__(self):
         pass
@@ -217,33 +292,35 @@ class Threads_ExceptionHandler:
     def __enter__(self):
         pass
 
-    def __exit__(self, e_type: type, e_value: Exception, e_traceback: TracebackType):
+    def __exit__(self, exc_type: type, exc_value: Exception, exc_traceback: TracebackType):
         """Exit method called upon exiting the 'with' block.
 
         Args:
-            e_type (type): The type of the exception raised.
-            e_value (Exception): The value of the exception raised.
-            e_traceback (TracebackType): The traceback information of the exception raised.
+            exc_type (type): The type of the exception raised.
+            exc_value (Exception): The value of the exception raised.
+            exc_traceback (TracebackType): The traceback information of the exception raised.
 
         Returns:
             bool: True to suppress the exception from propagating further.
         """
-        if e_type:
-            Threads_ExceptionHandler.raising_e_type = e_type
-            Threads_ExceptionHandler.raising_e_value = e_value
-            Threads_ExceptionHandler.raising_e_traceback = e_traceback
+        if exc_type:
+            Threads_ExceptionHandler.raising_exc_type = exc_type
+            Threads_ExceptionHandler.raising_exc_value = exc_value
+            Threads_ExceptionHandler.raising_exc_traceback = exc_traceback
 
-            tb = e_traceback
+            tb = exc_traceback
             while tb.tb_next:
                 tb = tb.tb_next
             # Set the failed function name
             Threads_ExceptionHandler.raising_function = tb.tb_frame.f_code.co_name
 
-            terminate_current_script_process("THREAD_RAISED")
+            exception_info = ExceptionInfo(exc_type, exc_value, exc_traceback)
+            terminate_script("THREAD_RAISED", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to: https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
 
             return True  # Prevent exceptions from propagating
 
-class Settings:
+class DefaultSettings:
+    """Class containing default setting values."""
     CAPTURE_TSHARK_PATH = None
     CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT = True
     CAPTURE_INTERFACE_NAME = None
@@ -255,10 +332,11 @@ class Settings:
     CAPTURE_VPN_MODE = False
     CAPTURE_OVERFLOW_TIMER = 3.0
     STDOUT_SHOW_ADVERTISING_HEADER = True
-    STDOUT_RESET_INFOS_ON_CONNECTED = True
+    STDOUT_SESSIONS_LOGGING = True
+    STDOUT_RESET_PORTS_ON_REJOINS = True
     STDOUT_FIELDS_TO_HIDE = []
     STDOUT_FIELD_SHOW_SEEN_DATE = False
-    STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "First Seen"
+    STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
     STDOUT_DISCONNECTED_PLAYERS_TIMER = 16.0
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
@@ -270,17 +348,21 @@ class Settings:
     BLACKLIST_PROTECTION_EXIT_PROCESS_PATH = None
     BLACKLIST_PROTECTION_RESTART_PROCESS_PATH = None
 
+
+class Settings(DefaultSettings):
     _allowed_settings_types = (type(None), Path, bool, list, str, float, int)
 
     _valid_stdout_hidden_fields = ["Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]
 
     _stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
+        "Last Rejoin": "datetime.last_rejoin",
         "Last Seen": "datetime.last_seen",
         "Usernames": "blacklist.usernames",
+        "Rejoins": "rejoins",
+        "Total Packets": "total_packets",
         "Packets": "packets",
         "PPS": "pps.rate",
-        "Rejoins": "rejoins",
         "IP Address": "ip",
         "Ports": "ports",
         "Country": "iplookup.country",
@@ -368,8 +450,12 @@ class Settings:
             ;;<STDOUT_SHOW_ADVERTISING_HEADER>
             ;;Determine if you want or not to show the developer's advertisements in the script's display.
             ;;
-            ;;<STDOUT_RESET_INFOS_ON_CONNECTED>
-            ;;Resets and recalculates each fields for players who were previously disconnected.
+            ;;<STDOUT_SESSIONS_LOGGING>
+            ;;Determine if you want to log console's output to \"SessionsLogging\" folder.
+            ;;It is synced with the console output and contains all fields.
+            ;;
+            ;;<STDOUT_RESET_PORTS_ON_REJOINS>
+            ;;When a player rejoins, clear their previously detected ports list.
             ;;
             ;;<STDOUT_FIELDS_TO_HIDE>
             ;;Specifies a list of fields you wish to hide from the output.
@@ -378,11 +464,11 @@ class Settings:
             ;;{Settings._valid_stdout_hidden_fields}
             ;;
             ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
-            ;;Shows or not the date from which a player has been captured in \"First Seen\" and \"Last Seen\" fields.
+            ;;Shows or not the date from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
             ;;
             ;;<STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY>
             ;;Specifies the fields from the connected players by which you want the output data to be sorted.
-            ;;Valid values include any field names. For example: First Seen
+            ;;Valid values include any field names. For example: Last Rejoin
             ;;
             ;;<STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY>
             ;;Specifies the fields from the disconnected players by which you want the output data to be sorted.
@@ -398,7 +484,7 @@ class Settings:
             ;;Setting it to 0 will make it unlimitted.
             ;;
             ;;<STDOUT_REFRESHING_TIMER>
-            ;;Time interval between which this will refresh the console display.
+            ;;Minimum time interval between which this will refresh the console display.
             ;;
             ;;<BLACKLIST_ENABLED>
             ;;Determine if you want or not to enable the blacklisted users feature.
@@ -433,7 +519,7 @@ class Settings:
         SETTINGS_PATH.write_text(text, encoding="utf-8")
 
     def load_from_settings_file(settings_path: Path):
-        def custom_str_to_bool(string: str, only_match_against: bool | None = None):
+        def custom_str_to_bool(string: str, only_match_against: Optional[bool] = None):
             """
             This function returns the boolean value represented by the string for lowercase or any case variation;\n
             otherwise, it raises an \"InvalidBooleanValueError\".
@@ -507,7 +593,10 @@ class Settings:
                     try:
                         Settings.CAPTURE_TSHARK_PATH, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
                     except InvalidNoneTypeValueError:
-                        Settings.CAPTURE_TSHARK_PATH = Path(setting_value)
+                        stripped__setting_value = setting_value.strip("\"'")
+                        if not setting_value == stripped__setting_value:
+                            need_rewrite_settings = True
+                        Settings.CAPTURE_TSHARK_PATH = Path(stripped__setting_value.replace("\\", "/"))
                 elif setting_name == "CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT":
                     try:
                         Settings.CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT, need_rewrite_current_setting = custom_str_to_bool(setting_value)
@@ -573,9 +662,14 @@ class Settings:
                         Settings.STDOUT_SHOW_ADVERTISING_HEADER, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_RESET_INFOS_ON_CONNECTED":
+                elif setting_name == "STDOUT_SESSIONS_LOGGING":
                     try:
-                        Settings.STDOUT_RESET_INFOS_ON_CONNECTED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.STDOUT_SESSIONS_LOGGING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_RESET_PORTS_ON_REJOINS":
+                    try:
+                        Settings.STDOUT_RESET_PORTS_ON_REJOINS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELDS_TO_HIDE":
@@ -784,7 +878,7 @@ class Interface:
 
 class ThirdPartyServers(enum.Enum):
     PC_Discord = ["66.22.196.0/22", "66.22.237.0/24", "66.22.238.0/24", "66.22.241.0/24", "66.22.243.0/24", "66.22.244.0/24"]
-    PC_Valve = ["155.133.248.0/24", "162.254.197.0/24", "185.25.180.0/23", "185.25.182.0/24"] # Valve = Steam
+    PC_Valve = ["103.10.124.0/23", "103.28.54.0/23", "146.66.152.0/21", "155.133.224.0/19", "162.254.192.0/21", "185.25.180.0/22", "205.196.6.0/24"] # Valve = Steam
     PC_Google = ["34.0.192.0/19", "34.0.240.0/20", "35.214.128.0/17"]
     PC_multicast = ["224.0.0.0/4"]
     PC_UK_Ministry_of_Defence = ["25.58.230.47/32"]
@@ -839,6 +933,7 @@ class Player_DateTime:
 
     def _initialize(self, packet_datetime: datetime):
         self.first_seen = packet_datetime
+        self.last_rejoin = packet_datetime
         self.last_seen = packet_datetime
         self.left = None
 
@@ -895,25 +990,30 @@ class Player_Blacklist:
         self.processed_logging = False
         self.processed_protection = False
 
+class Player_TwoTakeOne:
+    def __init__(self):
+        self.usernames: list[str] = []
+
 class Player:
     def __init__(self, ip: str, port: int, packet_datetime: datetime):
         self._initialize(ip, port, packet_datetime)
 
     def _initialize(self, ip: str, port: int, packet_datetime: datetime):
         self.ip = ip
-        self.two_take_one__usernames = []
         self.rejoins = 0
         self.packets = 1
+        self.total_packets = 1
 
         self.pps = Player_PPS(packet_datetime)
         self.ports = Player_Ports(port)
         self.datetime = Player_DateTime(packet_datetime)
         self.iplookup = Player_IPLookup()
         self.blacklist = Player_Blacklist()
+        self.two_take_one = Player_TwoTakeOne()
 
     def reset(self, port: int, packet_datetime: datetime):
         self.packets = 1
-        #self.pps.reset(packet_datetime)
+        self.pps.reset(packet_datetime)
         self.ports.reset(port)
         self.datetime.reset(packet_datetime)
 
@@ -1003,14 +1103,14 @@ class SessionHost:
     players_pending_for_disconnection = []
 
     def get_host_player(session_connected: list[Player]):
-        connected_players: list[Player] = take(2, sorted(session_connected, key=attrgetter("datetime.first_seen")))
+        connected_players: list[Player] = take(2, sorted(session_connected, key=attrgetter("datetime.last_rejoin")))
 
         potential_session_host_player = None
 
         if len(connected_players) == 1:
             potential_session_host_player = connected_players[0]
         elif len(connected_players) == 2:
-            time_difference = connected_players[1].datetime.first_seen - connected_players[0].datetime.first_seen
+            time_difference = connected_players[1].datetime.last_rejoin - connected_players[0].datetime.last_rejoin
             if time_difference >= timedelta(milliseconds=200):
                 potential_session_host_player = connected_players[0]
         else:
@@ -1133,7 +1233,7 @@ def get_interface_info(interface_index: str):
     if not interfaces:
         return None
     if len(interfaces) > 1:
-        crash_text = textwrap.dedent(f"""
+        stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                    Developer didn't expect this scenario to be possible.
 
@@ -1146,8 +1246,7 @@ def get_interface_info(interface_index: str):
                    interfaces: {interfaces}
                    len(interfaces): {len(interfaces)}
         """.removeprefix("\n").removesuffix("\n"))
-        init_script_crash_under_control(crash_text)
-        raise ScriptCrashedUnderControl
+        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     interface = interfaces[0]
     if not isinstance(interface, _wmi_object):
@@ -1155,7 +1254,7 @@ def get_interface_info(interface_index: str):
 
     return interface
 
-def get_organization_name(mac_address: str | None):
+def get_organization_name(mac_address: Optional[str]):
     if mac_address is None:
         return None
 
@@ -1181,7 +1280,6 @@ def get_and_parse_arp_cache():
     #    "arp", "-a"
     #], shell=True, text=True)
 
-    # deepcode ignore HandleUnicode: Strings in Python 3 are already Unicode by default.
     arp_output = subprocess.check_output([
         "arp", "-a"
     ], text=True)
@@ -1200,9 +1298,9 @@ def get_and_parse_arp_cache():
             if not interface_info:
                 continue
 
-            interface_name: str | None = interface_info.NetConnectionID
+            interface_name: Optional[str] = interface_info.NetConnectionID
             if not isinstance(interface_name, str):
-                crash_text = textwrap.dedent(f"""
+                stdout_crash_text = textwrap.dedent(f"""
                     ERROR:
                            Developer didn't expect this scenario to be possible.
 
@@ -1215,8 +1313,7 @@ def get_and_parse_arp_cache():
                            interface_index: {interface_index}
                            interface_name: {interface_name}
                 """.removeprefix("\n").removesuffix("\n"))
-                init_script_crash_under_control(crash_text)
-                raise ScriptCrashedUnderControl
+                terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
             interface_ip_address = parts[1]
 
@@ -1247,7 +1344,7 @@ def get_and_parse_arp_cache():
 
 def format_mac_address(mac_address: str):
     if not is_mac_address(mac_address):
-        crash_text = textwrap.dedent(f"""
+        stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                    Developer didn't expect this scenario to be possible.
 
@@ -1259,10 +1356,8 @@ def format_mac_address(mac_address: str):
             DEBUG:
                    mac_address: {mac_address}
         """.removeprefix("\n").removesuffix("\n"))
-        init_script_crash_under_control(crash_text)
-        raise ScriptCrashedUnderControl
+        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
-    # deepcode ignore AttributeLoadOnNone: It's impossible for 'mac_address' to be 'None' at this point. If it were 'None', a TypeError would have been raised earlier in the code, most likely from the 'is_mac_address()' function.
     return mac_address.replace("-", ":").upper()
 
 def get_country_info(ip_address: str):
@@ -1306,31 +1401,35 @@ def get_asn_info(ip_address: str):
 
     return asn
 
-def show_message_box(title: str, message: str, style: Msgbox):
+def show_message_box(title: str, message: str, style: Msgbox.Style) -> int:
+    # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
-def get_tshark_version():
-    if Settings.CAPTURE_TSHARK_PATH is None:
-        return None
+def show_error__tshark_not_detected():
+    webbrowser.open(WIRESHARK_REQUIERED_DL)
 
-    try:
-        result = subprocess.check_output([Settings.CAPTURE_TSHARK_PATH, '--version'], text=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return None
-    else:
-        return result.splitlines()[0]
+    msgbox_title = TITLE
+    msgbox_message = textwrap.dedent(f"""
+        ERROR: Could not detect \"TShark (Wireshark) v4.2.8\" installed on your system.
 
-def npcap_or_winpcap_installed():
-    service_names = ["npcap", "npf"]
+        Opening the \"Wireshark\" project download page for you.
+        You can then download and install it from there and press \"Retry\".
+    """.removeprefix("\n").removesuffix("\n"))
+    msgbox_style = Msgbox.Style.RetryCancel | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
 
-    for service in service_names:
-        try:
-            subprocess.check_output(["sc", "query", service], stderr=subprocess.DEVNULL)
-            return True
-        except subprocess.CalledProcessError:
-            continue
+    return show_message_box(msgbox_title, msgbox_message, msgbox_style)
 
-    return False
+def safe_print(*args, **kwargs):
+    """
+    Print the provided arguments if the script has not crashed.
+
+    :param args: The values to be printed.
+    :param kwargs: Additional keyword arguments to pass to the built-in print function.
+    """
+    if ScriptControl.has_crashed():
+        return
+
+    print(*args, **kwargs)
 
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
@@ -1472,7 +1571,7 @@ def update_and_initialize_geolite2_readers():
     if show_error:
         msgbox_title = TITLE
         msgbox_message = msgbox_message.rstrip("\n")
-        msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
+        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
         show_message_box(msgbox_title, msgbox_message, msgbox_style)
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
@@ -1547,68 +1646,8 @@ def kill_process_tree(pid: int):
     except psutil.NoSuchProcess:
         pass
 
-def terminate_current_script_process(terminate_method: Literal["EXIT", "SIGINT", "THREAD_RAISED"]):
-    if terminate_method == "EXIT":
-        if exit__signal.is_set():
-            return
-        exit__signal.set()
-
-    elif terminate_method == "SIGINT":
-        if keyboard_interrupt__signal.is_set():
-            return
-        keyboard_interrupt__signal.set()
-
-        print(f"\n{Fore.YELLOW}Ctrl+C pressed. Exiting script ...{Fore.RESET}")
-
-    elif terminate_method == "THREAD_RAISED":
-        if threads_raised__signal.is_set():
-            return
-        threads_raised__signal.set()
-
-        log_and_display_exception(Threads_ExceptionHandler.raising_e_type, Threads_ExceptionHandler.raising_e_value, Threads_ExceptionHandler.raising_e_traceback)
-
-    exit_gracefully = True
-
-    for thread_name in ["stdout_render_core__thread", "iplookup_core__thread", "blacklist_sniffer_core__thread"]:
-        if thread_name in globals():
-            thread = globals()[thread_name]
-            if isinstance(thread, threading.Thread):
-                if thread.is_alive():
-                    exit_gracefully = False
-
-    if exit_gracefully:
-        sys.exit(1) if terminate_method == "THREAD_RAISED" else sys.exit(0)
-    else:
-        pid = os.getpid() # Get the process ID (PID) of the current script
-        process = psutil.Process(pid)
-        process.terminate()
-
-def init_script_crash_under_control(crash_text: str):
-    ScriptControl.set_crashed(f"\n\n{crash_text}\n")
-
-    msgbox_title = TITLE
-    msgbox_message = crash_text
-    msgbox_style = Msgbox.OKOnly | Msgbox.Critical | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
-
-    crash_alert__thread = threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style))
-    crash_alert__thread.start()
-
-    time.sleep(1)
-
-    print(ScriptControl.get_message())
-
-    crash_alert__thread.join()
-
-def signal_handler(sig: int, frame: FrameType):
-    if sig == 2: # means CTRL+C pressed
-        if not ScriptControl.has_crashed(): # Block CTRL+C if script is already crashing under control
-            terminate_current_script_process("SIGINT")
 
 colorama.init(autoreset=True)
-signal.signal(signal.SIGINT, signal_handler)
-exit__signal = threading.Event()
-keyboard_interrupt__signal = threading.Event()
-threads_raised__signal = threading.Event()
 
 if is_pyinstaller_compiled():
     SCRIPT_DIR = Path(sys.executable).parent
@@ -1617,15 +1656,18 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.7 - 18/10/2024 (22:55)"
+VERSION = "v1.1.7 - 25/10/2024 (15:02)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
+SESSION_LOGGING_PATH = Path("SessionsLogging") / datetime.now().strftime("%Y/%m/%d") / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
 BLACKLIST_LOGGING_PATH = Path("blacklist.log")
 TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_INI_PARSER_PATTERN = re.compile(r"^(?P<key>[^=]+)=(?P<value>[^;#]+)")
+RE_TWO_TAKE_ONE_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
+ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
 WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
 
@@ -1651,28 +1693,27 @@ else:
                 Current version: {current_version}
                 Latest version: {latest_version}
             """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.YesNo | Msgbox.Question | Msgbox.MsgBoxSetForeground
+            msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Question | Msgbox.Style.MsgBoxSetForeground
             errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-            if errorlevel == 6:
+            if errorlevel == Msgbox.ReturnValues.IDYES:
                 webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
-                terminate_current_script_process("EXIT")
+                terminate_script("EXIT")
     else:
         error_updating__flag = True
 
 if error_updating__flag:
     msgbox_title = TITLE
-    msgbox_message = f"""
+    msgbox_message = textwrap.dedent(f"""
         ERROR: Failed to check for updates.
 
         Do you want to open the \"{TITLE}\" project download page ?
         You can then download and run the latest version from there.
-    """
-    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.YesNo | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
+    """.removeprefix("\n").removesuffix("\n"))
+    msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
     errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == 6:
+    if errorlevel == Msgbox.ReturnValues.IDYES:
         webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
-        terminate_current_script_process("EXIT")
+        terminate_script("EXIT")
 
 cls()
 if not is_pyinstaller_compiled():
@@ -1715,11 +1756,11 @@ if not is_pyinstaller_compiled():
         msgbox_message += "\n\nDo you want to ignore this warning and continue with script execution?"
 
         # Show message box
-        msgbox_style = Msgbox.YesNo | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
+        msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
         msgbox_title = TITLE
         errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-        if errorlevel != 6:
-            terminate_current_script_process("EXIT")
+        if errorlevel != Msgbox.ReturnValues.IDYES:
+            terminate_script("EXIT")
 
 cls()
 title(f"Initializing the script for your Windows version - {TITLE}")
@@ -1734,25 +1775,25 @@ else:
 cls()
 title(f"Checking that \"Npcap\" or \"WinpCap\" driver is installed on your system - {TITLE}")
 print("\nChecking that \"Npcap\" or \"WinpCap\" driver is installed on your system ...\n")
-while not npcap_or_winpcap_installed():
+while not is_npcap_or_winpcap_installed():
     webbrowser.open("https://nmap.org/npcap/")
     msgbox_title = TITLE
-    msgbox_message = f"""
+    msgbox_message = textwrap.dedent(f"""
         ERROR: Could not detect the \"Npcap\" or \"WinpCap\" driver installed on your system.
 
         Opening the \"Npcap\" project download page for you.
         You can then download and install it from there and press \"Retry\".
-    """
-    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
+    """.removeprefix("\n").removesuffix("\n"))
+    msgbox_style = Msgbox.Style.RetryCancel | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
     errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == 2:
-        terminate_current_script_process("EXIT")
+    if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+        terminate_script("EXIT")
 
 cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
 print("\nApplying your custom settings from \"Settings.ini\" ...\n")
 Settings.load_from_settings_file(SETTINGS_PATH)
+
 if Settings.BLACKLIST_VOICE_NOTIFICATIONS:
     if Settings.BLACKLIST_VOICE_NOTIFICATIONS == "Male":
         VOICE_NAME = "Liam"
@@ -1760,34 +1801,78 @@ if Settings.BLACKLIST_VOICE_NOTIFICATIONS:
         VOICE_NAME = "Jane"
 
 cls()
+title(f"Checking your custom settings from \"Settings.ini\" - {TITLE}")
+print("\nChecking your custom settings from \"Settings.ini\" ...\n")
+if Settings.STDOUT_FIELDS_TO_HIDE:
+    for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
+        # Check for both connected and disconnected player sort fields
+        for sort_field_name, sort_field_value, default_sort_value in [
+            ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+            ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        ]:
+            if field_name in sort_field_value:
+                msgbox_title = TITLE
+                msgbox_message = textwrap.dedent(f"""
+                    ERROR in your custom \"Settings.ini\" file:
+
+                    You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
+
+                    Do you want to replace:
+                    {sort_field_name}={sort_field_value}
+                    with its default value:
+                    {sort_field_name}={default_sort_value}
+                """.removeprefix("\n").removesuffix("\n"))
+                msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+                errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+
+                if errorlevel != Msgbox.ReturnValues.IDYES:
+                    terminate_script("EXIT")
+
+                # Replace the incorrect field with its default value
+                setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name))
+
+                # Reconstruct the settings after applying changes
+                Settings.reconstruct_settings()
+
+cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.8\" is installed on your system - {TITLE}")
 print("\nChecking that \"Tshark (Wireshark) v4.2.8\" is installed on your system ...\n")
-while not (tshark_version := get_tshark_version()) == WIRESHARK_REQUIERED_VERSION:
-    webbrowser.open(WIRESHARK_REQUIERED_DL)
-    msgbox_title = TITLE
-
-    if tshark_version is None:
-        msgbox_message = f"""
-            ERROR: Could not detect \"TShark (Wireshark) v4.2.8\" installed on your system.
-
-            Opening the \"Wireshark\" project download page for you.
-            You can then download and install it from there and press \"Retry\".
-        """
+while True:
+    try:
+        TSHARK_PATH = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
+    except TSharkNotFoundException:
+        errorlevel = show_error__tshark_not_detected()
+        if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+            terminate_script("EXIT")
     else:
-        msgbox_message = f"""
-            ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
+        TSHARK_VERSION = get_tshark_version(TSHARK_PATH)
 
-            Installed version: {tshark_version}
-            Requiered version: {WIRESHARK_REQUIERED_VERSION}
+        if TSHARK_VERSION == WIRESHARK_REQUIERED_VERSION:
+            break
 
-            Opening the \"Wireshark\" project download page for you.
-            You can then download and install it from there and press \"Retry\".
-        """
-    msgbox_message = textwrap.dedent(msgbox_message).removeprefix("\n").removesuffix("\n")
-    msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
-    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == 2:
-        terminate_current_script_process("EXIT")
+        webbrowser.open(WIRESHARK_REQUIERED_DL)
+        msgbox_title = TITLE
+
+        if TSHARK_VERSION is None:
+            errorlevel = show_error__tshark_not_detected()
+            if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+                terminate_script("EXIT")
+        else:
+            msgbox_message = textwrap.dedent(f"""
+                ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
+
+                Installed version: {TSHARK_VERSION}
+                Requiered version: {WIRESHARK_REQUIERED_VERSION}
+
+                Opening the \"Wireshark\" project download page for you.
+                You can then download and install it from there and press \"Retry\".
+            """.removeprefix("\n").removesuffix("\n"))
+            msgbox_style = Msgbox.Style.AbortRetryIgnore | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+            if errorlevel == Msgbox.ReturnValues.IDABORT:
+                terminate_script("EXIT")
+            elif errorlevel == Msgbox.ReturnValues.IDIGNORE:
+                break
 
 cls()
 title(f"Initializing and updating MaxMind's GeoLite2 Country, City and ASN databases - {TITLE}")
@@ -1825,7 +1910,7 @@ for interface, stats in net_io_stats.items():
         continue
 
     if len(mac_addresses) > 1:
-        crash_text = textwrap.dedent(f"""
+        stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                    Developer didn't expect this scenario to be possible.
 
@@ -1837,8 +1922,7 @@ for interface, stats in net_io_stats.items():
                    ip_addresses: {ip_addresses}
                    mac_addresses: {mac_addresses}
         """.removeprefix("\n").removesuffix("\n"))
-        init_script_crash_under_control(crash_text)
-        raise ScriptCrashedUnderControl
+        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     ip_addresses = [ip for ip in ip_addresses if is_private_device_ipv4(ip)]
     if not ip_addresses:
@@ -1890,7 +1974,7 @@ table.align["IP Address"] = "l"
 table.align["MAC Address"] = "c"
 table.align["Organization Name"] = "c"
 
-interfaces_options: dict[int, dict[str, str | None]] = {}
+interfaces_options: dict[int, dict[str, Optional[str]]] = {}
 counter = 0
 
 for interface in Interface.get_all_interfaces():
@@ -2039,21 +2123,12 @@ while True:
             interface = Settings.CAPTURE_INTERFACE_NAME,
             capture_filter = CAPTURE_FILTER,
             display_filter = DISPLAY_FILTER,
-            tshark_path = Settings.CAPTURE_TSHARK_PATH
+            tshark_path = TSHARK_PATH
         )
     except TSharkNotFoundException:
-        webbrowser.open(WIRESHARK_REQUIERED_DL)
-        msgbox_title = TITLE
-        msgbox_message = textwrap.dedent(f"""
-            ERROR: Could not detect \"TShark (Wireshark) 4.2.8\" installed on your system.
-
-            Opening the \"Wireshark\" project download page for you.
-            You can then download and install it from there and press \"Retry\".
-        """.removeprefix("\n").removesuffix("\n"))
-        msgbox_style = Msgbox.RetryCancel | Msgbox.Exclamation | Msgbox.MsgBoxSetForeground
-        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+        errorlevel = show_error__tshark_not_detected()
         if errorlevel == 2:
-            terminate_current_script_process("EXIT")
+            terminate_script("EXIT")
     else:
         break
 
@@ -2097,9 +2172,8 @@ def blacklist_sniffer_core():
                 Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
                 Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
             """.removeprefix("\n").removesuffix("\n")), "    ")
-            msgbox_style = Msgbox.OKOnly | Msgbox.Exclamation | Msgbox.SystemModal | Msgbox.MsgBoxSetForeground
-            # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style)).start()
+            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
         def play_sound(connection_type: Literal["connected", "disconnected"]):
             file_path = Path(f"{TTS_PATH}/{VOICE_NAME} ({connection_type}).wav")
@@ -2429,7 +2503,7 @@ def stdout_render_core():
         session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
 
-        connected_players_table__field_names = [
+        stdout_connected_players_table__field_names = [
             field_name
             for field_name in [
                 field_name
@@ -2438,9 +2512,19 @@ def stdout_render_core():
             ]
             if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
         ]
-        add_down_arrow_char_to_sorted_table_field(connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+        add_down_arrow_char_to_sorted_table_field(stdout_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+        logging_connected_players_table__field_names = [
+            field_name
+            for field_name in [
+                field_name
+                for field_name in Settings._stdout_fields_mapping.keys()
+                if not field_name == "Last Seen"
+            ]
+            if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+        ]
+        add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
 
-        disconnected_players_table__field_names = [
+        stdout_disconnected_players_table__field_names = [
             field_name
             for field_name in [
                 field_name
@@ -2449,7 +2533,17 @@ def stdout_render_core():
             ]
             if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
         ]
-        add_down_arrow_char_to_sorted_table_field(disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        add_down_arrow_char_to_sorted_table_field(stdout_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        logging_disconnected_players_table__field_names = [
+            field_name
+            for field_name in [
+                field_name
+                for field_name in Settings._stdout_fields_mapping.keys()
+                if not field_name == "PPS"
+            ]
+            if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+        ]
+        add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
         printer = PrintCacher()
         global_pps_t1 = time.perf_counter()
@@ -2457,6 +2551,26 @@ def stdout_render_core():
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_IP_ADDRESS)), len(str(Settings.CAPTURE_INTERFACE_NAME)), len(str(is_arp_enabled)))
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.CAPTURE_IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+        two_take_one__plugin__ip_to_usernames: dict[str, list[str]] = {}
+
+        # NOTE: The log file content is read only once because the plugin is no longer supported.
+        if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
+            with TWO_TAKE_ONE__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
+                for line in f:
+                    match = RE_TWO_TAKE_ONE_USER_PATTERN.match(line)
+                    if match:
+                        username = match.group("username")
+                        if not isinstance(username, str):
+                            continue
+
+                        ip = match.group("ip")
+                        if not isinstance(ip, str):
+                            continue
+
+                        if ip not in two_take_one__plugin__ip_to_usernames:
+                            two_take_one__plugin__ip_to_usernames[ip] = []
+                        if not username in two_take_one__plugin__ip_to_usernames[ip]:
+                            two_take_one__plugin__ip_to_usernames[ip].append(username)
 
         while True:
             if ScriptControl.has_crashed():
@@ -2470,13 +2584,10 @@ def stdout_render_core():
 
             for player in PlayersRegistry.iterate_players_from_registry():
                 if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
-                    for username in re.findall(
-                        r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:%s, timestamp:\d{10}$" % re.escape(player.ip),
-                        TWO_TAKE_ONE__PLUGIN__LOG_PATH.read_text(encoding="utf-8"),
-                        re.MULTILINE
-                    ):
-                        if username not in player.two_take_one__usernames:
-                            player.two_take_one__usernames.append(username)
+                    if player.ip in two_take_one__plugin__ip_to_usernames:
+                        for username in two_take_one__plugin__ip_to_usernames[player.ip]:
+                            if username not in player.two_take_one.usernames:
+                                player.two_take_one.usernames.append(username)
 
                 if (
                     not player.datetime.left
@@ -2485,12 +2596,9 @@ def stdout_render_core():
                     player.datetime.left = player.datetime.last_seen
 
                 if not player.iplookup.maxmind.is_initialized:
-                    if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                        player.iplookup.maxmind.asn = get_asn_info(player.ip)
-                    if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                        player.iplookup.maxmind.country, player.iplookup.maxmind.country_iso = get_country_info(player.ip)
-                    if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                        player.iplookup.maxmind.city = get_city_info(player.ip)
+                    player.iplookup.maxmind.asn = get_asn_info(player.ip)
+                    player.iplookup.maxmind.country, player.iplookup.maxmind.country_iso = get_country_info(player.ip)
+                    player.iplookup.maxmind.city = get_city_info(player.ip)
 
                     player.iplookup.maxmind.is_initialized = True
 
@@ -2514,7 +2622,7 @@ def stdout_render_core():
                 if SessionHost.player:
                     if SessionHost.player.datetime.left:
                         SessionHost.player = None
-                # we should also potentially needs to check that not more then 1s passed before each disconnected
+                # TODO: We should also potentially needs to check that not more then 1s passed before each disconnected
                 if SessionHost.players_pending_for_disconnection and all(player.datetime.left for player in SessionHost.players_pending_for_disconnection):
                     SessionHost.player = None
                     SessionHost.search_player = True
@@ -2600,11 +2708,11 @@ def stdout_render_core():
             printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
             printer.cache_print(f"-" * 109)
 
-            connected_players_table = PrettyTable()
-            connected_players_table.set_style(SINGLE_BORDER)
-            connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-            connected_players_table.field_names = connected_players_table__field_names
-            connected_players_table.align = "l"
+            stdout_connected_players_table = PrettyTable()
+            stdout_connected_players_table.set_style(SINGLE_BORDER)
+            stdout_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
+            stdout_connected_players_table.field_names = stdout_connected_players_table__field_names
+            stdout_connected_players_table.align = "l"
             for player in session_connected:
                 if (
                     Settings.BLACKLIST_ENABLED
@@ -2618,11 +2726,13 @@ def stdout_render_core():
 
                 row = []
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
                 if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one__usernames, player.blacklist.usernames))}{player_reset}")
+                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}{player_reset}")
+                row.append(f"{player_color}{player.rejoins}{player_reset}")
+                row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}{player_reset}")
-                row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
                 if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}{player_reset}")
@@ -2638,13 +2748,13 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
                 if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
-                connected_players_table.add_row(row)
+                stdout_connected_players_table.add_row(row)
 
-            disconnected_players_table = PrettyTable()
-            disconnected_players_table.set_style(SINGLE_BORDER)
-            disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-            disconnected_players_table.field_names = disconnected_players_table__field_names
-            disconnected_players_table.align = "l"
+            stdout_disconnected_players_table = PrettyTable()
+            stdout_disconnected_players_table.set_style(SINGLE_BORDER)
+            stdout_disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
+            stdout_disconnected_players_table.field_names = stdout_disconnected_players_table__field_names
+            stdout_disconnected_players_table.align = "l"
             for player in session_disconnected:
                 if (
                     Settings.BLACKLIST_ENABLED
@@ -2658,11 +2768,13 @@ def stdout_render_core():
 
                 row = []
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
                 row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
                 if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one__usernames, player.blacklist.usernames))}{player_reset}")
-                row.append(f"{player_color}{player.packets}{player_reset}")
+                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
+                row.append(f"{player_color}{player.total_packets}{player_reset}")
+                row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{player_color}{player.ip}{player_reset}")
                 if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}{player_reset}")
@@ -2678,35 +2790,112 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
                 if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
-                disconnected_players_table.add_row(row)
+                stdout_disconnected_players_table.add_row(row)
 
             printer.cache_print("")
-            printer.cache_print(connected_players_table.get_string())
-            printer.cache_print(disconnected_players_table.get_string())
+            printer.cache_print(stdout_connected_players_table.get_string())
+            printer.cache_print(stdout_disconnected_players_table.get_string())
             printer.cache_print("")
 
             cls()
             printer.flush_cache()
 
-            def display_refresh_message(seconds_elapsed: Optional[float] = None):
-                if seconds_elapsed is None:
-                    seconds_left = Settings.STDOUT_REFRESHING_TIMER
-                else:
-                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - seconds_elapsed, 1)
+            if Settings.STDOUT_SESSIONS_LOGGING:
+                logging_connected_players_table = PrettyTable()
+                logging_connected_players_table.set_style(SINGLE_BORDER)
+                logging_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
+                logging_connected_players_table.field_names = logging_connected_players_table__field_names
+                logging_connected_players_table.align = "l"
+                for player in session_connected:
+                    row = []
+                    row.append(f"{format_player_datetime(player.datetime.first_seen)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_rejoin)}")
+                    row.append(f"{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}")
+                    row.append(f"{player.rejoins}")
+                    row.append(f"{player.total_packets}")
+                    row.append(f"{player.packets}")
+                    row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
+                    row.append(f"{format_player_ip(player.ip)}")
+                    row.append(f"{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}")
+                    row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
+                    row.append(f"{player.iplookup.maxmind.city}")
+                    row.append(f"{player.iplookup.maxmind.asn}")
+                    row.append(f"{player.iplookup.ipapi.mobile}")
+                    row.append(f"{player.iplookup.ipapi.proxy}")
+                    row.append(f"{player.iplookup.ipapi.hosting}")
+                    logging_connected_players_table.add_row(row)
+
+                logging_disconnected_players_table = PrettyTable()
+                logging_disconnected_players_table.set_style(SINGLE_BORDER)
+                logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected_all))} who've left your session ({len(session_disconnected_all)}):"
+                logging_disconnected_players_table.field_names = logging_disconnected_players_table__field_names
+                logging_disconnected_players_table.align = "l"
+                for player in session_disconnected_all:
+                    row = []
+                    row.append(f"{format_player_datetime(player.datetime.first_seen)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_rejoin)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_seen)}")
+                    row.append(f"{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}")
+                    row.append(f"{player.rejoins}")
+                    row.append(f"{player.total_packets}")
+                    row.append(f"{player.packets}")
+                    row.append(f"{player.ip}")
+                    row.append(f"{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}")
+                    row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
+                    row.append(f"{player.iplookup.maxmind.city}")
+                    row.append(f"{player.iplookup.maxmind.asn}")
+                    row.append(f"{player.iplookup.ipapi.mobile}")
+                    row.append(f"{player.iplookup.ipapi.proxy}")
+                    row.append(f"{player.iplookup.ipapi.hosting}")
+                    logging_disconnected_players_table.add_row(row)
+
+                # Check if the directories exist, if not create them
+                if not SESSION_LOGGING_PATH.parent.exists():
+                    SESSION_LOGGING_PATH.parent.mkdir(parents=True)  # Create the directories if they don't exist
+
+                # Check if the file exists, if not create it
+                if not SESSION_LOGGING_PATH.exists():
+                    SESSION_LOGGING_PATH.touch()  # Create the file if it doesn't exist
+
+                with SESSION_LOGGING_PATH.open("w", encoding="utf-8") as f:
+                    stdout_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
+                    f.write(stdout_without_vt100)
+
+            og_process_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
+
+            if Settings.STDOUT_REFRESHING_TIMER == 0:
+                safe_print("\033[K" + f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})", end="\r")
+                time.sleep(0.1)
+                continue
+
+            if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 1.0:
+                safe_print("\033[K" + f"Refreshing took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
+                time.sleep(0.1)
+                continue
+
+            while True:
+                total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
 
                 if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
+                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - total_refreshing__time_elapsed, 0.1)
                     seconds_left = round(seconds_left, 1)
-                    sleep_seconds = 0.1
+                    remaining_sleep_seconds = 0
+                    eta = max(round(seconds_left + og_process_refreshing__time_elapsed, 1), 0.1)
                 else:
+                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - total_refreshing__time_elapsed, 1)
                     seconds_left = round(seconds_left)
-                    sleep_seconds = 1
+                    remaining_sleep_seconds = 0.9
+                    eta = max(round(seconds_left + og_process_refreshing__time_elapsed), 1)
 
-                print("\033[K" + f"Scanning IPs, refreshing display in {seconds_left} second{plural(seconds_left)} ...", end="\r")
-                time.sleep(sleep_seconds)
+                safe_print("\033[K" + f"Scanning IPs, refreshing display in {eta} second{plural(eta)} ...", end="\r")
+                time.sleep(0.1)
 
-            display_refresh_message()
-            while (seconds_elapsed := time.perf_counter() - main_loop__t1) < Settings.STDOUT_REFRESHING_TIMER:
-                display_refresh_message(seconds_elapsed)
+                total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
+                if total_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
+                    break
+
+                if remaining_sleep_seconds > 0:
+                    time.sleep(remaining_sleep_seconds)
 
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
@@ -2729,7 +2918,7 @@ def packet_callback(packet: Packet):
         raise ValueError("Neither the source nor destination address matches the specified <CAPTURE_IP_ADDRESS>.")
 
     if not target_port:
-        crash_text = textwrap.dedent(f"""
+        stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                    Developer didn't expect this scenario to be possible.
 
@@ -2747,8 +2936,7 @@ def packet_callback(packet: Packet):
                    target_ip: {target_ip}
                    target_port: {target_port}
         """.removeprefix("\n").removesuffix("\n"))
-        init_script_crash_under_control(crash_text)
-        raise ScriptCrashedUnderControl
+        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     global_pps_counter += 1
 
@@ -2761,19 +2949,22 @@ def packet_callback(packet: Packet):
 
     # No matter what:
     player.datetime.last_seen = packet_datetime
+    player.total_packets += 1
+    player.pps.counter += 1
 
     if player.datetime.left: # player left, rejoined now.
         player.datetime.left = None
+        player.datetime.last_rejoin = packet_datetime
         player.rejoins += 1
+        player.packets = 1
 
-        if Settings.STDOUT_RESET_INFOS_ON_CONNECTED:
-            player.reset(target_port, packet_datetime)
+        if Settings.STDOUT_RESET_PORTS_ON_REJOINS:
+            player.ports.reset(target_port)
             return
+    else:
+        player.packets += 1
 
-    # player connected, has not been reset, do the usual stuff
-    player.packets += 1
-    player.pps.counter += 1
-
+    # player connected, has not been reset
     if target_port not in player.ports.list:
         player.ports.list.append(target_port)
     player.ports.last = target_port
@@ -2784,19 +2975,15 @@ title(TITLE)
 tshark_restarted_times = 0
 global_pps_counter = 0
 
-# deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-stdout_render_core__thread = threading.Thread(target=stdout_render_core)
+stdout_render_core__thread = threading.Thread(target=stdout_render_core, daemon=True)
 stdout_render_core__thread.start()
 
 if Settings.BLACKLIST_ENABLED:
-    # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-    blacklist_sniffer_core__thread = threading.Thread(target=blacklist_sniffer_core)
+    blacklist_sniffer_core__thread = threading.Thread(target=blacklist_sniffer_core, daemon=True)
     blacklist_sniffer_core__thread.start()
 
-if not all(field_name in Settings.STDOUT_FIELDS_TO_HIDE for field_name in ["Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]):
-    # deepcode ignore MissingAPI: If the thread was started and the program exits, it will be `join()` in the `terminate_current_script_process()` function.
-    iplookup_core__thread = threading.Thread(target=iplookup_core)
-    iplookup_core__thread.start()
+iplookup_core__thread = threading.Thread(target=iplookup_core, daemon=True)
+iplookup_core__thread.start()
 
 with Threads_ExceptionHandler():
     while True:

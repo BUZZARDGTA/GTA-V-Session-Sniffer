@@ -1,13 +1,15 @@
-# Standard Python Libraries
-import ssl
-from ssl import SSLContext
-
-# Third-party library imports
+# External/Third-party Python Libraries
 import requests
 import urllib3
 from urllib3.poolmanager import PoolManager
 from urllib3.util import create_urllib3_context
 from urllib3.exceptions import InsecureRequestWarning
+
+# Standard Python Libraries
+import ssl
+from ssl import SSLContext
+from typing import Optional
+
 
 # Workaround unsecure request warnings
 urllib3.disable_warnings(InsecureRequestWarning)
@@ -18,7 +20,7 @@ HEADERS = {
 
 # Allow custom ssl context for adapters
 class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
-    def __init__(self, ssl_context: SSLContext | None = None, **kwargs):
+    def __init__(self, ssl_context: Optional[SSLContext], **kwargs):
         self.ssl_context = ssl_context
         super().__init__(**kwargs)
 
