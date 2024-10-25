@@ -348,13 +348,10 @@ class DefaultSettings:
     BLACKLIST_PROTECTION_EXIT_PROCESS_PATH = None
     BLACKLIST_PROTECTION_RESTART_PROCESS_PATH = None
 
-
 class Settings(DefaultSettings):
-    _allowed_settings_types = (type(None), Path, bool, list, str, float, int)
+    stdout_hideable_fields = ["Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]
 
-    _valid_stdout_hidden_fields = ["Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]
-
-    _stdout_fields_mapping = {
+    stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
         "Last Rejoin": "datetime.last_rejoin",
         "Last Seen": "datetime.last_seen",
@@ -375,15 +372,21 @@ class Settings(DefaultSettings):
 
     @classmethod
     def iterate_over_settings(cls):
-        for attr_name, attr_value in vars(cls).items():
+        _allowed_settings_types = (type(None), Path, bool, list, str, float, int)
+
+        for attr_name, attr_value in vars(DefaultSettings).items():
             if (
-                attr_name.startswith("_")
-                or callable(attr_value)
-                or not isinstance(attr_value, Settings._allowed_settings_types)
+                callable(attr_value)
+                or attr_name.startswith("_")
+                or attr_name in ["stdout_hideable_fields", "stdout_fields_mapping"]
+                or not attr_name.isupper()
+                or not isinstance(attr_value, _allowed_settings_types)
             ):
                 continue
 
-            yield attr_name, attr_value
+            # Get the value from Settings if it exists, otherwise from DefaultSettings
+            current_value = getattr(cls, attr_name, attr_value)
+            yield attr_name, current_value
 
     @classmethod
     def get_settings_length(cls):
@@ -461,7 +464,7 @@ class Settings(DefaultSettings):
             ;;Specifies a list of fields you wish to hide from the output.
             ;;It can only hides field names that are not essential to the script's functionality.
             ;;Valid values include any of the following field names:
-            ;;{Settings._valid_stdout_hidden_fields}
+            ;;{Settings.stdout_hideable_fields}
             ;;
             ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
             ;;Shows or not the date from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
@@ -680,7 +683,7 @@ class Settings(DefaultSettings):
                     else:
                         if isinstance(stdout_fields_to_hide, list):
                             # Filter out invalid field names from stdout_fields_to_hide
-                            filtered_stdout_fields_to_hide = [field_name for field_name in stdout_fields_to_hide if field_name in Settings._valid_stdout_hidden_fields]
+                            filtered_stdout_fields_to_hide = [field_name for field_name in stdout_fields_to_hide if field_name in Settings.stdout_hideable_fields]
 
                             # Check if any invalid field names were removed
                             if set(stdout_fields_to_hide) != set(filtered_stdout_fields_to_hide):
@@ -696,12 +699,12 @@ class Settings(DefaultSettings):
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY":
-                    if setting_value in Settings._stdout_fields_mapping.keys():
+                    if setting_value in Settings.stdout_fields_mapping.keys():
                         Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = setting_value
                     else:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY":
-                    if setting_value in Settings._stdout_fields_mapping.keys():
+                    if setting_value in Settings.stdout_fields_mapping.keys():
                         Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = setting_value
                     else:
                         need_rewrite_settings = True
@@ -1656,7 +1659,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.7 - 25/10/2024 (15:02)"
+VERSION = "v1.1.8 - 26/10/2024 (00:13)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 BLACKLIST_PATH = Path("Blacklist.ini")
@@ -2500,14 +2503,14 @@ def stdout_render_core():
 
         global iplookup_core__thread, global_pps_counter, tshark_latency
 
-        session_connected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
-        session_disconnected_sorted_key = Settings._stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
+        session_connected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
+        session_disconnected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
 
         stdout_connected_players_table__field_names = [
             field_name
             for field_name in [
                 field_name
-                for field_name in Settings._stdout_fields_mapping.keys()
+                for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "Last Seen"
             ]
             if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
@@ -2517,7 +2520,7 @@ def stdout_render_core():
             field_name
             for field_name in [
                 field_name
-                for field_name in Settings._stdout_fields_mapping.keys()
+                for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "Last Seen"
             ]
             if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
@@ -2528,7 +2531,7 @@ def stdout_render_core():
             field_name
             for field_name in [
                 field_name
-                for field_name in Settings._stdout_fields_mapping.keys()
+                for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "PPS"
             ]
             if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
@@ -2538,7 +2541,7 @@ def stdout_render_core():
             field_name
             for field_name in [
                 field_name
-                for field_name in Settings._stdout_fields_mapping.keys()
+                for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "PPS"
             ]
             if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
