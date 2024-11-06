@@ -87,7 +87,7 @@ You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 
 ### Resolving Mobile, Proxy and Hosting fields.
 
-The script relies on the free [ip-api](https://ip-api.com/) API website to resolve player's "Mobile", "Proxy/VPN/Tor" and "Hosting/Data Center" fields.<br />
+The script relies on the free [ip-api](https://ip-api.com/) API website to resolve player's "Mobile", "VPN" and "Hosting" fields.<br />
 This free and limited usage allows for a maximum resolution of (100 \* 15) = 1500 IPs per minute.
 
 ## Troubleshooting
@@ -124,14 +124,96 @@ Refreshing the display of the script positions your terminal's cursor at the ver
 However, if you are using Windows Terminal, this issue is somewhat resolved because the view sticks to the top of the page by scrolling there initially.<br />
 I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/) for an optimal experience.
 
+## UserIP INI databases Tutorial
+
+### What's an UserIP database ?
+
+In earlier versions, there was only one database `Blacklist.ini` for blacklisting users.<br>
+Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to suit your needs.
+
+For example, I personally maintain four lists:
+
+* Searchlist.ini: For people whose IPs I am searching for.
+* Blacklist.ini: For individuals whose GTA5 process I want to suspend.
+* Enemylist.ini: For users I want to be notified about when they join the session.
+* Friendlist.ini: For users I don't want notifications for but wish to highlight in green.
+
+Throughout the INI file, any text following a `;` or `#` symbol is treated as a comment.
+
+### UserIP Settings
+
+These are settings specific for each UserIP database files configuration.
+
+If you don't know what value to choose for a specifc setting, set it's value to None.<br>
+The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
+
+#### \<ENABLED\>
+Determine if you want or not to enable this UserIP database.
+
+#### \<COLOR\>
+Determine which color will be applied on the script's output for these users.
+Valid values are either one of the following colors:<br>
+"BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"
+
+#### \<NOTIFICATIONS\>
+Determine if you want or not to display a notification when a user is detected.
+
+#### \<VOICE_NOTIFICATIONS\>
+This setting determines the voice that will play when a user is detected or when they disconnect.<br>
+Valid values are either "Male" or "Female".<br>
+Set it to "False" to disable this setting.
+
+#### \<LOG\>
+Determine if you want or not to log the user in the UserIP logging file.
+
+#### \<PROTECTION\>
+Determine if you want or not a protection when a user is found.<br>
+Valid values include any of the following protections:<br>
+"Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"<br>
+Set it to "False" value to disable this setting.
+
+#### \<PROTECTION_PROCESS_PATH\>
+The file path of the process that will be used for the \<PROTECTION\> setting.<br>
+Please note that UWP apps are not supported.
+
+#### \<PROTECTION_RESTART_PROCESS_PATH\>
+The file path of the process that will be started when<br>
+the \<PROTECTION\> setting is set to the "Restart_Process" value.<br>
+Please note that UWP apps are not supported.
+
+#### Examples:
+```
+[Settings]
+ENABLED=True
+COLOR=RED
+NOTIFICATIONS=True
+VOICE_NOTIFICATIONS=Male
+LOG=True
+PROTECTION=False
+PROTECTION_PROCESS_PATH=E:\Games\GTAV\GTA5.exe
+PROTECTION_RESTART_PROCESS_PATH=D:\Desktop\Grand Theft Auto V.url
+```
+
+### UserIP Formatting
+
+You need to list the entries under the `[UserIP]` section of the INI file in this format:<br>
+`<USERNAME>=<IP>`
+
+#### Examples:
+
+```
+[UserIP]
+username1=0.0.0.0
+username2=127.0.0.1
+username3=255.255.255.255
+```
+
 ## Tips and Tricks
 
 ### General Tips and Tricks
 
 - You can handily zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
 - You can pause your terminal's output by using the keyboard shortcut `[CTRL] + [S]` and resume it with `[CTRL] + [Q]`.
-- The port in [brackets] is the first detected, while the <ins>underlined</ins> is the last detected.
-- If you want to know more information about a specific IP or Port, I'd recommend you to check out [Illegal Services/IP Address Lookup](https://illegal-services.com/Bookmarks%20Toolbar/Illegal%20Services/IP%20Address%20Lookup/index.html) and [Illegal Services/IP Port Scanning](https://illegal-services.com/Bookmarks%20Toolbar/Illegal%20Services/IP%20Port%20Scanning/index.html).<br />
 
 ### GTA V Tips and Tricks
 

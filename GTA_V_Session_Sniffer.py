@@ -17,7 +17,7 @@ import geoip2.errors
 import geoip2.database
 from colorama import Fore, Back, Style
 from wmi import _wmi_namespace, _wmi_object
-from prettytable import PrettyTable, SINGLE_BORDER
+from prettytable import PrettyTable, TableStyle
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.text import Text
@@ -59,7 +59,7 @@ if sys.version_info.major <= 3 and sys.version_info.minor < 9:
     sys.exit(0)
 
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M",
     handlers=[
@@ -67,6 +67,7 @@ logging.basicConfig(
         # rich.traceback does it nicer ---> logging.StreamHandler(sys.stdout)
     ]
 )
+logging.captureWarnings(True)
 
 
 @dataclass
@@ -88,7 +89,7 @@ def terminate_script(
         if terminate_gracefully is False:
             return False
 
-        for thread_name in ["stdout_render_core__thread", "iplookup_core__thread", "blacklist_sniffer_core__thread"]:
+        for thread_name in ["stdout_render_core__thread", "iplookup_core__thread"]:
             if thread_name in globals():
                 thread = globals()[thread_name]
                 if isinstance(thread, threading.Thread):
@@ -138,9 +139,7 @@ def terminate_script(
             errorlevel = force_terminate_errorlevel
         sys.exit(errorlevel)
 
-    pid = os.getpid() # Get the process ID (PID) of the current script
-    process = psutil.Process(pid)
-    process.terminate()
+    terminate_process_tree()
 
 def handle_exception(exc_type: Type[BaseException], exc_value: BaseException, exc_traceback: Optional[TracebackException]):
     """Handles exceptions for the main script. (not threads)"""
@@ -168,7 +167,7 @@ class InvalidNoneTypeValueError(Exception):
 
 class InvalidFileError(Exception):
     def __init__(self, path: str):
-        super().__init__(f"The path does not point to a regular file: '{path}'")
+        super().__init__(f'The path does not point to a regular file: "{path}"')
 
 class PacketCaptureOverflow(Exception):
     pass
@@ -334,40 +333,41 @@ class DefaultSettings:
     STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
-    STDOUT_FIELDS_TO_HIDE = []
-    STDOUT_FIELD_SHOW_SEEN_DATE = False
+    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "City"]
+    STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME = True
+    STDOUT_DATE_FIELDS_SHOW_DATE = False
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
-    STDOUT_DISCONNECTED_PLAYERS_TIMER = 16.0
+    STDOUT_FIELD_COUNTRY_MAX_LEN = 20
+    STDOUT_FIELD_CITY_MAX_LEN = 20
+    STDOUT_FIELD_ASN_MAX_LEN = 20
+    STDOUT_DISCONNECTED_PLAYERS_TIMER = 10.0
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
     STDOUT_REFRESHING_TIMER = 3
-    BLACKLIST_ENABLED = True
-    BLACKLIST_NOTIFICATIONS = True
-    BLACKLIST_VOICE_NOTIFICATIONS: Literal["Male", "Female", False] = "Male"
-    BLACKLIST_PROTECTION: Literal["Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC", False] = False
-    BLACKLIST_PROTECTION_EXIT_PROCESS_PATH = None
-    BLACKLIST_PROTECTION_RESTART_PROCESS_PATH = None
+    USERIP_ENABLED = True
 
 class Settings(DefaultSettings):
-    stdout_hideable_fields = ["Ports", "Country", "City", "ASN", "Mobile", "Proxy/VPN/Tor", "Hosting/Data Center"]
+    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Country", "City", "ASN", "Mobile", "VPN", "Hosting"]
 
     stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
         "Last Rejoin": "datetime.last_rejoin",
         "Last Seen": "datetime.last_seen",
-        "Usernames": "blacklist.usernames",
+        "Usernames": "userip.usernames",
         "Rejoins": "rejoins",
-        "Total Packets": "total_packets",
+        "T. Packets": "total_packets",
         "Packets": "packets",
         "PPS": "pps.rate",
         "IP Address": "ip",
-        "Ports": "ports",
+        "Last Port": "ports.last",
+        "Intermediate Ports": "ports.intermediate",
+        "First Port": "ports.first",
         "Country": "iplookup.country",
         "City": "iplookup.city",
         "ASN": "iplookup.asn",
         "Mobile": "iplookup.mobile",
-        "Proxy/VPN/Tor": "iplookup.proxy",
-        "Hosting/Data Center": "iplookup.hosting"
+        "VPN": "iplookup.proxy",
+        "Hosting": "iplookup.hosting"
     }
 
     @classmethod
@@ -400,121 +400,111 @@ class Settings(DefaultSettings):
         print("\nCorrect reconstruction of \"Settings.ini\" ...")
         text = textwrap.dedent(f"""
             ;;-----------------------------------------------------------------------------
-            ;;Lines starting with \";\" or \"#\" symbols are commented lines.
+            ;; Lines starting with \";\" or \"#\" symbols are commented lines.
+            ;;-----------------------------------------------------------------------------
+
+            ;;-----------------------------------------------------------------------------
+            ;; This is the settings file for \"GTA V Session Sniffer\" configuration.
             ;;
-            ;;This is the settings file for \"GTA V Session Sniffer\" configuration.
-            ;;
-            ;;If you don't know what value to choose for a specifc setting, set it's value to None.
-            ;;The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
+            ;; If you don't know what value to choose for a specifc setting, set it's value to None.
+            ;; The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
             ;;
             ;;<CAPTURE_TSHARK_PATH>
-            ;;The full path to your \"tshark.exe\" executable.
-            ;;If not set, it will attempt to detect tshark from your Wireshark installation.
+            ;;  The full path to your \"tshark.exe\" executable.
+            ;;  If not set, it will attempt to detect tshark from your Wireshark installation.
             ;;
             ;;<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>
-            ;;Allows you to skip the network interface selection by automatically
-            ;;using the <CAPTURE_INTERFACE_NAME>, <CAPTURE_IP_ADDRESS> and <CAPTURE_MAC_ADDRESS> settings.
+            ;;  Allows you to skip the network interface selection by automatically
+            ;;  using the <CAPTURE_INTERFACE_NAME>, <CAPTURE_IP_ADDRESS> and <CAPTURE_MAC_ADDRESS> settings.
             ;;
             ;;<CAPTURE_INTERFACE_NAME>
-            ;;The network interface from which packets will be captured.
+            ;;  The network interface from which packets will be captured.
             ;;
             ;;<CAPTURE_IP_ADDRESS>
-            ;;The IP address of a network interface on your computer from which packets will be captured.
-            ;;If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
-            ;;Valid example value: \"x.x.x.x\"
+            ;;  The IP address of a network interface on your computer from which packets will be captured.
+            ;;  If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
+            ;;  Valid example value: \"x.x.x.x\"
             ;;
             ;;<CAPTURE_MAC_ADDRESS>
-            ;;The MAC address of a network interface on your computer from which packets will be captured.
-            ;;If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
-            ;;Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
+            ;;  The MAC address of a network interface on your computer from which packets will be captured.
+            ;;  If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
+            ;;  Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
             ;;
             ;;<CAPTURE_ARP>
-            ;;Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
+            ;;  Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
             ;;
             ;;<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>
-            ;;Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
+            ;;  Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
             ;;
             ;;<CAPTURE_PROGRAM_PRESET>
-            ;;A program preset that will help capturing the right packets for your program.
-            ;;Supported program presets are only \"GTA5\" and \"Minecraft\".
-            ;;Note that Minecraft only supports Bedrock Edition.
-            ;;Please also note that Minecraft have only been tested on PCs.
-            ;;I do not have information regarding it's functionality on consoles.
+            ;;  A program preset that will help capturing the right packets for your program.
+            ;;  Supported program presets are only \"GTA5\" and \"Minecraft\".
+            ;;  Note that Minecraft only supports Bedrock Edition.
+            ;;  Please also note that Minecraft have only been tested on PCs.
+            ;;  I do not have information regarding it's functionality on consoles.
             ;;
             ;;<CAPTURE_VPN_MODE>
-            ;;Setting this to False will add filters to exclude unrelated IPs from the output.
-            ;;However, if you are scanning trough a VPN <CAPTURE_INTERFACE_NAME>, you have to set it to True.
+            ;;  Setting this to False will add filters to exclude unrelated IPs from the output.
+            ;;  However, if you are scanning trough a VPN <CAPTURE_INTERFACE_NAME>, you have to set it to True.
             ;;
             ;;<CAPTURE_OVERFLOW_TIMER>
-            ;;This timer represents the duration between the timestamp of a captured packet and the current time.
-            ;;When this timer is reached, the tshark process will be restarted.
-            ;;Valid values include any number greater than or equal to 3.
+            ;;  This timer represents the duration between the timestamp of a captured packet and the current time.
+            ;;  When this timer is reached, the tshark process will be restarted.
+            ;;  Valid values include any number greater than or equal to 3.
             ;;
             ;;<STDOUT_SHOW_ADVERTISING_HEADER>
-            ;;Determine if you want or not to show the developer's advertisements in the script's display.
+            ;;  Determine if you want or not to show the developer's advertisements in the script's display.
             ;;
             ;;<STDOUT_SESSIONS_LOGGING>
-            ;;Determine if you want to log console's output to \"SessionsLogging\" folder.
-            ;;It is synced with the console output and contains all fields.
+            ;;  Determine if you want to log console's output to \"SessionsLogging\" folder.
+            ;;  It is synced with the console output and contains all fields.
             ;;
             ;;<STDOUT_RESET_PORTS_ON_REJOINS>
-            ;;When a player rejoins, clear their previously detected ports list.
+            ;;  When a player rejoins, clear their previously detected ports list.
             ;;
             ;;<STDOUT_FIELDS_TO_HIDE>
-            ;;Specifies a list of fields you wish to hide from the output.
-            ;;It can only hides field names that are not essential to the script's functionality.
-            ;;Valid values include any of the following field names:
-            ;;{Settings.stdout_hideable_fields}
+            ;;  Specifies a list of fields you wish to hide from the output.
+            ;;  It can only hides field names that are not essential to the script's functionality.
+            ;;  Valid values include any of the following field names:
+            ;;  {Settings.stdout_hideable_fields}
             ;;
-            ;;<STDOUT_FIELD_SHOW_SEEN_DATE>
-            ;;Shows or not the date from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
+            ;;<STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME>
+            ;;  Shows or not the elapsed time from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
+            ;;
+            ;;<STDOUT_DATE_FIELDS_SHOW_DATE>
+            ;;  Shows or not the date from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
             ;;
             ;;<STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY>
-            ;;Specifies the fields from the connected players by which you want the output data to be sorted.
-            ;;Valid values include any field names. For example: Last Rejoin
+            ;;  Specifies the fields from the connected players by which you want the output data to be sorted.
+            ;;  Valid values include any field names. For example: Last Rejoin
             ;;
             ;;<STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY>
-            ;;Specifies the fields from the disconnected players by which you want the output data to be sorted.
-            ;;Valid values include any field names. For example: Last Seen
+            ;;  Specifies the fields from the disconnected players by which you want the output data to be sorted.
+            ;;  Valid values include any field names. For example: Last Seen
+            ;;
+            ;;<STDOUT_FIELD_COUNTRY_MAX_LEN>
+            ;;  Maximum allowed length for the "Country" field.
+            ;;
+            ;;<STDOUT_FIELD_CITY_MAX_LEN>
+            ;;  Maximum allowed length for the "City" field.
+            ;;
+            ;;<STDOUT_FIELD_ASN_MAX_LEN>
+            ;;  Maximum allowed length for the "ASN" field.
             ;;
             ;;<STDOUT_DISCONNECTED_PLAYERS_TIMER>
-            ;;The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
-            ;;Valid values include any number greater than or equal to 3.
+            ;;  The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
+            ;;  Valid values include any number greater than or equal to 3.
             ;;
             ;;<STDOUT_DISCONNECTED_PLAYERS_COUNTER>
-            ;;The maximum number of players showing up in disconnected players list.
-            ;;Valid values include any number greater than or equal to 0.
-            ;;Setting it to 0 will make it unlimitted.
+            ;;  The maximum number of players showing up in disconnected players list.
+            ;;  Valid values include any number greater than or equal to 0.
+            ;;  Setting it to 0 will make it unlimitted.
             ;;
             ;;<STDOUT_REFRESHING_TIMER>
-            ;;Minimum time interval between which this will refresh the console display.
+            ;;  Minimum time interval between which this will refresh the console display.
             ;;
-            ;;<BLACKLIST_ENABLED>
-            ;;Determine if you want or not to enable the blacklisted users feature.
-            ;;
-            ;;<BLACKLIST_NOTIFICATIONS>
-            ;;Determine if you want or not to display a notification when a blacklisted user is detected.
-            ;;
-            ;;<BLACKLIST_VOICE_NOTIFICATIONS>
-            ;;This setting determines the voice that will play when a blacklisted player is detected or when they disconnect.
-            ;;Valid values are either \"Male\" or \"Female\".
-            ;;Set it to \"False\" to disable this setting.
-            ;;
-            ;;<BLACKLIST_PROTECTION>
-            ;;Determine if you want or not a protection when a blacklisted user is found.
-            ;;Valid values include any of the following protections:
-            ;;\"Exit_Process\", \"Restart_Process\", \"Shutdown_PC\", \"Restart_PC\"
-            ;;Set it to \"False\" value to disable this setting.
-            ;;
-            ;;<BLACKLIST_PROTECTION_EXIT_PROCESS_PATH>
-            ;;The file path of the process that will be terminated when
-            ;;the <BLACKLIST_PROTECTION> setting is set to either \"Exit_Process\" or \"Restart_Process\" value.
-            ;;Please note that UWP apps are not supported.
-            ;;
-            ;;<BLACKLIST_PROTECTION_RESTART_PROCESS_PATH>
-            ;;The file path of the process that will be started when
-            ;;the <BLACKLIST_PROTECTION> setting is set to the \"Restart_Process\" value.
-            ;;Please note that UWP apps are not supported.
+            ;;<USERIP_ENABLED>
+            ;; Determine if you want or not to enable detections from the UserIP databases.
             ;;-----------------------------------------------------------------------------
         """.removeprefix("\n"))
         for setting_name, setting_value in Settings.iterate_over_settings():
@@ -522,64 +512,10 @@ class Settings(DefaultSettings):
         SETTINGS_PATH.write_text(text, encoding="utf-8")
 
     def load_from_settings_file(settings_path: Path):
-        def custom_str_to_bool(string: str, only_match_against: Optional[bool] = None):
-            """
-            This function returns the boolean value represented by the string for lowercase or any case variation;\n
-            otherwise, it raises an \"InvalidBooleanValueError\".
-
-            Args:
-                string (str): The boolean string to be checked.
-                (optional) only_match_against (bool | None): If provided, the only boolean value to match against.
-            """
-            need_rewrite_current_setting = False
-            resolved_value = None
-
-            string_lower = string.lower()
-
-            if string_lower == "true":
-                resolved_value = True
-            elif string_lower == "false":
-                resolved_value = False
-
-            if resolved_value is None:
-                raise InvalidBooleanValueError("Input is not a valid boolean value")
-
-            if (
-                only_match_against is not None
-                and only_match_against is not resolved_value
-            ):
-                raise InvalidBooleanValueError("Input does not match the specified boolean value")
-
-            if not string == str(resolved_value):
-                need_rewrite_current_setting = True
-
-            return resolved_value, need_rewrite_current_setting
-
-        def custom_str_to_nonetype(string: str):
-            """
-            This function returns the NoneType value represented by the string for lowercase or any case variation;\n
-            otherwise, it raises an \"InvalidNoneTypeValueError\".
-
-            Args:
-                string (str): The NoneType string to be checked.
-            """
-            string_lower = string.lower()
-            need_rewrite_current_setting = False
-
-            if string_lower == "none":
-                if not string == "None":
-                    need_rewrite_current_setting = True
-                value = None
-            else:
-                raise InvalidNoneTypeValueError("Input is not a valid NoneType value")
-
-            return value, need_rewrite_current_setting
-
-
         matched_settings_count = 0
 
         try:
-            settings, need_rewrite_settings = parse_ini_file(settings_path, values_handling="first")
+            settings, need_rewrite_settings = parse_settings_ini_file(settings_path, values_handling="first")
             settings: dict[str, str]
         except FileNotFoundError:
             need_rewrite_settings = True
@@ -641,8 +577,11 @@ class Settings(DefaultSettings):
                     try:
                         Settings.CAPTURE_PROGRAM_PRESET, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
                     except InvalidNoneTypeValueError:
-                        if setting_value in ["GTA5", "Minecraft"]:
-                            Settings.CAPTURE_PROGRAM_PRESET = setting_value
+                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, ["GTA5", "Minecraft"])
+                        if case_insensitive_match:
+                            Settings.CAPTURE_PROGRAM_PRESET = normalized_match
+                            if not case_sensitive_match:
+                                need_rewrite_current_setting = True
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "CAPTURE_VPN_MODE":
@@ -681,33 +620,77 @@ class Settings(DefaultSettings):
                     except ValueError:
                         need_rewrite_settings = True
                     else:
-                        if isinstance(stdout_fields_to_hide, list):
-                            # Filter out invalid field names from stdout_fields_to_hide
-                            filtered_stdout_fields_to_hide = [field_name for field_name in stdout_fields_to_hide if field_name in Settings.stdout_hideable_fields]
+                        if isinstance(stdout_fields_to_hide, list) and all(isinstance(item, str) for item in stdout_fields_to_hide):
+                            filtered_stdout_fields_to_hide: list[Optional[str]] = []
 
-                            # Check if any invalid field names were removed
-                            if set(stdout_fields_to_hide) != set(filtered_stdout_fields_to_hide):
-                                need_rewrite_settings = True
+                            for value in stdout_fields_to_hide:
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, Settings.stdout_hideable_fields)
+                                if case_insensitive_match:
+                                    filtered_stdout_fields_to_hide.append(normalized_match)
+                                    if not case_sensitive_match:
+                                        need_rewrite_current_setting = True
+                                else:
+                                    need_rewrite_settings = True
 
-                            # Update STDOUT_FIELDS_TO_HIDE with the corrected list
                             Settings.STDOUT_FIELDS_TO_HIDE = filtered_stdout_fields_to_hide
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_SHOW_SEEN_DATE":
+                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME":
                     try:
-                        Settings.STDOUT_FIELD_SHOW_SEEN_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_DATE":
+                    try:
+                        Settings.STDOUT_DATE_FIELDS_SHOW_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY":
-                    if setting_value in Settings.stdout_fields_mapping.keys():
-                        Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = setting_value
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_fields_mapping.keys())
+                    if case_insensitive_match:
+                        Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = normalized_match
+                        if not case_sensitive_match:
+                            need_rewrite_current_setting = True
                     else:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY":
-                    if setting_value in Settings.stdout_fields_mapping.keys():
-                        Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = setting_value
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_fields_mapping.keys())
+                    if case_insensitive_match:
+                        Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = normalized_match
+                        if not case_sensitive_match:
+                            need_rewrite_current_setting = True
                     else:
                         need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_COUNTRY_MAX_LEN":
+                    try:
+                        stdout_field_country_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_country_max_len >= 1:
+                            Settings.STDOUT_FIELD_COUNTRY_MAX_LEN = stdout_field_country_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_CITY_MAX_LEN":
+                    try:
+                        stdout_field_city_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_city_max_len >= 1:
+                            Settings.STDOUT_FIELD_CITY_MAX_LEN = stdout_field_city_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_ASN_MAX_LEN":
+                    try:
+                        stdout_field_asn_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_asn_max_len >= 1:
+                            Settings.STDOUT_FIELD_ASN_MAX_LEN = stdout_field_asn_max_len
+                        else:
+                            need_rewrite_settings = True
                 elif setting_name == "STDOUT_DISCONNECTED_PLAYERS_TIMER":
                     try:
                         player_disconnected_timer = float(setting_value)
@@ -741,55 +724,11 @@ class Settings(DefaultSettings):
                             Settings.STDOUT_REFRESHING_TIMER = stdout_refreshing_timer
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_ENABLED":
+                elif setting_name == "USERIP_ENABLED":
                     try:
-                        Settings.BLACKLIST_ENABLED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.USERIP_ENABLED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_NOTIFICATIONS":
-                    try:
-                        Settings.BLACKLIST_NOTIFICATIONS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
-                    except InvalidBooleanValueError:
-                        need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_VOICE_NOTIFICATIONS":
-                    try:
-                        Settings.BLACKLIST_VOICE_NOTIFICATIONS, need_rewrite_current_setting = custom_str_to_bool(setting_value, only_match_against=False)
-                    except InvalidBooleanValueError:
-                        if setting_value in ["Male", "Female"]:
-                            Settings.BLACKLIST_VOICE_NOTIFICATIONS = setting_value
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_PROTECTION":
-                    try:
-                        Settings.BLACKLIST_PROTECTION, need_rewrite_current_setting = custom_str_to_bool(setting_value, only_match_against=False)
-                    except InvalidBooleanValueError:
-                        if setting_value in [
-                            "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"
-                        ]:
-                            Settings.BLACKLIST_PROTECTION = setting_value
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_PROTECTION_EXIT_PROCESS_PATH":
-                    try:
-                        Settings.BLACKLIST_PROTECTION_EXIT_PROCESS_PATH, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
-                    except InvalidNoneTypeValueError:
-                        blacklist_protection_exit_process_path = Path(setting_value)
-                        if blacklist_protection_exit_process_path.is_file():
-                            Settings.BLACKLIST_PROTECTION_EXIT_PROCESS_PATH = blacklist_protection_exit_process_path
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "BLACKLIST_PROTECTION_RESTART_PROCESS_PATH":
-                    try:
-                        Settings.BLACKLIST_PROTECTION_RESTART_PROCESS_PATH, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
-                    except InvalidNoneTypeValueError:
-                        blacklist_protection_restart_process_path = Path(setting_value)
-                        if (
-                            blacklist_protection_restart_process_path.is_file()
-                            or blacklist_protection_restart_process_path.is_symlink()
-                        ):
-                            Settings.BLACKLIST_PROTECTION_RESTART_PROCESS_PATH = blacklist_protection_restart_process_path
-                        else:
-                            need_rewrite_settings = True
 
                 if need_rewrite_current_setting:
                     need_rewrite_settings = True
@@ -882,9 +821,10 @@ class Interface:
 class ThirdPartyServers(enum.Enum):
     PC_Discord = ["66.22.196.0/22", "66.22.237.0/24", "66.22.238.0/24", "66.22.241.0/24", "66.22.243.0/24", "66.22.244.0/24"]
     PC_Valve = ["103.10.124.0/23", "103.28.54.0/23", "146.66.152.0/21", "155.133.224.0/19", "162.254.192.0/21", "185.25.180.0/22", "205.196.6.0/24"] # Valve = Steam
-    PC_Google = ["34.0.192.0/19", "34.0.240.0/20", "35.214.128.0/17"]
+    PC_Google = ["34.0.0.0/9", "34.128.0.0/10", "35.184.0.0/13", "35.192.0.0/11", "35.224.0.0/12", "35.240.0.0/13"]
     PC_multicast = ["224.0.0.0/4"]
-    PC_UK_Ministry_of_Defence = ["25.58.230.47/32"]
+    PC_UK_Ministry_of_Defence = ["25.0.0.0/8"]
+    PC_Servers_Com = ["173.237.26.0/24"]
     PC_Others = ["113.117.15.193/32"]
     GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
     GTAV_PC_Microsoft = ["52.139.128.0/18"]
@@ -896,14 +836,14 @@ class ThirdPartyServers(enum.Enum):
 
 class PrintCacher:
     def __init__(self):
-        self.cache = []
+        self.cache: list[str] = []
 
     def cache_print(self, string: str):
         self.cache.append(string)
 
     def flush_cache(self):
         print("\n".join(self.cache))
-        self.cache = []
+        self.cache: list[str] = []
 
 class Player_PPS:
     def __init__(self, packet_datetime: datetime):
@@ -925,6 +865,7 @@ class Player_Ports:
     def _initialize(self, port: int):
         self.list = [port]
         self.first = port
+        self.intermediate: list[Optional[int]] = []
         self.last = port
 
     def reset(self, port: int):
@@ -938,7 +879,7 @@ class Player_DateTime:
         self.first_seen = packet_datetime
         self.last_rejoin = packet_datetime
         self.last_seen = packet_datetime
-        self.left = None
+        self.left: Optional[datetime] = None
 
     def reset(self, packet_datetime: datetime):
         self._initialize(packet_datetime)
@@ -947,55 +888,69 @@ class MaxMind_GeoLite2:
     def __init__(self):
         self.is_initialized = False
 
-        self.country = None
-        self.country_iso = None
-        self.city = None
-        self.asn = None
+        self.country: Optional[str] = None
+        self.country_short: Optional[str] = None
+        self.country_iso: Optional[str] = None
+        self.city: Optional[str] = None
+        self.city_short: Optional[str] = None
+        self.asn: Optional[str] = None
+        self.asn_short: Optional[str] = None
 
 class IPAPI:
     def __init__(self):
         self.is_initialized = False
 
-        self.continent = None
-        self.continentCode = None
-        self.country = None
-        self.countryCode = None
-        self.region = None
-        self.regionName = None
-        self.city = None
-        self.district = None
-        self.zipcode = None
-        self.lat = None
-        self.lon = None
-        self.timezone = None
-        self.offset = None
-        self.currency = None
-        self.isp = None
-        self.org = None
-        self.asnumber = None
-        self.asname = None
-        self.mobile = None
-        self.proxy = None
-        self.hosting = None
+        self.continent: Optional[str] = None
+        self.continentCode: Optional[str] = None
+        self.country: Optional[str] = None
+        self.countryCode: Optional[str] = None
+        self.region: Optional[str] = None
+        self.regionName: Optional[str] = None
+        self.city: Optional[str] = None
+        self.district: Optional[str] = None
+        self.zipcode: Optional[str] = None
+        self.lat: Optional[str] = None
+        self.lon: Optional[str] = None
+        self.timezone: Optional[str] = None
+        self.offset: Optional[str] = None
+        self.currency: Optional[str] = None
+        self.isp: Optional[str] = None
+        self.org: Optional[str] = None
+        self.asnumber: Optional[str] = None
+        self.asname: Optional[str] = None
+        self.mobile: Optional[str] = None
+        self.proxy: Optional[str] = None
+        self.hosting: Optional[str] = None
 
 class Player_IPLookup:
     def __init__(self):
         self.maxmind = MaxMind_GeoLite2()
         self.ipapi = IPAPI()
 
-class Player_Blacklist:
+class Player_Detection:
     def __init__(self):
-        self.detection_type = None
-        self.usernames: list[str] = []
-        self.notification_t1 = None
-        self.time =  None
-        self.date_time = None
-        self.processed_logging = False
-        self.processed_protection = False
+        self.type: Optional[Literal["Static IP"]] = None
+        self.time: Optional[str] = None
+        self.date_time: Optional[str] = None
+        self.as_processed_userip_task = False
+
+class Player_UserIp:
+    def __init__(self):
+        self._initialize()
+
+    def _initialize(self):
+        self.is_listed = False
+        self.database_name: Optional[str] = None
+        self.settings: Optional[UserIP_Settings] = None
+        self.usernames: list[Optional[str]] = []
+        self.detection = Player_Detection()
+
+    def reset(self):
+        self._initialize()
 
 class Player_TwoTakeOne:
     def __init__(self):
-        self.usernames: list[str] = []
+        self.usernames: list[Optional[str]] = []
 
 class Player:
     def __init__(self, ip: str, port: int, packet_datetime: datetime):
@@ -1006,12 +961,13 @@ class Player:
         self.rejoins = 0
         self.packets = 1
         self.total_packets = 1
+        self.usernames: list[str] = []
 
         self.pps = Player_PPS(packet_datetime)
         self.ports = Player_Ports(port)
         self.datetime = Player_DateTime(packet_datetime)
         self.iplookup = Player_IPLookup()
-        self.blacklist = Player_Blacklist()
+        self.userip = Player_UserIp()
         self.two_take_one = Player_TwoTakeOne()
 
     def reset(self, port: int, packet_datetime: datetime):
@@ -1130,6 +1086,132 @@ class SessionHost:
         ):
             SessionHost.player = potential_session_host_player
             SessionHost.search_player = False
+
+class UserIP_Settings:
+    """
+    Class to represent settings with attributes for each setting key.
+    """
+    def __init__(self,
+        ENABLED: bool,
+        COLOR: Literal["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"],
+        LOG: bool,
+        NOTIFICATIONS: bool,
+        VOICE_NOTIFICATIONS: Union[str | Literal[False]],
+        PROTECTION: Literal["Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC", False],
+        PROTECTION_PROCESS_PATH: Optional[Path],
+        PROTECTION_RESTART_PROCESS_PATH: Optional[Path]
+    ):
+        self.ENABLED = ENABLED
+        self.COLOR = COLOR
+        self.NOTIFICATIONS = NOTIFICATIONS
+        self.VOICE_NOTIFICATIONS = VOICE_NOTIFICATIONS
+        self.LOG = LOG
+        self.PROTECTION = PROTECTION
+        self.PROTECTION_PROCESS_PATH = PROTECTION_PROCESS_PATH
+        self.PROTECTION_RESTART_PROCESS_PATH = PROTECTION_RESTART_PROCESS_PATH
+
+class UserIP:
+    """
+    Class representing information associated with a specific IP, including settings and usernames.
+    """
+    def __init__(self,
+        ip: str,
+        database_name: str,
+        settings: UserIP_Settings,
+        usernames: list[str]
+    ):
+        self.ip = ip
+        self.database_name = database_name
+        self.settings = settings
+        self.usernames = usernames
+
+class UserIP_Databases:
+    userip_databases: list[tuple[str, UserIP_Settings, dict[str, list[str]]]] = []
+    userip_infos_by_ip: dict[str, UserIP] = {}
+    ips_set: set[str] = set()
+    notified_conflicts: set[str] = set()
+
+    @classmethod
+    def add(cls, database_name: str, settings: UserIP_Settings, user_ips: dict[str, list[str]]):
+        """
+        Add a settings dictionary and user_ips dictionary pair to the databases.
+
+        :param database_name: The name of the database.
+        :param settings: The settings class for the database.
+        :param user_ips: A dictionary mapping usernames to lists of IPs.
+        """
+        cls.userip_databases.append((database_name, settings, user_ips))
+
+    @classmethod
+    def reset(cls):
+        """
+        Reset the userip_databases by clearing all entries.
+        """
+        cls.userip_databases.clear()
+
+    @classmethod
+    def build(cls):
+        """
+        Build the userip_infos_by_ip dictionaries from the current databases.
+        This method updates the dictionaries without clearing their content entirely, and avoids duplicates.
+        """
+        userip_infos_by_ip: dict[str, UserIP] = {}
+        ips_set: set[str] = set()
+
+        for database_name, settings, user_ips in cls.userip_databases:
+            for username, ips in user_ips.items():
+                for ip in ips:
+                    conflict_key = f"{ip}:{database_name}"
+
+                    if ip in userip_infos_by_ip and not userip_infos_by_ip[ip].database_name == database_name:
+                        if conflict_key not in cls.notified_conflicts:
+                            msgbox_title = TITLE
+                            msgbox_message = textwrap.dedent(f"""
+                                ERROR:
+                                    UserIP databases IP conflict
+
+                                INFOS:
+                                    The same IP cannot be assigned to multiple databases.
+                                    Users assigned to this IP will be ignored until the conflict is resolved.
+
+                                DEBUG:
+                                    \"{USERIP_DATABASES_PATH}\\{database_name}.ini\":
+                                    {username}={ip}
+
+                                    \"{USERIP_DATABASES_PATH}\\{userip_infos_by_ip[ip].database_name}.ini\":
+                                    {', '.join(userip_infos_by_ip[ip].usernames)}={ip}
+                            """.removeprefix("\n").removesuffix("\n"))
+                            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+                            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+
+                            cls.notified_conflicts.add(conflict_key)
+                        continue
+
+                    if conflict_key in cls.notified_conflicts:
+                        cls.notified_conflicts.remove(conflict_key)
+
+                    ips_set.add(ip)
+
+                    if ip not in userip_infos_by_ip:
+                        userip_infos_by_ip[ip] = UserIP(
+                            ip = ip,
+                            database_name = database_name,
+                            settings = settings,
+                            usernames = [username]
+                        )
+
+                    if username not in userip_infos_by_ip[ip].usernames:
+                        userip_infos_by_ip[ip].usernames.append(username)
+
+        cls.userip_infos_by_ip = userip_infos_by_ip
+        cls.ips_set = ips_set
+
+    @classmethod
+    def get_userip_info(cls, ip: str):
+        """
+        Returns an UserIP object for the specified IP, containing its associated name, settings and usernames.
+        """
+        return cls.userip_infos_by_ip.get(ip)
 
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
@@ -1305,16 +1387,16 @@ def get_and_parse_arp_cache():
             if not isinstance(interface_name, str):
                 stdout_crash_text = textwrap.dedent(f"""
                     ERROR:
-                           Developer didn't expect this scenario to be possible.
+                        Developer didn't expect this scenario to be possible.
 
                     INFOS:
-                           The "WMI" Python module returned an unexpected
-                           type for the interface name; expected 'str'.
+                        The "WMI" Python module returned an unexpected
+                        type for the interface name; expected 'str'.
 
                     DEBUG:
-                           type(interface_name).__name__: {type(interface_name).__name__}
-                           interface_index: {interface_index}
-                           interface_name: {interface_name}
+                        type(interface_name).__name__: {type(interface_name).__name__}
+                        interface_index: {interface_index}
+                        interface_name: {interface_name}
                 """.removeprefix("\n").removesuffix("\n"))
                 terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
@@ -1349,19 +1431,36 @@ def format_mac_address(mac_address: str):
     if not is_mac_address(mac_address):
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
-                   Developer didn't expect this scenario to be possible.
+                Developer didn't expect this scenario to be possible.
 
             INFOS:
-                   It seems like a MAC address does not follow
-                   \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
-                   format.
+                It seems like a MAC address does not follow
+                \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
+                format.
 
             DEBUG:
-                   mac_address: {mac_address}
+                mac_address: {mac_address}
         """.removeprefix("\n").removesuffix("\n"))
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     return mac_address.replace("-", ":").upper()
+
+def truncate_with_ellipsis(string: str, max_length: int):
+    """
+    Format a string by truncating it to a specified maximum length,
+    and appending "..." if truncated.
+
+    Args:
+        string (str): The string to format.
+        max_length (int): The maximum length of the formatted string.
+
+    Returns:
+        str: The formatted string, truncated with "..." if it exceeds
+            the specified `max_length`. Otherwise, returns the original `string`.
+    """
+    if len(string) > max_length:
+        return f"{string[:max_length]}..."
+    return string
 
 def get_country_info(ip_address: str):
     country_name = "N/A"
@@ -1376,7 +1475,9 @@ def get_country_info(ip_address: str):
             country_name = str(response.country.name)
             country_iso = str(response.country.iso_code)
 
-    return country_name, country_iso
+    country_short = truncate_with_ellipsis(country_name, Settings.STDOUT_FIELD_COUNTRY_MAX_LEN)
+
+    return country_name, country_short, country_iso
 
 def get_city_info(ip_address: str):
     city = "N/A"
@@ -1389,7 +1490,9 @@ def get_city_info(ip_address: str):
         else:
             city = str(response.city.name)
 
-    return city
+    city_short = truncate_with_ellipsis(city, Settings.STDOUT_FIELD_CITY_MAX_LEN)
+
+    return city, city_short
 
 def get_asn_info(ip_address: str):
     asn = "N/A"
@@ -1402,7 +1505,9 @@ def get_asn_info(ip_address: str):
         else:
             asn = str(response.autonomous_system_organization)
 
-    return asn
+    asn_short = truncate_with_ellipsis(asn, Settings.STDOUT_FIELD_ASN_MAX_LEN)
+
+    return asn, asn_short
 
 def show_message_box(title: str, message: str, style: Msgbox.Style) -> int:
     # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
@@ -1579,7 +1684,7 @@ def update_and_initialize_geolite2_readers():
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
-def parse_ini_file(ini_path: Path, values_handling: Literal["first", "last", "all"]):
+def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "last", "all"]):
     def process_ini_line_output(line: str):
         return line.rstrip("\n")
 
@@ -1592,43 +1697,282 @@ def parse_ini_file(ini_path: Path, values_handling: Literal["first", "last", "al
     ini_data = ini_path.read_text("utf-8")
 
     need_rewrite_ini = False
-    ini_db = {}
+    ini_db: dict[str, str | list[str]] = {}
 
     for line in map(process_ini_line_output, ini_data.splitlines(keepends=False)):
         corrected_line = line.strip()
         if not corrected_line == line:
             need_rewrite_ini = True
 
-        match = RE_INI_PARSER_PATTERN.search(corrected_line)
+        match = RE_SETTINGS_INI_PARSER_PATTERN.search(corrected_line)
         if not match:
             continue
-        key_name = match.group("key")
-        key_value = match.group("value")
+        setting_name = match.group("key")
+        if not isinstance(setting_name, str):
+            raise TypeError(f"Expected 'str' object, got '{type(setting_name)}'")
+        setting_value = match.group("value")
+        if not isinstance(setting_value, str):
+            raise TypeError(f"Expected 'str' object, got '{type(setting_value)}'")
 
-        corrected_key_name = key_name.strip()
-        if corrected_key_name == "":
+        corrected_setting_name = setting_name.strip()
+        if corrected_setting_name == "":
             continue
-        elif not corrected_key_name == key_name:
+        elif not corrected_setting_name == setting_name:
             need_rewrite_ini = True
 
-        corrected_key_value = key_value.strip()
-        if corrected_key_value == "":
+        corrected_setting_value = setting_value.strip()
+        if corrected_setting_value == "":
             continue
-        elif not corrected_key_value == key_value:
+        elif not corrected_setting_value == setting_value:
             need_rewrite_ini = True
 
         if values_handling == "first":
-            if corrected_key_name not in ini_db:
-                ini_db[corrected_key_name] = corrected_key_value
+            if corrected_setting_name not in ini_db:
+                ini_db[corrected_setting_name] = corrected_setting_value
         elif values_handling == "last":
-            ini_db[corrected_key_name] = corrected_key_value
+            ini_db[corrected_setting_name] = corrected_setting_value
         elif values_handling == "all":
-            if corrected_key_name in ini_db:
-                ini_db[corrected_key_name].append(corrected_key_value)
+            if corrected_setting_name in ini_db:
+                ini_db[corrected_setting_name].append(corrected_setting_value)
             else:
-                ini_db[corrected_key_name] = [corrected_key_value]
+                ini_db[corrected_setting_name] = [corrected_setting_value]
 
     return ini_db, need_rewrite_ini
+
+def parse_userip_ini_file(ini_path: Path):
+    def process_ini_line_output(line: str):
+        return line.strip()
+
+    if not ini_path.exists():
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
+                                str(ini_path.absolute()))
+    if not ini_path.is_file():
+        raise InvalidFileError(str(ini_path.absolute()))
+
+    settings: dict[str, Union[bool, str, int, float]] = {}
+    userip: dict[str, list[str]] = {}
+    current_section = None
+    matched_settings = []
+    ini_data = ini_path.read_text("utf-8")
+    corrected_ini_data_lines = []
+
+    for line in map(process_ini_line_output, ini_data.splitlines(keepends=True)):
+        corrected_ini_data_lines.append(line)
+
+        if line.startswith("[") and line.endswith("]"):
+            # we basically adding a newline if the previous line is not a newline for eyes visiblitly or idk how we say that
+            if corrected_ini_data_lines and len(corrected_ini_data_lines) > 1:
+                if not corrected_ini_data_lines[-2] == "":
+                    corrected_ini_data_lines.insert(-1, "")  # Insert an empty string before the last line
+            current_section = line[1:-1]
+            continue
+
+        if current_section is None:
+            continue
+
+        elif current_section == "Settings":
+            match = RE_SETTINGS_INI_PARSER_PATTERN.search(line)
+            if not match:
+                # If it's a newline or a comment we don't really care about rewritting at this point.
+                if not line.startswith((";", "#")) or line == "":
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+
+            setting = match.group("key")
+            if setting is None:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+            if not isinstance(setting, str):
+                raise TypeError(f"Expected 'str' object, got '{type(setting)}'")
+            value = match.group("value")
+            if value is None:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+            if not isinstance(value, str):
+                raise TypeError(f"Expected 'str' object, got '{type(value)}'")
+
+            setting = setting.strip()
+            if not setting:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+            value = value.strip()
+            if not value:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+
+            if not setting in USERIP_INI_SETTINGS_LIST:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+
+            if setting in settings:
+                if corrected_ini_data_lines:
+                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                continue
+            else:
+                matched_settings.append(setting)
+                need_rewrite_current_setting = False
+                is_setting_corrupted = False
+
+                if setting == "ENABLED":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                    except InvalidBooleanValueError:
+                        is_setting_corrupted = True
+                elif setting == "COLOR":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                    except InvalidNoneTypeValueError:
+                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"])
+                        if case_insensitive_match:
+                            settings[setting] = normalized_match
+                            if not case_sensitive_match:
+                                need_rewrite_current_setting = True
+                        else:
+                            is_setting_corrupted = True
+                elif setting == "LOG":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                    except InvalidBooleanValueError:
+                        is_setting_corrupted = True
+                elif setting == "NOTIFICATIONS":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                    except InvalidBooleanValueError:
+                        is_setting_corrupted = True
+                elif setting == "VOICE_NOTIFICATIONS":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
+                    except InvalidBooleanValueError:
+                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Male", "Female"])
+                        if case_insensitive_match:
+                            settings[setting] = normalized_match
+                            if not case_sensitive_match:
+                                need_rewrite_current_setting = True
+                        else:
+                            is_setting_corrupted = True
+                elif setting == "PROTECTION":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
+                    except InvalidBooleanValueError:
+                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"])
+                        if case_insensitive_match:
+                            settings[setting] = normalized_match
+                            if not case_sensitive_match:
+                                need_rewrite_current_setting = True
+                        else:
+                            is_setting_corrupted = True
+                elif setting == "PROTECTION_PROCESS_PATH":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                    except InvalidNoneTypeValueError:
+                        stripped_value = value.strip("\"'")
+                        if not value == stripped_value:
+                            is_setting_corrupted = True
+                        settings[setting] = Path(stripped_value.replace("\\", "/"))
+                elif setting == "PROTECTION_RESTART_PROCESS_PATH":
+                    try:
+                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                    except InvalidNoneTypeValueError:
+                        stripped_value = value.strip("\"'")
+                        if not value == stripped_value:
+                            is_setting_corrupted = True
+                        settings[setting] = Path(stripped_value.replace("\\", "/"))
+
+                if is_setting_corrupted:
+                    stdout_crash_text = textwrap.dedent(f"""
+                        ERROR:
+                            Corrupted UserIP Database File
+
+                        INFOS:
+                            The UserIP database file \"{ini_path}\" has an invalid value:
+                            {setting}={value}
+
+                            For more information on formatting, please refer to the documentation:
+                                https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                    """.removeprefix("\n").removesuffix("\n"))
+                    terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+
+                if need_rewrite_current_setting:
+                    corrected_ini_data_lines[-1] = f"{setting}={settings[setting]}"
+
+        elif current_section == "UserIP":
+            match = RE_USERIP_INI_PARSER_PATTERN.search(line)
+            if not match:
+                continue
+            username = match.group("username")
+            if username is None:
+                continue
+            if not isinstance(username, str):
+                raise TypeError(f"Expected 'str' object, got '{type(username)}'")
+            ip = match.group("ip")
+            if ip is None:
+                continue
+            if not isinstance(ip, str):
+                raise TypeError(f"Expected 'str' object, got '{type(ip)}'")
+
+            username = username.strip()
+            if not username:
+                continue
+            ip = ip.strip()
+            if not ip:
+                continue
+
+            if not is_ipv4_address(ip):
+                continue
+
+            if username in userip:
+                if ip not in userip[username]:
+                    userip[username].append(ip)
+            else:
+                userip[username] = [ip]
+
+    # Basically always have a newline ending
+    if len(corrected_ini_data_lines) > 1:
+        if not corrected_ini_data_lines[-1] == "":
+            corrected_ini_data_lines.append("")
+
+    fixed_ini_data = "\n".join(corrected_ini_data_lines)
+
+    if not ini_data == fixed_ini_data:
+        print("rewritted, ini file")
+        ini_path.write_text(fixed_ini_data)
+
+    list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
+    number_of_settings_missing = len(list_of_missing_settings)
+    if number_of_settings_missing == 1:
+        missing_settings_str = f"<{list_of_missing_settings[0].upper()}>"
+    else:
+        missing_settings_str = ", ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)
+
+    if number_of_settings_missing > 0:
+        stdout_crash_text = textwrap.dedent(f"""
+            ERROR:
+                Missing setting{plural(number_of_settings_missing)} in UserIP Database File
+
+            INFOS:
+                The UserIP database file \"{ini_path}\" as {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
+                {missing_settings_str}
+
+                For more information on formatting, please refer to the documentation:
+                    https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+        """.removeprefix("\n").removesuffix("\n"))
+        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+
+    return UserIP_Settings(
+        settings["ENABLED"],
+        settings["COLOR"],
+        settings["LOG"],
+        settings["NOTIFICATIONS"],
+        settings["VOICE_NOTIFICATIONS"],
+        settings["PROTECTION"],
+        settings["PROTECTION_PROCESS_PATH"],
+        settings["PROTECTION_RESTART_PROCESS_PATH"],
+    ), userip
 
 def is_file_need_newline_ending(file):
     file = Path(file)
@@ -1637,7 +1981,11 @@ def is_file_need_newline_ending(file):
 
     return not file.read_bytes().endswith(b"\n")
 
-def kill_process_tree(pid: int):
+def terminate_process_tree(pid: int = None):
+    """Terminates the process with the given PID and all its child processes.
+       Defaults to the current process if no PID is specified."""
+    pid = pid or os.getpid()
+
     try:
         parent = psutil.Process(pid)
         children = parent.children(recursive=True)
@@ -1649,6 +1997,86 @@ def kill_process_tree(pid: int):
     except psutil.NoSuchProcess:
         pass
 
+def check_case_insensitive_and_exact_match(input_value: str, custom_values_list: list[str]):
+    """
+    Checks if the input value matches any string in the list case-insensitively,
+    and whether it also matches exactly (case-sensitive).
+
+    It also returns the correctly capitalized version of the matched value from the list
+    if a case-insensitive match is found.
+
+    Returns a tuple of three values:
+    - The first boolean is True if a case-insensitive match is found.
+    - The second boolean is True if the exact case-sensitive match is found.
+    - The third value is the correctly capitalized version of the matched string if found, otherwise None.
+    """
+    case_insensitive_match = False
+    case_sensitive_match = False
+    normalized_match = None
+
+    lowered_input_value = input_value.lower()
+    for value in custom_values_list:
+        if value.lower() == lowered_input_value:
+            case_insensitive_match = True
+            normalized_match = value
+            if value == input_value:
+                case_sensitive_match = True
+                break
+
+    return case_insensitive_match, case_sensitive_match, normalized_match
+
+def custom_str_to_bool(string: str, only_match_against: Optional[bool] = None):
+    """
+    This function returns the boolean value represented by the string for lowercase or any case variation;\n
+    otherwise, it raises an \"InvalidBooleanValueError\".
+
+    Args:
+        string (str): The boolean string to be checked.
+        (optional) only_match_against (bool | None): If provided, the only boolean value to match against.
+    """
+    need_rewrite_current_setting = False
+    resolved_value = None
+
+    string_lower = string.lower()
+
+    if string_lower == "true":
+        resolved_value = True
+    elif string_lower == "false":
+        resolved_value = False
+
+    if resolved_value is None:
+        raise InvalidBooleanValueError("Input is not a valid boolean value")
+
+    if (
+        only_match_against is not None
+        and only_match_against is not resolved_value
+    ):
+        raise InvalidBooleanValueError("Input does not match the specified boolean value")
+
+    if not string == str(resolved_value):
+        need_rewrite_current_setting = True
+
+    return resolved_value, need_rewrite_current_setting
+
+def custom_str_to_nonetype(string: str):
+    """
+    This function returns the NoneType value represented by the string for lowercase or any case variation;\n
+    otherwise, it raises an \"InvalidNoneTypeValueError\".
+
+    Args:
+        string (str): The NoneType string to be checked.
+    """
+    string_lower = string.lower()
+    need_rewrite_current_setting = False
+
+    if string_lower == "none":
+        if not string == "None":
+            need_rewrite_current_setting = True
+        value = None
+    else:
+        raise InvalidNoneTypeValueError("Input is not a valid NoneType value")
+
+    return value, need_rewrite_current_setting
 
 colorama.init(autoreset=True)
 
@@ -1659,17 +2087,19 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.8 - 26/10/2024 (00:13)"
+VERSION = "v1.1.8 - 06/11/2024 (21:23)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
-BLACKLIST_PATH = Path("Blacklist.ini")
-SESSION_LOGGING_PATH = Path("SessionsLogging") / datetime.now().strftime("%Y/%m/%d") / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
-BLACKLIST_LOGGING_PATH = Path("blacklist.log")
+USERIP_DATABASES_PATH = Path("UserIP Databases")
+SESSIONS_LOGGING_PATH = Path("Sessions Logging") / datetime.now().strftime("%Y/%m/%d") / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+USERIP_LOGGING_PATH = Path("UserIP_Logging.log")
 TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
-RE_INI_PARSER_PATTERN = re.compile(r"^(?P<key>[^=]+)=(?P<value>[^;#]+)")
+RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
+RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>[^;#]+)")
 RE_TWO_TAKE_ONE_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
+USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
 WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
@@ -1738,7 +2168,7 @@ if not is_pyinstaller_compiled():
     third_party_packages = {
         "colorama": "0.4.6",
         "geoip2": "4.8.0",
-        "prettytable": "3.11.0",
+        "prettytable": "3.12.0",
         "psutil": "6.1.0",
         "requests": "2.32.3",
         "urllib3": "2.2.3",
@@ -1772,8 +2202,8 @@ if sys.getwindowsversion().major >= 10:
     UNDERLINE = "\033[4m"
     UNDERLINE_RESET = "\033[24m"
 else:
-    UNDERLINE = "_"
-    UNDERLINE_RESET = "_"
+    UNDERLINE = ""
+    UNDERLINE_RESET = ""
 
 cls()
 title(f"Checking that \"Npcap\" or \"WinpCap\" driver is installed on your system - {TITLE}")
@@ -1796,12 +2226,6 @@ cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
 print("\nApplying your custom settings from \"Settings.ini\" ...\n")
 Settings.load_from_settings_file(SETTINGS_PATH)
-
-if Settings.BLACKLIST_VOICE_NOTIFICATIONS:
-    if Settings.BLACKLIST_VOICE_NOTIFICATIONS == "Male":
-        VOICE_NAME = "Liam"
-    elif Settings.BLACKLIST_VOICE_NOTIFICATIONS == "Female":
-        VOICE_NAME = "Jane"
 
 cls()
 title(f"Checking your custom settings from \"Settings.ini\" - {TITLE}")
@@ -1915,15 +2339,15 @@ for interface, stats in net_io_stats.items():
     if len(mac_addresses) > 1:
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
-                   Developer didn't expect this scenario to be possible.
+                Developer didn't expect this scenario to be possible.
 
             INFOS:
-                   The IP address has multiple MAC addresses.
+                The IP address has multiple MAC addresses.
 
             DEBUG:
-                   interface: {interface}
-                   ip_addresses: {ip_addresses}
-                   mac_addresses: {mac_addresses}
+                interface: {interface}
+                ip_addresses: {ip_addresses}
+                mac_addresses: {mac_addresses}
         """.removeprefix("\n").removesuffix("\n"))
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
@@ -2139,150 +2563,104 @@ if not capture.tshark_path == Settings.CAPTURE_TSHARK_PATH:
     Settings.CAPTURE_TSHARK_PATH = capture.tshark_path
     Settings.reconstruct_settings()
 
-def blacklist_sniffer_core():
+userip_logging_file_write_lock = threading.Lock()
+
+def process_userip_task(player: Player, connection_type: Literal["connected", "disconnected"]):
     with Threads_ExceptionHandler():
-        def create_blacklist_file():
-            text = textwrap.dedent(f"""
-                ;;-----------------------------------------------------------------------
-                ;;Lines starting with \";\" or \"#\" symbols are commented lines.
-                ;;
-                ;;This is the blacklist file for \"GTA V Session Sniffer\" configuration.
-                ;;
-                ;;Your blacklist MUST be formatted in the following way in order to work:
-                ;;<USERNAME>=<IP ADDRESS>
-                ;;-----------------------------------------------------------------------
-            """.removeprefix("\n"))
-            BLACKLIST_PATH.write_text(text, encoding="utf-8")
+        def suspend_process_for_duration(process_pid: int, duration: int):
+            """Suspend the specified process for a given duration, then resume it."""
+            process = psutil.Process(process_pid)
+            process.suspend()
+            time.sleep(duration)
+            process.resume()
 
-        def blacklist_show_messagebox(player: Player):
-            msgbox_title = TITLE
-            msgbox_message = textwrap.indent(textwrap.dedent(f"""
-                #### Blacklisted user detected at {player.blacklist.time} ####
-                User{plural(len(player.blacklist.usernames))}: {', '.join(player.blacklist.usernames)}
-                IP: {player.ip}
-                Port{plural(len(player.ports.list))}: {', '.join(map(str, player.ports.list))}
-                Country Code: {player.iplookup.maxmind.country_iso}
-                Detection Type: {player.blacklist.detection_type}
-                ############# IP Lookup ##############
-                Continent: {player.iplookup.ipapi.continent}
-                Country: {player.iplookup.maxmind.country}
-                City: {player.iplookup.maxmind.city}
-                Organization: {player.iplookup.ipapi.org}
-                ISP: {player.iplookup.ipapi.isp}
-                AS: {player.iplookup.ipapi.asnumber}
-                AS Name: {player.iplookup.maxmind.asn}
-                Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
-                Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
-                Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
-            """.removeprefix("\n").removesuffix("\n")), "    ")
-            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
-        def play_sound(connection_type: Literal["connected", "disconnected"]):
-            file_path = Path(f"{TTS_PATH}/{VOICE_NAME} ({connection_type}).wav")
+        # We wants to run this as fast as possible so it's on top of the function.
+        if connection_type == "connected":
+            if player.userip.settings.PROTECTION:
+                if player.userip.settings.PROTECTION == "Suspend_Process":
+                    if process_pid := get_pid_by_path(player.userip.settings.PROTECTION_PROCESS_PATH):
+                        threading.Thread(target=suspend_process_for_duration, args=(process_pid, 8), daemon=True).start()
+                elif player.userip.settings.PROTECTION in ["Exit_Process", "Restart_Process"]:
+                    if isinstance(player.userip.settings.PROTECTION_PROCESS_PATH, Path):
+                        if process_pid := get_pid_by_path(player.userip.settings.PROTECTION_PROCESS_PATH):
+                            terminate_process_tree(process_pid)
+
+                            if player.userip.settings.PROTECTION == "Restart_Process" and isinstance(player.userip.settings.PROTECTION_RESTART_PROCESS_PATH, Path):
+                                os.startfile(str(player.userip.settings.PROTECTION_RESTART_PROCESS_PATH.absolute()))
+                elif player.userip.settings.PROTECTION == "Shutdown_PC":
+                    subprocess.Popen(["shutdown", "/s"])
+                elif player.userip.settings.PROTECTION == "Restart_PC":
+                    subprocess.Popen(["shutdown", "/r"])
+
+        if player.userip.settings.VOICE_NOTIFICATIONS:
+            if player.userip.settings.VOICE_NOTIFICATIONS == "Male":
+                voice_name = "Liam"
+            elif player.userip.settings.VOICE_NOTIFICATIONS == "Female":
+                voice_name = "Jane"
+            file_path = Path(f"{TTS_PATH}/{voice_name} ({connection_type}).wav")
 
             if not file_path.exists():
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
-                    str(file_path.absolute()))
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(file_path.absolute()))
             if not file_path.is_file():
                 raise InvalidFileError(str(file_path.absolute()))
 
             winsound.PlaySound(file_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
 
-        while True:
-            if ScriptControl.has_crashed():
+        if connection_type == "connected":
+            player.userip.detection.time = player.datetime.last_seen.strftime("%H:%M:%S")
+            player.userip.detection.date_time = player.datetime.last_seen.strftime("%Y-%m-%d_%H:%M:%S")
+
+            while not player.datetime.left and (datetime.now() - player.datetime.last_seen) < timedelta(seconds=10):
+                if player.userip.usernames and player.iplookup.maxmind.is_initialized:
+                    break
+                time.sleep(0.1)
+            else:
                 return
 
-            start_time = datetime.now()
+            with userip_logging_file_write_lock:
+                with USERIP_LOGGING_PATH.open("a", encoding="utf-8") as f:
+                    newline = "\n" if is_file_need_newline_ending(USERIP_LOGGING_PATH) else ""
+                    f.write(
+                        f"{newline}"
+                        f"User{plural(len(player.userip.usernames))}:{', '.join(player.userip.usernames)} | "
+                        f"IP:{player.ip} | Ports:{', '.join(map(str, reversed(player.ports.list)))} | "
+                        f"Time:{player.userip.detection.date_time} | Country:{player.iplookup.maxmind.country} | "
+                        f"Detection Type: {player.userip.detection.type} | "
+                        f"Database:{player.userip.database_name}\n"
+                    )
 
-            try:
-                blacklist, need_rewrite_blacklist = parse_ini_file(BLACKLIST_PATH, values_handling="all")
-                blacklist: dict[str, list[str]]
-            except FileNotFoundError:
-                create_blacklist_file()
-                continue
+            if player.userip.settings.NOTIFICATIONS:
+                while not player.datetime.left and (datetime.now() - player.datetime.last_seen) < timedelta(seconds=10):
+                    if player.iplookup.ipapi.is_initialized:
+                        break
+                    time.sleep(0.1)
+                else:
+                    return
 
-            for player in PlayersRegistry.iterate_players_from_registry():
-                if not player.iplookup.maxmind.is_initialized:
-                    continue
-
-                player.blacklist.detection_type = Player_Blacklist().detection_type
-                player.blacklist.usernames = Player_Blacklist().usernames
-
-                for username, ips in blacklist.items():
-                    for ip in ips:
-                        if not is_ipv4_address(ip):
-                            continue
-
-                        if ip == player.ip:
-                            player.blacklist.detection_type = "Static IP"
-
-                            if username not in player.blacklist.usernames:
-                                player.blacklist.usernames.append(username)
-
-                if player.blacklist.detection_type is None:
-                    player.blacklist = Player_Blacklist()
-                    continue
-
-                if player.datetime.left:
-                    if (
-                        Settings.BLACKLIST_VOICE_NOTIFICATIONS
-                        and player.blacklist.notification_t1
-                    ):
-                        play_sound("disconnected")
-
-                    player.blacklist.notification_t1 = Player_Blacklist().notification_t1
-                    player.blacklist.processed_logging = Player_Blacklist().processed_logging
-                    player.blacklist.processed_protection = Player_Blacklist().processed_protection
-                    continue
-
-                player.blacklist.time = player.datetime.last_seen.strftime("%H:%M:%S")
-                player.blacklist.date_time = player.datetime.last_seen.strftime("%Y-%m-%d_%H:%M:%S")
-
-                if (
-                    Settings.BLACKLIST_VOICE_NOTIFICATIONS
-                    and player.blacklist.notification_t1 is None
-                ):
-                    play_sound("connected")
-
-                if not player.blacklist.processed_logging:
-                    player.blacklist.processed_logging = True
-                    with BLACKLIST_LOGGING_PATH.open("a", encoding="utf-8") as f:
-                        newline = "\n" if is_file_need_newline_ending(BLACKLIST_LOGGING_PATH) else ""
-                        f.write(f"{newline}User{plural(len(player.blacklist.usernames))}:{', '.join(player.blacklist.usernames)} | IP:{player.ip} | Ports:{', '.join(map(str, player.ports.list))} | Time:{player.blacklist.date_time} | Country:{player.iplookup.maxmind.country} | Detection Type: {player.blacklist.detection_type}\n")
-
-                if Settings.BLACKLIST_NOTIFICATIONS:
-                    if not player.iplookup.ipapi.is_initialized:
-                        continue
-
-                    blacklist_notifaction_t2 = datetime.now()
-                    if player.blacklist.notification_t1 is None:
-                        player.blacklist.notification_t1 = blacklist_notifaction_t2
-                        blacklist_show_messagebox(player)
-
-                if Settings.BLACKLIST_PROTECTION:
-                    if not player.blacklist.processed_protection:
-                        player.blacklist.processed_protection = True
-                        if Settings.BLACKLIST_PROTECTION in ["Exit_Process", "Restart_Process"]:
-                            if isinstance(Settings.BLACKLIST_PROTECTION_EXIT_PROCESS_PATH, Path):
-                                process_pid = get_pid_by_path(Settings.BLACKLIST_PROTECTION_EXIT_PROCESS_PATH)
-                                if process_pid:
-                                    kill_process_tree(process_pid)
-
-                                    if (
-                                        Settings.BLACKLIST_PROTECTION == "Restart_Process"
-                                        and isinstance(Settings.BLACKLIST_PROTECTION_RESTART_PROCESS_PATH, Path)
-                                    ):
-                                        os.startfile(str(Settings.BLACKLIST_PROTECTION_RESTART_PROCESS_PATH.absolute()))
-                        elif Settings.BLACKLIST_PROTECTION == "Shutdown_PC":
-                            subprocess.Popen(["shutdown", "/s"])
-                        elif Settings.BLACKLIST_PROTECTION == "Restart_PC":
-                            subprocess.Popen(["shutdown", "/r"])
-
-            execution_time = datetime.now() - start_time
-            remaining_sleep_time = max(0, 3 - execution_time.total_seconds())
-            if remaining_sleep_time > 0:
-                time.sleep(remaining_sleep_time)
+                msgbox_title = TITLE
+                msgbox_message = textwrap.indent(textwrap.dedent(f"""
+                    #### UserIP detected at {player.userip.detection.time} ####
+                    User{plural(len(player.userip.usernames))}: {', '.join(player.userip.usernames)}
+                    IP: {player.ip}
+                    Port{plural(len(player.ports.list))}: {', '.join(map(str, reversed(player.ports.list)))}
+                    Country Code: {player.iplookup.maxmind.country_iso}
+                    Detection Type: {player.userip.detection.type}
+                    Database: {player.userip.database_name}
+                    ############# IP Lookup ##############
+                    Continent: {player.iplookup.ipapi.continent}
+                    Country: {player.iplookup.maxmind.country}
+                    City: {player.iplookup.maxmind.city}
+                    Organization: {player.iplookup.ipapi.org}
+                    ISP: {player.iplookup.ipapi.isp}
+                    AS: {player.iplookup.ipapi.asnumber}
+                    AS Name: {player.iplookup.maxmind.asn}
+                    Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
+                    Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
+                    Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
+                """.removeprefix("\n").removesuffix("\n")), "    ")
+                msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+                threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
 def iplookup_core():
     with Threads_ExceptionHandler():
@@ -2356,7 +2734,7 @@ def iplookup_core():
                     json=ips_to_lookup,
                     timeout=3
                 )
-            except requests.exceptions.ConnectionError:
+            except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout):
                 continue
 
             if response.status_code != 200:
@@ -2433,11 +2811,32 @@ def stdout_render_core():
 
             return padding_width
 
-        def format_player_datetime(datetime_object: datetime):
-            if Settings.STDOUT_FIELD_SHOW_SEEN_DATE:
-                formatted_datetime = datetime_object.strftime("%m/%d/%Y %H:%M:%S.%f")[:-3]
+        def format_player_datetime(datetime_object: datetime, is_stdout_processing = True):
+            if is_stdout_processing and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME:
+                elapsed = datetime.now() - datetime_object
+
+                hours, remainder = divmod(elapsed.total_seconds(), 3600)
+                minutes, remainder = divmod(remainder, 60)
+                seconds, milliseconds = divmod(remainder * 1000, 1000)
+
+                elapsed_str = []
+                if hours >= 1:
+                    elapsed_str.append(f"{int(hours):02}h")
+                if elapsed_str or minutes >= 1:
+                    elapsed_str.append(f"{int(minutes):02}m")
+                if elapsed_str or seconds >= 1:
+                    elapsed_str.append(f"{int(seconds):02}s")
+                if not elapsed_str and milliseconds > 0:
+                    elapsed_str.append(f"{int(milliseconds):03}ms")
+
+                elapsed_display = f" ({' '.join(elapsed_str)})"
             else:
-                formatted_datetime = datetime_object.strftime("%H:%M:%S.%f")[:-3]
+                elapsed_display = ""
+
+            if Settings.STDOUT_DATE_FIELDS_SHOW_DATE:
+                formatted_datetime = f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}{elapsed_display}"
+            else:
+                formatted_datetime = f"{datetime_object.strftime('%H:%M:%S.%f')[:-3]}{elapsed_display}"
 
             return formatted_datetime
 
@@ -2471,29 +2870,14 @@ def stdout_render_core():
                 and SessionHost.player.ip == player_ip
             ):
                 return f"{player_ip} 👑"
+            return player_ip
+
+        def format_player_intermediate_ports(player_ports: Player_Ports):
+            player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
+            if player_ports.intermediate:
+                return ", ".join(map(str, player_ports.intermediate))
             else:
-                return player_ip
-
-        def format_player_ports_list(ports_list: list[int], last_port: int, first_port: int):
-            formatted_ports = []
-
-            if len(ports_list) == 1:
-                return str(last_port)
-
-            for port in reversed(ports_list):
-                if not (
-                    port == last_port
-                    or port == first_port
-                ):
-                    formatted_ports.append(str(port))
-
-            if last_port == first_port:
-                formatted_ports.insert(0, f"[{UNDERLINE}{last_port}{UNDERLINE_RESET}]")  # Insert last port at the beginning
-            else:
-                formatted_ports.insert(0, f"{UNDERLINE}{last_port}{UNDERLINE_RESET}")  # Insert last port at the beginning
-                formatted_ports.append(f"[{first_port}]")  # Append first port at the end
-
-            return ", ".join(formatted_ports)
+                return ""
 
         def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
             for i, field in enumerate(field_names):
@@ -2513,7 +2897,7 @@ def stdout_render_core():
                 for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "Last Seen"
             ]
-            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.USERIP_ENABLED or field_name != "Usernames")
         ]
         add_down_arrow_char_to_sorted_table_field(stdout_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
         logging_connected_players_table__field_names = [
@@ -2523,7 +2907,7 @@ def stdout_render_core():
                 for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "Last Seen"
             ]
-            if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+            if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
         ]
         add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
 
@@ -2534,7 +2918,7 @@ def stdout_render_core():
                 for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "PPS"
             ]
-            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.USERIP_ENABLED or field_name != "Usernames")
         ]
         add_down_arrow_char_to_sorted_table_field(stdout_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
         logging_disconnected_players_table__field_names = [
@@ -2544,13 +2928,14 @@ def stdout_render_core():
                 for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "PPS"
             ]
-            if field_name and (Settings.BLACKLIST_ENABLED or field_name != "Usernames")
+            if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
         ]
         add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
         printer = PrintCacher()
         global_pps_t1 = time.perf_counter()
         global_pps_rate = 0
+        last_userip_parse_time = None
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_IP_ADDRESS)), len(str(Settings.CAPTURE_INTERFACE_NAME)), len(str(is_arp_enabled)))
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.CAPTURE_IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
@@ -2585,23 +2970,50 @@ def stdout_render_core():
             session_disconnected: list[Player] = []
             main_loop__t1 = time.perf_counter()
 
+            if Settings.USERIP_ENABLED:
+                if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
+                    UserIP_Databases.reset()
+                    for userip_file in USERIP_DATABASES_PATH.glob("*.ini"):
+                        userip_settings, userip_data = parse_userip_ini_file(userip_file)
+                        UserIP_Databases.add(userip_file.stem, userip_settings, userip_data)
+                    UserIP_Databases.build()
+
+                    last_userip_parse_time = time.perf_counter()
+
             for player in PlayersRegistry.iterate_players_from_registry():
+                if Settings.USERIP_ENABLED:
+                    if player.ip in UserIP_Databases.ips_set:
+                        userip_data = UserIP_Databases.get_userip_info(player.ip)
+
+                        player.userip.is_listed = True
+                        player.userip.database_name = userip_data.database_name
+                        player.userip.settings = userip_data.settings
+                        player.userip.usernames = userip_data.usernames
+                    else:
+                        player.userip.reset()
+
                 if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
                     if player.ip in two_take_one__plugin__ip_to_usernames:
                         for username in two_take_one__plugin__ip_to_usernames[player.ip]:
                             if username not in player.two_take_one.usernames:
                                 player.two_take_one.usernames.append(username)
 
+                player.usernames = concat_lists_no_duplicates(player.two_take_one.usernames, player.userip.usernames)
+
                 if (
                     not player.datetime.left
                     and (datetime.now() - player.datetime.last_seen).total_seconds() >= Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER
                 ):
                     player.datetime.left = player.datetime.last_seen
+                    if Settings.USERIP_ENABLED:
+                        if player.userip.is_listed:
+                            player.userip.detection.as_processed_userip_task = False
+                            threading.Thread(target=process_userip_task, args=(player, "disconnected"), daemon=True).start()
 
                 if not player.iplookup.maxmind.is_initialized:
-                    player.iplookup.maxmind.asn = get_asn_info(player.ip)
-                    player.iplookup.maxmind.country, player.iplookup.maxmind.country_iso = get_country_info(player.ip)
-                    player.iplookup.maxmind.city = get_city_info(player.ip)
+                    player.iplookup.maxmind.country, player.iplookup.maxmind.country_short, player.iplookup.maxmind.country_iso = get_country_info(player.ip)
+                    player.iplookup.maxmind.city, player.iplookup.maxmind.city_short = get_city_info(player.ip)
+                    player.iplookup.maxmind.asn, player.iplookup.maxmind.asn_short = get_asn_info(player.ip)
 
                     player.iplookup.maxmind.is_initialized = True
 
@@ -2712,16 +3124,16 @@ def stdout_render_core():
             printer.cache_print(f"-" * 109)
 
             stdout_connected_players_table = PrettyTable()
-            stdout_connected_players_table.set_style(SINGLE_BORDER)
+            stdout_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
             stdout_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
             stdout_connected_players_table.field_names = stdout_connected_players_table__field_names
             stdout_connected_players_table.align = "l"
             for player in session_connected:
                 if (
-                    Settings.BLACKLIST_ENABLED
-                    and player.blacklist.usernames
+                    Settings.USERIP_ENABLED
+                    and player.userip.usernames
                 ):
-                    player_color = Fore.WHITE + Back.RED + Style.BRIGHT
+                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
                     player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
                 else:
                     player_color = Fore.GREEN
@@ -2730,40 +3142,44 @@ def stdout_render_core():
                 row = []
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
                 row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
-                if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}{player_reset}")
+                if Settings.USERIP_ENABLED:
+                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}{player_reset}")
                 row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
-                if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}{player_reset}")
+                if "Last Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.ports.last}{player_reset}")
+                if "Intermediate Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
+                if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.ports.first}{player_reset}")
                 if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso}){player_reset}")
                 if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.city}{player_reset}")
+                    row.append(f"{player_color}{player.iplookup.maxmind.city_short}{player_reset}")
                 if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.asn}{player_reset}")
+                    row.append(f"{player_color}{player.iplookup.maxmind.asn_short}{player_reset}")
                 if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.mobile}{player_reset}")
-                if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
-                if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Hosting" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
                 stdout_connected_players_table.add_row(row)
 
             stdout_disconnected_players_table = PrettyTable()
-            stdout_disconnected_players_table.set_style(SINGLE_BORDER)
+            stdout_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
             stdout_disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
             stdout_disconnected_players_table.field_names = stdout_disconnected_players_table__field_names
             stdout_disconnected_players_table.align = "l"
             for player in session_disconnected:
                 if (
-                    Settings.BLACKLIST_ENABLED
-                    and player.blacklist.usernames
+                    Settings.USERIP_ENABLED
+                    and player.userip.usernames
                 ):
-                    player_color = Fore.WHITE + Back.RED + Style.BRIGHT
+                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
                     player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
                 else:
                     player_color = Fore.RED
@@ -2773,25 +3189,29 @@ def stdout_render_core():
                 row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
                 row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
                 row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
-                if Settings.BLACKLIST_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}{player_reset}")
+                if Settings.USERIP_ENABLED:
+                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{player_color}{player.ip}{player_reset}")
-                if "Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}{player_reset}")
+                if "Last Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.ports.last}{player_reset}")
+                if "Intermediate Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
+                if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.ports.first}{player_reset}")
                 if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso}){player_reset}")
                 if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.city}{player_reset}")
+                    row.append(f"{player_color}{player.iplookup.maxmind.city_short}{player_reset}")
                 if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.asn}{player_reset}")
+                    row.append(f"{player_color}{player.iplookup.maxmind.asn_short}{player_reset}")
                 if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.mobile}{player_reset}")
-                if "Proxy/VPN/Tor" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.proxy}{player_reset}")
-                if "Hosting/Data Center" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Hosting" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.hosting}{player_reset}")
                 stdout_disconnected_players_table.add_row(row)
 
@@ -2805,21 +3225,23 @@ def stdout_render_core():
 
             if Settings.STDOUT_SESSIONS_LOGGING:
                 logging_connected_players_table = PrettyTable()
-                logging_connected_players_table.set_style(SINGLE_BORDER)
+                logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
                 logging_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
                 logging_connected_players_table.field_names = logging_connected_players_table__field_names
                 logging_connected_players_table.align = "l"
                 for player in session_connected:
                     row = []
-                    row.append(f"{format_player_datetime(player.datetime.first_seen)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}")
+                    row.append(f"{format_player_datetime(player.datetime.first_seen, False)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_rejoin, False)}")
+                    row.append(f"{format_player_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
                     row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
                     row.append(f"{format_player_ip(player.ip)}")
-                    row.append(f"{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}")
+                    row.append(f"{player.ports.last}")
+                    row.append(f"{format_player_intermediate_ports(player.ports)}")
+                    row.append(f"{player.ports.first}")
                     row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
                     row.append(f"{player.iplookup.maxmind.city}")
                     row.append(f"{player.iplookup.maxmind.asn}")
@@ -2829,21 +3251,23 @@ def stdout_render_core():
                     logging_connected_players_table.add_row(row)
 
                 logging_disconnected_players_table = PrettyTable()
-                logging_disconnected_players_table.set_style(SINGLE_BORDER)
+                logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
                 logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected_all))} who've left your session ({len(session_disconnected_all)}):"
                 logging_disconnected_players_table.field_names = logging_disconnected_players_table__field_names
                 logging_disconnected_players_table.align = "l"
                 for player in session_disconnected_all:
                     row = []
-                    row.append(f"{format_player_datetime(player.datetime.first_seen)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_seen)}")
-                    row.append(f"{format_player_usernames(concat_lists_no_duplicates(player.two_take_one.usernames, player.blacklist.usernames))}")
+                    row.append(f"{format_player_datetime(player.datetime.first_seen, False)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_rejoin, False)}")
+                    row.append(f"{format_player_datetime(player.datetime.last_seen, False)}")
+                    row.append(f"{format_player_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
                     row.append(f"{player.ip}")
-                    row.append(f"{format_player_ports_list(player.ports.list, player.ports.first, player.ports.last)}")
+                    row.append(f"{player.ports.last}")
+                    row.append(f"{format_player_intermediate_ports(player.ports)}")
+                    row.append(f"{player.ports.first}")
                     row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
                     row.append(f"{player.iplookup.maxmind.city}")
                     row.append(f"{player.iplookup.maxmind.asn}")
@@ -2853,14 +3277,14 @@ def stdout_render_core():
                     logging_disconnected_players_table.add_row(row)
 
                 # Check if the directories exist, if not create them
-                if not SESSION_LOGGING_PATH.parent.exists():
-                    SESSION_LOGGING_PATH.parent.mkdir(parents=True)  # Create the directories if they don't exist
+                if not SESSIONS_LOGGING_PATH.parent.exists():
+                    SESSIONS_LOGGING_PATH.parent.mkdir(parents=True)  # Create the directories if they don't exist
 
                 # Check if the file exists, if not create it
-                if not SESSION_LOGGING_PATH.exists():
-                    SESSION_LOGGING_PATH.touch()  # Create the file if it doesn't exist
+                if not SESSIONS_LOGGING_PATH.exists():
+                    SESSIONS_LOGGING_PATH.touch()  # Create the file if it doesn't exist
 
-                with SESSION_LOGGING_PATH.open("w", encoding="utf-8") as f:
+                with SESSIONS_LOGGING_PATH.open("w", encoding="utf-8") as f:
                     stdout_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
                     f.write(stdout_without_vt100)
 
@@ -2872,7 +3296,7 @@ def stdout_render_core():
                 continue
 
             if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 1.0:
-                safe_print("\033[K" + f"Refreshing took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
+                safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
                 time.sleep(0.1)
                 continue
 
@@ -2923,21 +3347,21 @@ def packet_callback(packet: Packet):
     if not target_port:
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
-                   Developer didn't expect this scenario to be possible.
+                Developer didn't expect this scenario to be possible.
 
             INFOS:
-                   A player port was not found.
-                   This situation already happened to me,
-                   but at this time I had not the `target_ip` info
-                   from the packet, so it was useless.
+                A player port was not found.
+                This situation already happened to me,
+                but at this time I had not the `target_ip` info
+                from the packet, so it was useless.
 
-                   Note for the future:
-                   If `target_ip` is a false positive (not a player),
-                   always `continue` on a packet with no port.
+                Note for the future:
+                If `target_ip` is a false positive (not a player),
+                always `continue` on a packet with no port.
 
             DEBUG:
-                   target_ip: {target_ip}
-                   target_port: {target_port}
+                target_ip: {target_ip}
+                target_port: {target_port}
         """.removeprefix("\n").removesuffix("\n"))
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
@@ -2949,6 +3373,12 @@ def packet_callback(packet: Packet):
             Player(target_ip, target_port, packet_datetime)
         )
         return
+
+    if Settings.USERIP_ENABLED:
+        if player.userip.is_listed and not player.userip.detection.as_processed_userip_task:
+            player.userip.detection.as_processed_userip_task = True
+            player.userip.detection.type = "Static IP"
+            threading.Thread(target=process_userip_task, args=(player, "connected"), daemon=True).start()
 
     # No matter what:
     player.datetime.last_seen = packet_datetime
@@ -2980,10 +3410,6 @@ global_pps_counter = 0
 
 stdout_render_core__thread = threading.Thread(target=stdout_render_core, daemon=True)
 stdout_render_core__thread.start()
-
-if Settings.BLACKLIST_ENABLED:
-    blacklist_sniffer_core__thread = threading.Thread(target=blacklist_sniffer_core, daemon=True)
-    blacklist_sniffer_core__thread.start()
 
 iplookup_core__thread = threading.Thread(target=iplookup_core, daemon=True)
 iplookup_core__thread.start()

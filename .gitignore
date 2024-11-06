@@ -1,16 +1,16 @@
 /.devfolder
 /.vscode
 /Modules/capture/__pycache__/
+/Modules/https_utils/__pycache__/
 /Modules/oui_lookup/__pycache__/
 /GeoLite2 Databases
 *.pyc
 .dccache
 Settings.ini
+error.log
 debug.log
-Blacklist.ini
-blacklist.log
-debug.txt
+UserIP_Logging.log
 GTA_V_Session_Sniffer-x64.exe
 GTA_V_Session_Sniffer-x86.exe
-error.log
-/SessionsLogging
+/Sessions Logging
+/UserIP Databases
