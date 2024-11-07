@@ -140,6 +140,9 @@ For example, I personally maintain four lists:
 
 Throughout the INI file, any text following a `;` or `#` symbol is treated as a comment.
 
+Simply create a folder named `UserIP Databases` and add any *.ini files for the script to read.<br>
+To create these files, follow these guidelines:
+
 ### UserIP Settings
 
 These are settings specific for each UserIP database files configuration.
