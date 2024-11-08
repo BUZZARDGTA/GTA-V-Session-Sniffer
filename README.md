@@ -184,7 +184,12 @@ The file path of the process that will be started when<br>
 the \<PROTECTION\> setting is set to the "Restart_Process" value.<br>
 Please note that UWP apps are not supported.
 
-#### Examples:
+### UserIP Entries
+
+You need to list the entries under the `[UserIP]` section of the INI file in this format:<br>
+`<USERNAME>=<IP>`
+
+#### Example UserIP file:
 ```
 [Settings]
 ENABLED=True
@@ -195,16 +200,7 @@ LOG=True
 PROTECTION=False
 PROTECTION_PROCESS_PATH=E:\Games\GTAV\GTA5.exe
 PROTECTION_RESTART_PROCESS_PATH=D:\Desktop\Grand Theft Auto V.url
-```
 
-### UserIP Formatting
-
-You need to list the entries under the `[UserIP]` section of the INI file in this format:<br>
-`<USERNAME>=<IP>`
-
-#### Examples:
-
-```
 [UserIP]
 username1=0.0.0.0
 username2=127.0.0.1
