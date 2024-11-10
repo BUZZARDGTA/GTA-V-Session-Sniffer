@@ -400,111 +400,12 @@ class Settings(DefaultSettings):
         print("\nCorrect reconstruction of \"Settings.ini\" ...")
         text = textwrap.dedent(f"""
             ;;-----------------------------------------------------------------------------
+            ;; GTA V Session Sniffer Configuration Settings
+            ;;-----------------------------------------------------------------------------
             ;; Lines starting with \";\" or \"#\" symbols are commented lines.
-            ;;-----------------------------------------------------------------------------
-
-            ;;-----------------------------------------------------------------------------
-            ;; This is the settings file for \"GTA V Session Sniffer\" configuration.
             ;;
-            ;; If you don't know what value to choose for a specifc setting, set it's value to None.
-            ;; The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
-            ;;
-            ;;<CAPTURE_TSHARK_PATH>
-            ;;  The full path to your \"tshark.exe\" executable.
-            ;;  If not set, it will attempt to detect tshark from your Wireshark installation.
-            ;;
-            ;;<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>
-            ;;  Allows you to skip the network interface selection by automatically
-            ;;  using the <CAPTURE_INTERFACE_NAME>, <CAPTURE_IP_ADDRESS> and <CAPTURE_MAC_ADDRESS> settings.
-            ;;
-            ;;<CAPTURE_INTERFACE_NAME>
-            ;;  The network interface from which packets will be captured.
-            ;;
-            ;;<CAPTURE_IP_ADDRESS>
-            ;;  The IP address of a network interface on your computer from which packets will be captured.
-            ;;  If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
-            ;;  Valid example value: \"x.x.x.x\"
-            ;;
-            ;;<CAPTURE_MAC_ADDRESS>
-            ;;  The MAC address of a network interface on your computer from which packets will be captured.
-            ;;  If the <CAPTURE_ARP> setting is enabled, it can be from any device on your home network.
-            ;;  Valid example value: \"xx:xx:xx:xx:xx:xx\" or \"xx-xx-xx-xx-xx-xx\"
-            ;;
-            ;;<CAPTURE_ARP>
-            ;;  Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
-            ;;
-            ;;<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>
-            ;;  Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
-            ;;
-            ;;<CAPTURE_PROGRAM_PRESET>
-            ;;  A program preset that will help capturing the right packets for your program.
-            ;;  Supported program presets are only \"GTA5\" and \"Minecraft\".
-            ;;  Note that Minecraft only supports Bedrock Edition.
-            ;;  Please also note that Minecraft have only been tested on PCs.
-            ;;  I do not have information regarding it's functionality on consoles.
-            ;;
-            ;;<CAPTURE_VPN_MODE>
-            ;;  Setting this to False will add filters to exclude unrelated IPs from the output.
-            ;;  However, if you are scanning trough a VPN <CAPTURE_INTERFACE_NAME>, you have to set it to True.
-            ;;
-            ;;<CAPTURE_OVERFLOW_TIMER>
-            ;;  This timer represents the duration between the timestamp of a captured packet and the current time.
-            ;;  When this timer is reached, the tshark process will be restarted.
-            ;;  Valid values include any number greater than or equal to 3.
-            ;;
-            ;;<STDOUT_SHOW_ADVERTISING_HEADER>
-            ;;  Determine if you want or not to show the developer's advertisements in the script's display.
-            ;;
-            ;;<STDOUT_SESSIONS_LOGGING>
-            ;;  Determine if you want to log console's output to \"SessionsLogging\" folder.
-            ;;  It is synced with the console output and contains all fields.
-            ;;
-            ;;<STDOUT_RESET_PORTS_ON_REJOINS>
-            ;;  When a player rejoins, clear their previously detected ports list.
-            ;;
-            ;;<STDOUT_FIELDS_TO_HIDE>
-            ;;  Specifies a list of fields you wish to hide from the output.
-            ;;  It can only hides field names that are not essential to the script's functionality.
-            ;;  Valid values include any of the following field names:
-            ;;  {Settings.stdout_hideable_fields}
-            ;;
-            ;;<STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME>
-            ;;  Shows or not the elapsed time from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
-            ;;
-            ;;<STDOUT_DATE_FIELDS_SHOW_DATE>
-            ;;  Shows or not the date from which a player has been captured in \"First Seen\", \"Last Rejoin\" and \"Last Seen\" fields.
-            ;;
-            ;;<STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY>
-            ;;  Specifies the fields from the connected players by which you want the output data to be sorted.
-            ;;  Valid values include any field names. For example: Last Rejoin
-            ;;
-            ;;<STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY>
-            ;;  Specifies the fields from the disconnected players by which you want the output data to be sorted.
-            ;;  Valid values include any field names. For example: Last Seen
-            ;;
-            ;;<STDOUT_FIELD_COUNTRY_MAX_LEN>
-            ;;  Maximum allowed length for the "Country" field.
-            ;;
-            ;;<STDOUT_FIELD_CITY_MAX_LEN>
-            ;;  Maximum allowed length for the "City" field.
-            ;;
-            ;;<STDOUT_FIELD_ASN_MAX_LEN>
-            ;;  Maximum allowed length for the "ASN" field.
-            ;;
-            ;;<STDOUT_DISCONNECTED_PLAYERS_TIMER>
-            ;;  The duration after which a player will be moved as disconnected on the console if no packets are received within this time.
-            ;;  Valid values include any number greater than or equal to 3.
-            ;;
-            ;;<STDOUT_DISCONNECTED_PLAYERS_COUNTER>
-            ;;  The maximum number of players showing up in disconnected players list.
-            ;;  Valid values include any number greater than or equal to 0.
-            ;;  Setting it to 0 will make it unlimitted.
-            ;;
-            ;;<STDOUT_REFRESHING_TIMER>
-            ;;  Minimum time interval between which this will refresh the console display.
-            ;;
-            ;;<USERIP_ENABLED>
-            ;; Determine if you want or not to enable detections from the UserIP databases.
+            ;; For detailed explanations of each setting, please refer to the following documentation:
+            ;; https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/?tab=readme-ov-file#editing-settings
             ;;-----------------------------------------------------------------------------
         """.removeprefix("\n"))
         for setting_name, setting_value in Settings.iterate_over_settings():
@@ -939,7 +840,6 @@ class Player_UserIp:
         self._initialize()
 
     def _initialize(self):
-        self.is_listed = False
         self.database_name: Optional[str] = None
         self.settings: Optional[UserIP_Settings] = None
         self.usernames: list[Optional[str]] = []
@@ -954,6 +854,7 @@ class Player_TwoTakeOne:
 
 class Player:
     def __init__(self, ip: str, port: int, packet_datetime: datetime):
+        self.is_player_just_registered = True
         self._initialize(ip, port, packet_datetime)
 
     def _initialize(self, ip: str, port: int, packet_datetime: datetime):
@@ -984,6 +885,8 @@ class PlayersRegistry:
         if player.ip in cls.players_registry:
             raise ValueError(f"Player with IP \"{player.ip}\" already exists.")
         cls.players_registry[player.ip] = player
+
+        return player
 
     @classmethod
     def get_player(cls, ip: str):
@@ -1099,7 +1002,8 @@ class UserIP_Settings:
         VOICE_NOTIFICATIONS: Union[str | Literal[False]],
         PROTECTION: Literal["Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC", False],
         PROTECTION_PROCESS_PATH: Optional[Path],
-        PROTECTION_RESTART_PROCESS_PATH: Optional[Path]
+        PROTECTION_RESTART_PROCESS_PATH: Optional[Path],
+        PROTECTION_SUSPEND_PROCESS_MODE: Union[int, float, Literal["Auto", "Manual"]]
     ):
         self.ENABLED = ENABLED
         self.COLOR = COLOR
@@ -1109,6 +1013,7 @@ class UserIP_Settings:
         self.PROTECTION = PROTECTION
         self.PROTECTION_PROCESS_PATH = PROTECTION_PROCESS_PATH
         self.PROTECTION_RESTART_PROCESS_PATH = PROTECTION_RESTART_PROCESS_PATH
+        self.PROTECTION_SUSPEND_PROCESS_MODE = PROTECTION_SUSPEND_PROCESS_MODE
 
 class UserIP:
     """
@@ -1130,6 +1035,27 @@ class UserIP_Databases:
     userip_infos_by_ip: dict[str, UserIP] = {}
     ips_set: set[str] = set()
     notified_conflicts: set[str] = set()
+
+    @staticmethod
+    def _notify_conflict(database_name: str, username: str, ip: str, conflicting_userip: UserIP):
+        msgbox_title = TITLE
+        msgbox_message = f"""
+            ERROR:
+                UserIP databases IP conflict
+
+            INFOS:
+                The same IP cannot be assigned to multiple databases.
+                Users assigned to this IP will be ignored until the conflict is resolved.
+
+            DEBUG:
+                "{USERIP_DATABASES_PATH}\\{database_name}.ini":
+                {username}={ip}
+
+                "{USERIP_DATABASES_PATH}\\{conflicting_userip.database_name}.ini":
+                {', '.join(conflicting_userip.usernames)}={ip}
+        """
+        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message.strip(), msgbox_style), daemon=True).start()
 
     @classmethod
     def add(cls, database_name: str, settings: UserIP_Settings, user_ips: dict[str, list[str]]):
@@ -1165,25 +1091,7 @@ class UserIP_Databases:
 
                     if ip in userip_infos_by_ip and not userip_infos_by_ip[ip].database_name == database_name:
                         if conflict_key not in cls.notified_conflicts:
-                            msgbox_title = TITLE
-                            msgbox_message = textwrap.dedent(f"""
-                                ERROR:
-                                    UserIP databases IP conflict
-
-                                INFOS:
-                                    The same IP cannot be assigned to multiple databases.
-                                    Users assigned to this IP will be ignored until the conflict is resolved.
-
-                                DEBUG:
-                                    \"{USERIP_DATABASES_PATH}\\{database_name}.ini\":
-                                    {username}={ip}
-
-                                    \"{USERIP_DATABASES_PATH}\\{userip_infos_by_ip[ip].database_name}.ini\":
-                                    {', '.join(userip_infos_by_ip[ip].usernames)}={ip}
-                            """.removeprefix("\n").removesuffix("\n"))
-                            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-                            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
-
+                            cls._notify_conflict(database_name, username, ip, userip_infos_by_ip[ip])
                             cls.notified_conflicts.add(conflict_key)
                         continue
 
@@ -1212,6 +1120,20 @@ class UserIP_Databases:
         Returns an UserIP object for the specified IP, containing its associated name, settings and usernames.
         """
         return cls.userip_infos_by_ip.get(ip)
+
+    @classmethod
+    def update_player_userip_data(cls, player: Player):
+        """
+        Updates the player's UserIP data using the information from UserIP_Databases.
+
+        :param player: The player object with 'ip' and 'userip' attributes.
+        """
+        if userip_data := cls.get_userip_info(player.ip):
+            player.userip.database_name = userip_data.database_name
+            player.userip.settings = userip_data.settings
+            player.userip.usernames = userip_data.usernames
+            return True
+        return False
 
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
@@ -1302,8 +1224,8 @@ def get_minimum_padding(var: str | int, max_padding: int, padding: int):
     return max_padding
 
 def get_pid_by_path(filepath: Path):
-    for process in psutil.process_iter(['pid', 'exe']):
-        if process.info['exe'] == str(filepath.absolute()):
+    for process in psutil.process_iter(["pid", "exe"]):
+        if process.info["exe"] == str(filepath.absolute()):
             return process.pid
     return None
 
@@ -1882,17 +1804,40 @@ def parse_userip_ini_file(ini_path: Path):
                         if not value == stripped_value:
                             is_setting_corrupted = True
                         settings[setting] = Path(stripped_value.replace("\\", "/"))
+                elif setting == "PROTECTION_SUSPEND_PROCESS_MODE":
+                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Auto", "Manual"])
+                        if case_insensitive_match:
+                            settings[setting] = normalized_match
+                            if not case_sensitive_match:
+                                need_rewrite_current_setting = True
+                        else:
+                            try:
+                                if "." in value:
+                                    PROTECTION_SUSPEND_PROCESS_MODE = float(value)
+                                else:
+                                    PROTECTION_SUSPEND_PROCESS_MODE = int(value)
+                            except (ValueError, TypeError):
+                                is_setting_corrupted = True
+                            else:
+                                if PROTECTION_SUSPEND_PROCESS_MODE >= 0:
+                                    settings[setting] = PROTECTION_SUSPEND_PROCESS_MODE
+                                else:
+                                    is_setting_corrupted = True
 
                 if is_setting_corrupted:
                     stdout_crash_text = textwrap.dedent(f"""
                         ERROR:
-                            Corrupted UserIP Database File
+                            Corrupted UserIP Database File (Settings)
 
                         INFOS:
-                            The UserIP database file \"{ini_path}\" has an invalid value:
+                            UserIP database file:
+                            \"{ini_path}\"
+                            has an invalid settings value:
+
                             {setting}={value}
 
-                            For more information on formatting, please refer to the documentation:
+                            For more information on formatting, please refer to the
+                            documentation:
                                 https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
                     """.removeprefix("\n").removesuffix("\n"))
                     terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
@@ -1939,15 +1884,10 @@ def parse_userip_ini_file(ini_path: Path):
     fixed_ini_data = "\n".join(corrected_ini_data_lines)
 
     if not ini_data == fixed_ini_data:
-        print("rewritted, ini file")
         ini_path.write_text(fixed_ini_data)
 
     list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
     number_of_settings_missing = len(list_of_missing_settings)
-    if number_of_settings_missing == 1:
-        missing_settings_str = f"<{list_of_missing_settings[0].upper()}>"
-    else:
-        missing_settings_str = ", ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)
 
     if number_of_settings_missing > 0:
         stdout_crash_text = textwrap.dedent(f"""
@@ -1955,10 +1895,14 @@ def parse_userip_ini_file(ini_path: Path):
                 Missing setting{plural(number_of_settings_missing)} in UserIP Database File
 
             INFOS:
-                The UserIP database file \"{ini_path}\" as {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
-                {missing_settings_str}
+                UserIP database file:
+                \"{ini_path}\"
+                has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
 
-                For more information on formatting, please refer to the documentation:
+                {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
+
+                For more information on formatting, please refer to the
+                documentation:
                     https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
         """.removeprefix("\n").removesuffix("\n"))
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
@@ -1972,6 +1916,7 @@ def parse_userip_ini_file(ini_path: Path):
         settings["PROTECTION"],
         settings["PROTECTION_PROCESS_PATH"],
         settings["PROTECTION_RESTART_PROCESS_PATH"],
+        settings["PROTECTION_SUSPEND_PROCESS_MODE"]
     ), userip
 
 def is_file_need_newline_ending(file):
@@ -2087,7 +2032,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.8 - 06/11/2024 (21:23)"
+VERSION = "v1.1.9 - 10/11/2024 (01:18)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -2099,7 +2044,7 @@ RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$"
 RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
 RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>[^;#]+)")
 RE_TWO_TAKE_ONE_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
-USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH"]
+USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
 WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
@@ -2567,12 +2512,32 @@ userip_logging_file_write_lock = threading.Lock()
 
 def process_userip_task(player: Player, connection_type: Literal["connected", "disconnected"]):
     with Threads_ExceptionHandler():
-        def suspend_process_for_duration(process_pid: int, duration: int):
-            """Suspend the specified process for a given duration, then resume it."""
+        def suspend_process_for_duration_or_mode(process_pid: int, duration_or_mode: Union[int, float, Literal["Auto", "Manual"]]):
+            """
+            Suspends the specified process for a given duration or until a specified condition is met.
+
+            ### Parameters:
+            * process_pid: The process ID of the process to be suspended.
+            * duration_or_mode:
+                - If an integer or float, it specifies the duration (in seconds) to suspend the process.
+                - If set to \"Manual\", the process will be suspended indefinitely until the user manually resume it.
+                - If set to \"Auto\", the process will be suspended until the player is flagged as \"disconnected\", after which it is resumed automatically.
+            """
             process = psutil.Process(process_pid)
             process.suspend()
-            time.sleep(duration)
-            process.resume()
+
+            if isinstance(duration_or_mode, (int, float)):
+                time.sleep(duration_or_mode)
+                process.resume()
+                return
+
+            if duration_or_mode == "Manual":
+                return
+            elif duration_or_mode == "Auto":
+                while not player.datetime.left:
+                    time.sleep(0.1)
+                process.resume()
+                return
 
 
         # We wants to run this as fast as possible so it's on top of the function.
@@ -2580,7 +2545,7 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
             if player.userip.settings.PROTECTION:
                 if player.userip.settings.PROTECTION == "Suspend_Process":
                     if process_pid := get_pid_by_path(player.userip.settings.PROTECTION_PROCESS_PATH):
-                        threading.Thread(target=suspend_process_for_duration, args=(process_pid, 8), daemon=True).start()
+                        threading.Thread(target=suspend_process_for_duration_or_mode, args=(process_pid, player.userip.settings.PROTECTION_SUSPEND_PROCESS_MODE), daemon=True).start()
                 elif player.userip.settings.PROTECTION in ["Exit_Process", "Restart_Process"]:
                     if isinstance(player.userip.settings.PROTECTION_PROCESS_PATH, Path):
                         if process_pid := get_pid_by_path(player.userip.settings.PROTECTION_PROCESS_PATH):
@@ -2608,9 +2573,6 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
             winsound.PlaySound(file_path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
 
         if connection_type == "connected":
-            player.userip.detection.time = player.datetime.last_seen.strftime("%H:%M:%S")
-            player.userip.detection.date_time = player.datetime.last_seen.strftime("%Y-%m-%d_%H:%M:%S")
-
             while not player.datetime.left and (datetime.now() - player.datetime.last_seen) < timedelta(seconds=10):
                 if player.userip.usernames and player.iplookup.maxmind.is_initialized:
                     break
@@ -2792,6 +2754,102 @@ tshark_latency = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
+        def update_userip_databases(last_userip_parse_time: Optional[float]):
+            DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
+                ;;-----------------------------------------------------------------------------
+                ;; GTA V Session Sniffer User IP default database file
+                ;;-----------------------------------------------------------------------------
+                ;; Lines starting with \";\" or \"#\" symbols are commented lines.
+                ;;
+                ;; For detailed explanations of each setting, please refer to the following documentation:
+                ;; https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/?tab=readme-ov-file#editing-settings
+                ;;-----------------------------------------------------------------------------
+                [Settings]
+            """.removeprefix("\n").removesuffix("\n"))
+
+            DEFAULT_USERIP_FILES_SETTINGS = {
+                USERIP_DATABASES_PATH / "Blacklist.ini": """
+                    ENABLED=True
+                    COLOR=RED
+                    LOG=True
+                    NOTIFICATIONS=True
+                    VOICE_NOTIFICATIONS=Male
+                    PROTECTION=False
+                    PROTECTION_PROCESS_PATH=None
+                    PROTECTION_RESTART_PROCESS_PATH=None
+                    PROTECTION_SUSPEND_PROCESS_MODE=Auto
+                """,
+                USERIP_DATABASES_PATH / "Enemylist.ini": """
+                    ENABLED=True
+                    COLOR=YELLOW
+                    LOG=True
+                    NOTIFICATIONS=True
+                    VOICE_NOTIFICATIONS=Male
+                    PROTECTION=False
+                    PROTECTION_PROCESS_PATH=None
+                    PROTECTION_RESTART_PROCESS_PATH=None
+                    PROTECTION_SUSPEND_PROCESS_MODE=Auto
+                """,
+                USERIP_DATABASES_PATH / "Friendlist.ini": """
+                    ENABLED=True
+                    COLOR=GREEN
+                    LOG=True
+                    NOTIFICATIONS=False
+                    VOICE_NOTIFICATIONS=Female
+                    PROTECTION=False
+                    PROTECTION_PROCESS_PATH=None
+                    PROTECTION_RESTART_PROCESS_PATH=None
+                    PROTECTION_SUSPEND_PROCESS_MODE=Auto
+                """,
+                USERIP_DATABASES_PATH / "Randomlist.ini": """
+                    ENABLED=True
+                    COLOR=BLACK
+                    LOG=True
+                    NOTIFICATIONS=False
+                    VOICE_NOTIFICATIONS=Female
+                    PROTECTION=False
+                    PROTECTION_PROCESS_PATH=None
+                    PROTECTION_RESTART_PROCESS_PATH=None
+                    PROTECTION_SUSPEND_PROCESS_MODE=Auto
+                """,
+                USERIP_DATABASES_PATH / "Searchlist.ini": """
+                    ENABLED=True
+                    COLOR=BLUE
+                    LOG=True
+                    NOTIFICATIONS=False
+                    VOICE_NOTIFICATIONS=Female
+                    PROTECTION=False
+                    PROTECTION_PROCESS_PATH=None
+                    PROTECTION_RESTART_PROCESS_PATH=None
+                    PROTECTION_SUSPEND_PROCESS_MODE=Auto
+                """
+            }
+
+            DEFAULT_USERIP_FILE_FOOTER = textwrap.dedent("""
+                [UserIP]
+                # Add users below in this format: username=IP
+                # Examples:
+                # username1=192.168.1.1
+                # username2=127.0.0.1
+                # username3=255.255.255.255
+            """.removeprefix("\n").removesuffix("\n"))
+
+            USERIP_DATABASES_PATH.mkdir(parents=True, exist_ok=True)
+
+            for userip_path, settings in DEFAULT_USERIP_FILES_SETTINGS.items():
+                if not userip_path.exists():
+                    file_content = f"{DEFAULT_USERIP_FILE_HEADER}\n\n{settings}\n\n{DEFAULT_USERIP_FILE_FOOTER}"
+                    userip_path.write_text(file_content, encoding="utf-8")
+
+            UserIP_Databases.reset()
+            for userip_path in USERIP_DATABASES_PATH.glob("*.ini"):
+                parsed_settings, parsed_data = parse_userip_ini_file(userip_path)
+                UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
+            UserIP_Databases.build()
+
+            last_userip_parse_time = time.perf_counter()
+            return last_userip_parse_time
+
         def calculate_padding_width(total_width: int, *lengths: int):
             """
             Calculate the padding width based on the total width and the lengths of provided strings.
@@ -2972,23 +3030,12 @@ def stdout_render_core():
 
             if Settings.USERIP_ENABLED:
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
-                    UserIP_Databases.reset()
-                    for userip_file in USERIP_DATABASES_PATH.glob("*.ini"):
-                        userip_settings, userip_data = parse_userip_ini_file(userip_file)
-                        UserIP_Databases.add(userip_file.stem, userip_settings, userip_data)
-                    UserIP_Databases.build()
-
-                    last_userip_parse_time = time.perf_counter()
+                    last_userip_parse_time = update_userip_databases(last_userip_parse_time)
 
             for player in PlayersRegistry.iterate_players_from_registry():
                 if Settings.USERIP_ENABLED:
                     if player.ip in UserIP_Databases.ips_set:
-                        userip_data = UserIP_Databases.get_userip_info(player.ip)
-
-                        player.userip.is_listed = True
-                        player.userip.database_name = userip_data.database_name
-                        player.userip.settings = userip_data.settings
-                        player.userip.usernames = userip_data.usernames
+                        UserIP_Databases.update_player_userip_data(player)
                     else:
                         player.userip.reset()
 
@@ -3006,7 +3053,7 @@ def stdout_render_core():
                 ):
                     player.datetime.left = player.datetime.last_seen
                     if Settings.USERIP_ENABLED:
-                        if player.userip.is_listed:
+                        if player.userip.detection.time:
                             player.userip.detection.as_processed_userip_task = False
                             threading.Thread(target=process_userip_task, args=(player, "disconnected"), daemon=True).start()
 
@@ -3324,6 +3371,10 @@ def stdout_render_core():
                 if remaining_sleep_seconds > 0:
                     time.sleep(remaining_sleep_seconds)
 
+                    if Settings.USERIP_ENABLED:
+                        if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
+                            last_userip_parse_time = update_userip_databases(last_userip_parse_time)
+
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
 
@@ -3369,16 +3420,22 @@ def packet_callback(packet: Packet):
 
     player = PlayersRegistry.get_player(target_ip)
     if player is None:
-        PlayersRegistry.add_player(
+        player = PlayersRegistry.add_player(
             Player(target_ip, target_port, packet_datetime)
         )
-        return
 
     if Settings.USERIP_ENABLED:
-        if player.userip.is_listed and not player.userip.detection.as_processed_userip_task:
+        if target_ip in UserIP_Databases.ips_set and not player.userip.detection.as_processed_userip_task:
             player.userip.detection.as_processed_userip_task = True
             player.userip.detection.type = "Static IP"
-            threading.Thread(target=process_userip_task, args=(player, "connected"), daemon=True).start()
+            player.userip.detection.time = packet_datetime.strftime("%H:%M:%S")
+            player.userip.detection.date_time = packet_datetime.strftime("%Y-%m-%d_%H:%M:%S")
+            if UserIP_Databases.update_player_userip_data(player):
+                threading.Thread(target=process_userip_task, args=(player, "connected"), daemon=True).start()
+
+    if player.is_player_just_registered:
+        player.is_player_just_registered = False
+        return
 
     # No matter what:
     player.datetime.last_seen = packet_datetime

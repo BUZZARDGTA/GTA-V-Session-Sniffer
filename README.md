@@ -50,12 +50,110 @@ It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npca
 
 ### Editing Settings
 
-In order to edit the settings from the script you only have to open the file `Settings.ini`.<br />
-It is generated the first time you launch the script and is automatically updated thereafter.<br />
-However, the settings are only refreshed upon script startup.<br />
-Therefore, if you've made any changes and wish to apply them, you'll need to restart the script.
+To edit the script settings, open the `Settings.ini` file.<br>
+This file is created upon the first script launch and automatically updates thereafter.
 
-_If you are curious about all the settings that you can manually configure, you can refer to each comments in the `Settings.ini` file for deeper documentation on each setting._
+Please note that any changes made to the file will take effect only after restarting the script.<br>
+If you're unsure about a specific setting, set its value to None. The script will analyze the file and regenerate it if errors are found.
+
+For detailed explanations of each setting, please refer to the sections below.
+
+#### <CAPTURE_TSHARK_PATH>
+The full path to your "tshark.exe" executable.<br>
+If not set, it will attempt to detect tshark from your Wireshark installation.
+
+#### <CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>
+Allows you to skip the network interface selection by automatically<br>
+using the `<CAPTURE_INTERFACE_NAME>`, `<CAPTURE_IP_ADDRESS>` and `<CAPTURE_MAC_ADDRESS>` settings.
+
+#### <CAPTURE_INTERFACE_NAME>
+The network interface from which packets will be captured.
+
+#### <CAPTURE_IP_ADDRESS>
+The IP address of a network interface on your computer from which packets will be captured.<br>
+If the `<CAPTURE_ARP>` setting is enabled, it can be from any device on your home network.
+Valid example value: "x.x.x.x"
+
+#### <CAPTURE_MAC_ADDRESS>
+The MAC address of a network interface on your computer from which packets will be captured.<br>
+If the `<CAPTURE_ARP>` setting is enabled, it can be from any device on your home network.<br>
+Valid example value: "xx:xx:xx:xx:xx:xx" or "xx-xx-xx-xx-xx-xx"
+
+#### <CAPTURE_ARP>
+Allows you to capture from devices located outside your computer but within your home network, such as gaming consoles.
+
+#### <CAPTURE_BLOCK_THIRD_PARTY_SERVERS>
+Determine if you want or not to block the annoying IP ranges from servers that shouldn't be detected.
+
+#### <CAPTURE_PROGRAM_PRESET>
+A program preset that will help capturing the right packets for your program.<br>
+Supported program presets are only "GTA5" and "Minecraft".<br>
+Note that Minecraft only supports Bedrock Edition.<br>
+Please also note that Minecraft have only been tested on PCs.<br>
+I do not have information regarding it's functionality on consoles.
+
+#### <CAPTURE_VPN_MODE>
+Setting this to False will add filters to exclude unrelated IPs from the output.<br>
+However, if you are scanning trough a VPN `<CAPTURE_INTERFACE_NAME>`, you have to set it to True.
+
+#### <CAPTURE_OVERFLOW_TIMER>
+This timer represents the duration between the timestamp of a captured packet and the current time.<br>
+When this timer is reached, the tshark process will be restarted.<br>
+Valid values include any number greater than or equal to 3.
+
+#### <STDOUT_SHOW_ADVERTISING_HEADER>
+Determine if you want or not to show the developer's advertisements in the script's display.
+
+#### <STDOUT_SESSIONS_LOGGING>
+Determine if you want to log console's output to "SessionsLogging" folder.<br>
+It is synced with the console output and contains all fields.
+
+#### <STDOUT_RESET_PORTS_ON_REJOINS>
+When a player rejoins, clear their previously detected ports list.
+
+#### <STDOUT_FIELDS_TO_HIDE>
+Specifies a list of fields you wish to hide from the output.<br>
+It can only hides field names that are not essential to the script's functionality.<br>
+Valid values include any of the following field names:
+{Settings.stdout_hideable_fields}
+
+#### <STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME>
+Shows or not the elapsed time from which a player has been captured in "First Seen", "Last Rejoin" and "Last Seen" fields.
+
+#### <STDOUT_DATE_FIELDS_SHOW_DATE>
+Shows or not the date from which a player has been captured in "First Seen", "Last Rejoin" and "Last Seen" fields.
+
+#### <STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY>
+Specifies the fields from the connected players by which you want the output data to be sorted.<br>
+Valid values include any field names. For example: Last Rejoin
+
+#### <STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY>
+Specifies the fields from the disconnected players by which you want the output data to be sorted.<br>
+Valid values include any field names. For example: Last Seen
+
+#### <STDOUT_FIELD_COUNTRY_MAX_LEN>
+Maximum allowed length for the "Country" field.
+
+#### <STDOUT_FIELD_CITY_MAX_LEN>
+Maximum allowed length for the "City" field.
+
+#### <STDOUT_FIELD_ASN_MAX_LEN>
+Maximum allowed length for the "ASN" field.
+
+#### <STDOUT_DISCONNECTED_PLAYERS_TIMER>
+The duration after which a player will be moved as disconnected on the console if no packets are received within this time.<br>
+Valid values include any number greater than or equal to 3.
+
+#### <STDOUT_DISCONNECTED_PLAYERS_COUNTER>
+The maximum number of players showing up in disconnected players list.<br>
+Valid values include any number greater than or equal to 0.<br>
+Setting it to 0 will make it unlimitted.
+
+#### <STDOUT_REFRESHING_TIMER>
+Minimum time interval between which this will refresh the console display.
+
+#### <USERIP_ENABLED>
+Determine if you want or not to enable detections from the UserIP databases.
 
 ### Scan trough a VPN
 
@@ -156,15 +254,15 @@ Determine if you want or not to enable this UserIP database.
 #### \<COLOR\>
 Determine which color will be applied on the script's output for these users.
 Valid values are either one of the following colors:<br>
-"BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"
+`BLACK`, `RED`, `GREEN`, `YELLOW`, `BLUE`, `MAGENTA`, `CYAN`, `WHITE`
 
 #### \<NOTIFICATIONS\>
 Determine if you want or not to display a notification when a user is detected.
 
 #### \<VOICE_NOTIFICATIONS\>
 This setting determines the voice that will play when a user is detected or when they disconnect.<br>
-Valid values are either "Male" or "Female".<br>
-Set it to "False" to disable this setting.
+Valid values are either `Male` or `Female`.<br>
+Set it to `False` to disable this setting.
 
 #### \<LOG\>
 Determine if you want or not to log the user in the UserIP logging file.
@@ -172,17 +270,24 @@ Determine if you want or not to log the user in the UserIP logging file.
 #### \<PROTECTION\>
 Determine if you want or not a protection when a user is found.<br>
 Valid values include any of the following protections:<br>
-"Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"<br>
-Set it to "False" value to disable this setting.
+`Suspend_Process`, `Exit_Process`, `Restart_Process`, `Shutdown_PC`, `Restart_PC`<br>
+Set it to `False` value to disable this setting.
 
 #### \<PROTECTION_PROCESS_PATH\>
-The file path of the process that will be used for the \<PROTECTION\> setting.<br>
+The file path of the process that will be used for the `<PROTECTION>` setting.<br>
 Please note that UWP apps are not supported.
 
 #### \<PROTECTION_RESTART_PROCESS_PATH\>
 The file path of the process that will be started when<br>
-the \<PROTECTION\> setting is set to the "Restart_Process" value.<br>
+the `<PROTECTION>` setting is set to the `Restart_Process` value.<br>
 Please note that UWP apps are not supported.
+
+#### \<PROTECTION_SUSPEND_PROCESS_MODE\>
+Specifies the duration (in seconds) for which the `<PROTECTION_PROCESS_PATH>` process will be suspended when `<PROTECTION>` is set to `Suspend_Process`.<br>
+
+- Floating-point number: Specify a duration in seconds (e.g., 2.5 for 2.5 seconds).<br>
+- `Auto`: Keep the process suspended as long as the IP is detected in the session.<br>
+- `Manual`: Suspend the process indefinitely until the user manually resumes it.
 
 ### UserIP Entries
 
@@ -200,6 +305,7 @@ LOG=True
 PROTECTION=False
 PROTECTION_PROCESS_PATH=E:\Games\GTAV\GTA5.exe
 PROTECTION_RESTART_PROCESS_PATH=D:\Desktop\Grand Theft Auto V.url
+PROTECTION_SUSPEND_PROCESS_MODE=Auto
 
 [UserIP]
 username1=0.0.0.0
