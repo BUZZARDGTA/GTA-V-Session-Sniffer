@@ -1,5 +1,5 @@
 # Local Python Libraries (Included with Project)
-from Modules.https_utils.unsafe_https import create_unsafe_https_session
+from Modules.https_utils.unsafe_https import s
 
 # Standard Python Libraries
 import re
@@ -11,7 +11,6 @@ RE_NEW_MAC_ENTRY_PATTERN = re.compile(
     r"^(?P<OUI_OR_MAL>[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}-[0-9A-Fa-f]{2}) {3}\(hex\)\t{2}(?P<ORGANIZATION_NAME>.*)\r\n(?P<COMPANY_ID>[0-9A-Fa-f]{6}) {5}\(base 16\)\t{2}(?P<ORGANIZATION_NAME_BIS>.*)\r\n\t{4}(?P<ADDRESS_LINE_1>.*)\r\n\t{4}(?P<ADDRESS_LINE_2>.*)\r\n\t{4}(?P<ADDRESS_COUNTRY_ISO_CODE>.*)",
     re.M
 )
-s = create_unsafe_https_session()
 
 
 class FetchError(Exception):
@@ -66,6 +65,8 @@ def fetch_and_parse_oui_db():
     try:
         response = s.get(OUI_URL)
     except Exception as e:
+        # TODO:
+        print("fetching mac failed")
         raise FetchError("Failed to retrieve data from OUI URL.") from e
 
     oui_db: dict[str, list] = {}

@@ -4,7 +4,7 @@ from Modules.capture.utils import get_tshark_path
 # Standard Python Libraries
 import subprocess
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 from datetime import datetime
 
 
@@ -26,7 +26,7 @@ class UDP:
         self.dstport = int(dstport) if dstport else None
 
 class Packet:
-    def __init__(self, fields: list):
+    def __init__(self, fields: list[str]):
         self.frame = Frame(fields[0])
         self.ip = IP(fields[1], fields[2])
         self.udp = UDP(fields[3], fields[4])
@@ -35,8 +35,8 @@ class PacketCapture:
     def __init__(
         self,
         interface: str,
-        capture_filter: None | str = None,
-        display_filter: None | str = None,
+        capture_filter: Optional[str] = None,
+        display_filter: Optional[str] = None,
         tshark_path: Path = None
     ):
         self.interface = interface
@@ -52,8 +52,8 @@ class PacketCapture:
             '--log-level', 'critical',
             '-B', '1',
             '-i', interface,
-            *(("-f", capture_filter) if capture_filter else ()),
-            *(("-Y", display_filter) if display_filter else ()),
+            *(('-f', capture_filter) if capture_filter else ()),
+            *(('-Y', display_filter) if display_filter else ()),
             '-T', 'fields',
             '-E', 'separator=|',
             '-e', 'frame.time_epoch',
@@ -84,7 +84,8 @@ class PacketCapture:
             time_elapsed = time.time() - start_time
             if time_elapsed >= timeout:
                 if packets_queue.empty():
-                    callback("None")
+                    # NOTE: I don't use this code anyways, but returning `None` here seems like an issue to fix.
+                    callback('None')
                 else:
                     while not packets_queue.empty():
                         packet = packets_queue.get()

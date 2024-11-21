@@ -15,7 +15,7 @@ from typing import Optional
 urllib3.disable_warnings(InsecureRequestWarning)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:132.0) Gecko/20100101 Firefox/132.0"
 }
 
 # Allow custom ssl context for adapters
@@ -32,7 +32,7 @@ class CustomSSLContextHTTPAdapter(requests.adapters.HTTPAdapter):
             ssl_context=self.ssl_context,
         )
 
-def create_unsafe_https_session(headers=None):
+def create_unsafe_https_session(headers: dict[str, str] = None):
     context = create_urllib3_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
@@ -48,3 +48,6 @@ def create_unsafe_https_session(headers=None):
     session.verify = False
 
     return session
+
+
+s = create_unsafe_https_session(HEADERS)

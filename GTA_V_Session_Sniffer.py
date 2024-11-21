@@ -4,7 +4,7 @@
 from Modules.capture.capture import PacketCapture, Packet
 from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
 from Modules.oui_lookup.oui_lookup import MacLookup
-from Modules.https_utils.unsafe_https import create_unsafe_https_session
+from Modules.https_utils.unsafe_https import s
 
 # --------------------------------------------
 # 📦 External/Third-party Python Libraries 📦
@@ -33,7 +33,6 @@ import json
 import time
 import enum
 import errno
-import socket
 import ctypes
 import signal
 import logging
@@ -643,37 +642,44 @@ class Settings(DefaultSettings):
 class Interface:
     all_interfaces: list["Interface"] = []
 
-    def __init__(
-        self, name: str,
-        ip_addresses: list[str] = None,
-        mac_address: str = None,
-        organization_name: str = None,
-        packets_sent: int = None,
-        packets_recv: int = None
-    ):
+    def __init__(self, name: str):
         self.name = name
-        self.ip_addresses = ip_addresses
-        self.mac_address = mac_address
-        self.organization_name = organization_name
-        self.packets_sent = packets_sent
-        self.packets_recv = packets_recv
+
+        self.ip_addresses: list[str] = []
+        self.mac_address = "N/A"
+        self.manufacturer = "N/A"
+        self.packets_sent = "N/A"
+        self.packets_recv = "N/A"
         self.arp_infos: dict[str, dict] = {}
+
+        self.Description = "N/A"
+        self.GUID = "N/A"
+        self.Installed = "N/A"
+        self.InterfaceIndex = "N/A"
+        self.Name = "N/A"
+        self.NetEnabled = "N/A"
+        self.PhysicalAdapter = "N/A"
+        self.ProductName = "N/A"
+
+        self.IPEnabled = "N/A"
+        self.SettingID = "N/A"
+
         Interface.all_interfaces.append(self)
 
-    def add_arp_info(self, ip_address: str, mac_address: str, details: Optional[dict[str, str]] = None):
+    def add_arp_info(self, ip_address: str, details: dict[str, str]):
         """
-        Add ARP information for the given IP and MAC addresses.
+        Add ARP information for the given interface IP.
 
         Args:
             ip_address (str): IP address.
             mac_address (str): MAC address.
-            details (Optional[Dict[str, str]]): Additional details related to ARP.
+            details (Dict[str, str]): Details related to ARP.
         """
-        if ip_address and mac_address:
-            arp_info = {"mac_address": mac_address, "details": details or {}}
+        if ip_address:
+            arp_info = {"details": details or {}}
             self.arp_infos[ip_address] = arp_info
 
-    def update_arp_info(self, ip_address: str, details: Optional[dict[str, str]] = None):
+    def update_arp_info(self, ip_address: str, details: dict[str, str]):
         """
         Update ARP information for the given IP address.
 
@@ -702,16 +708,6 @@ class Interface:
         """
         return self.arp_infos.get(ip_address)
 
-    def get_all_arp_infos(self):
-        """
-        Get all ARP information for the given interface.
-        """
-        return self.arp_infos
-
-    @classmethod
-    def get_all_interfaces(cls):
-        return cls.all_interfaces
-
     @classmethod
     def get_interface_by_name(cls, interface_name: str):
         for interface in cls.all_interfaces:
@@ -719,8 +715,15 @@ class Interface:
                 return interface
         return None
 
+    @classmethod
+    def get_interface_by_id(cls, interface_index: int):
+        for interface in cls.all_interfaces:
+            if interface.InterfaceIndex == interface_index:
+                return interface
+        return None
+
 class ThirdPartyServers(enum.Enum):
-    PC_Discord = ["66.22.196.0/22", "66.22.237.0/24", "66.22.238.0/24", "66.22.241.0/24", "66.22.243.0/24", "66.22.244.0/24"]
+    PC_Discord = ["66.22.196.0/22", "66.22.200.0/21", "66.22.208.0/20", "66.22.224.0/20", "66.22.240.0/21", "66.22.248.0/24"]
     PC_Valve = ["103.10.124.0/23", "103.28.54.0/23", "146.66.152.0/21", "155.133.224.0/19", "162.254.192.0/21", "185.25.180.0/22", "205.196.6.0/24"] # Valve = Steam
     PC_Google = ["34.0.0.0/9", "34.128.0.0/10", "35.184.0.0/13", "35.192.0.0/11", "35.224.0.0/12", "35.240.0.0/13"]
     PC_multicast = ["224.0.0.0/4"]
@@ -885,7 +888,6 @@ class PlayersRegistry:
         if player.ip in cls.players_registry:
             raise ValueError(f"Player with IP \"{player.ip}\" already exists.")
         cls.players_registry[player.ip] = player
-
         return player
 
     @classmethod
@@ -1034,6 +1036,7 @@ class UserIP_Databases:
     userip_databases: list[tuple[str, UserIP_Settings, dict[str, list[str]]]] = []
     userip_infos_by_ip: dict[str, UserIP] = {}
     ips_set: set[str] = set()
+    notified_settings_conflicts: set[Path] = set()
     notified_conflicts: set[str] = set()
 
     @staticmethod
@@ -1066,7 +1069,8 @@ class UserIP_Databases:
         :param settings: The settings class for the database.
         :param user_ips: A dictionary mapping usernames to lists of IPs.
         """
-        cls.userip_databases.append((database_name, settings, user_ips))
+        if settings.ENABLED == True:
+            cls.userip_databases.append((database_name, settings, user_ips))
 
     @classmethod
     def reset(cls):
@@ -1195,6 +1199,9 @@ def is_mac_address(mac_address: str):
     return bool(RE_MAC_ADDRESS_PATTERN.match(mac_address))
 
 def is_private_device_ipv4(ip_address: str):
+    return IPv4Address(ip_address).is_private
+
+def is_valid_non_special_ipv4(ip_address: str):
     try:
         ipv4_obj = IPv4Address(ip_address)
     except AddressValueError:
@@ -1229,39 +1236,7 @@ def get_pid_by_path(filepath: Path):
             return process.pid
     return None
 
-def get_interface_info(interface_index: str):
-    c: _wmi_namespace = wmi.WMI()
-    if not isinstance(c, _wmi_namespace):
-        raise TypeError(f"Expected '_wmi_namespace' object, got '{type(c)}'")
-
-    interfaces: list[_wmi_object] = c.Win32_NetworkAdapter(InterfaceIndex=interface_index)
-    if not isinstance(interfaces, list):
-        raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
-    if not interfaces:
-        return None
-    if len(interfaces) > 1:
-        stdout_crash_text = textwrap.dedent(f"""
-            ERROR:
-                   Developer didn't expect this scenario to be possible.
-
-            INFOS:
-                   \"WMI\" Python's module returned more then one
-                   interface for a given interface Index.
-
-            DEBUG:
-                   interface_index: {interface_index}
-                   interfaces: {interfaces}
-                   len(interfaces): {len(interfaces)}
-        """.removeprefix("\n").removesuffix("\n"))
-        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-
-    interface = interfaces[0]
-    if not isinstance(interface, _wmi_object):
-        raise TypeError(f"Expected '_wmi_object' object, got '{type(interface)}'")
-
-    return interface
-
-def get_organization_name(mac_address: Optional[str]):
+def get_mac_address_organization_name(mac_address: Optional[str]):
     if mac_address is None:
         return None
 
@@ -1276,78 +1251,97 @@ def get_organization_name(mac_address: Optional[str]):
 
     return None
 
+def get_tshark_interfaces():
+    def process_stdout(stdout: str):
+        return stdout.strip().split(" ", maxsplit=2)
+
+    stdout = subprocess.check_output([
+        R"C:\Program Files\Wireshark\tshark.exe", "-D"
+    ], text=True, encoding="utf-8")
+
+    interfaces: list[tuple[str, str, str]] = []
+    for parts in map(process_stdout, stdout.splitlines()):
+        if len(parts) == 3:
+            index = parts[0].removesuffix(".")
+            device_name = parts[1]
+            name = parts[2].removeprefix("(").removesuffix(")")
+            interfaces.append((index, device_name, name))
+
+    return interfaces
+
 def get_and_parse_arp_cache():
-    def process_arp_output(arp_output: str):
-        return arp_output.split(maxsplit=5)
-
-    ## Changes the code page to 65001
-    #arp_output = subprocess.check_output([
-    #    "chcp", "65001",
-    #    "&",
-    #    "arp", "-a"
-    #], shell=True, text=True)
-
-    arp_output = subprocess.check_output([
+    stdout = subprocess.check_output([
         "arp", "-a"
-    ], text=True)
+    ], text=True, encoding="utf-8", errors="ignore") # NOTE: "ignore" completely removes those annoying chars, so it might be a problem at some points?
 
-    cached_arp_dict: dict[int, dict[str, str | list[Optional[dict[str, str]]]]] = {}
+    RE_NEW_INTERFACE_PATTERN = re.compile(r"^\w+\s*:\s*(?P<IP_ADDRESS>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*---\s*(?P<INTERFACE_IDX_HEX>0x[0-9a-fA-F]+)$")
+    RE_ENTRY_PATTERN = re.compile(r"^\s*(?P<IP_ADDRESS>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(?P<MAC_ADDRESS>(?:[0-9a-fA-F]{2}[:-]){5}(?:[0-9a-fA-F]{2}))\s*\w+\s*$")
 
-    for parts in map(process_arp_output, arp_output.splitlines()):
-        if (
-            len(parts) >= 4
-            and is_ipv4_address(parts[1])
-            and parts[2] == "---"
-            and is_hex(parts[3])
-        ):
-            interface_index = hex_to_int(parts[3])
-            interface_info = get_interface_info(interface_index)
-            if not interface_info:
-                continue
+    cached_arp_dict: dict[int, dict[str, str | list[dict[str, str]]]] = {}
+    current_interface: dict[str, str | list[dict[str, str]]] = {}
 
-            interface_name: Optional[str] = interface_info.NetConnectionID
-            if not isinstance(interface_name, str):
-                stdout_crash_text = textwrap.dedent(f"""
-                    ERROR:
-                        Developer didn't expect this scenario to be possible.
+    for line in stdout.splitlines():
+        new_interface_match = RE_NEW_INTERFACE_PATTERN.match(line)
+        if new_interface_match:
+            current_interface = {}
 
-                    INFOS:
-                        The "WMI" Python module returned an unexpected
-                        type for the interface name; expected 'str'.
+            ip_address = new_interface_match.group('IP_ADDRESS')
+            interface_idx_hex = new_interface_match.group('INTERFACE_IDX_HEX')
 
-                    DEBUG:
-                        type(interface_name).__name__: {type(interface_name).__name__}
-                        interface_index: {interface_index}
-                        interface_name: {interface_name}
-                """.removeprefix("\n").removesuffix("\n"))
-                terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-
-            interface_ip_address = parts[1]
-
-            cached_arp_dict[interface_index] = dict(
-                interface_name = interface_name,
-                interface_ip_address = interface_ip_address,
-                interface_arp_output = []
-            )
+            if ip_address and isinstance(ip_address, str) and is_ipv4_address(ip_address) and interface_idx_hex and is_hex(interface_idx_hex):
+                interface_index = hex_to_int(interface_idx_hex)
+                interface_name = Interface.get_interface_by_id(interface_index).Name
+                if interface_name:
+                    current_interface = {
+                        "interface_name": Interface.get_interface_by_id(interface_index).Name,
+                        "interface_ip_address": ip_address,
+                        "interface_arp_output": []
+                    }
+                    cached_arp_dict[interface_index] = current_interface
 
             continue
 
-        if (
-            len(parts) >= 3
-            and is_ipv4_address(parts[0])
-            and is_mac_address(parts[1])
-        ):
-            ip_address = parts[0]
-            mac_address = format_mac_address(parts[1])
+        entry_match = RE_ENTRY_PATTERN.match(line)
+        if entry_match and current_interface:
+            ip_address = entry_match.group('IP_ADDRESS')
+            mac_address = entry_match.group('MAC_ADDRESS')
 
-            cached_arp_dict[interface_index]["interface_arp_output"].append(
-                dict(
-                    ip_address = ip_address,
-                    mac_address = mac_address
-                )
-            )
+            if ip_address and isinstance(ip_address, str) and is_ipv4_address(ip_address) and mac_address and isinstance(mac_address, str) and is_mac_address(mac_address):
+                current_interface["interface_arp_output"].append({
+                    "ip_address": ip_address,
+                    "mac_address": mac_address
+                })
 
     return cached_arp_dict
+
+def iterate_network_adapter_details(**kwargs):
+    """Yields network adapter info using WMI."""
+    interfaces: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapter(**kwargs)
+    if not isinstance(interfaces, list):
+        raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
+    if not interfaces:
+        return None
+
+    for interface in interfaces:
+        if not isinstance(interface, _wmi_object):
+            raise TypeError(f"Expected '_wmi_object', got '{type(interface)}'")
+
+        yield(interface)
+
+def iterate_network_ip_details(**kwargs):
+    """Yields network IP address info using WMI."""
+    # Get network adapter configurations
+    configurations: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapterConfiguration(**kwargs)
+    if not isinstance(configurations, list):
+        raise TypeError(f"Expected 'list', got '{type(configurations)}'")
+    if not configurations:
+        return None
+
+    for configuration in configurations:
+        if not isinstance(configuration, _wmi_object):
+            raise TypeError(f"Expected '_wmi_object', got '{type(configuration)}'")
+
+        yield(configuration)
 
 def format_mac_address(mac_address: str):
     if not is_mac_address(mac_address):
@@ -1825,22 +1819,27 @@ def parse_userip_ini_file(ini_path: Path):
                                     is_setting_corrupted = True
 
                 if is_setting_corrupted:
-                    stdout_crash_text = textwrap.dedent(f"""
-                        ERROR:
-                            Corrupted UserIP Database File (Settings)
+                    if not ini_path in UserIP_Databases.notified_settings_conflicts:
+                        UserIP_Databases.notified_settings_conflicts.add(ini_path)
+                        msgbox_title = TITLE
+                        msgbox_message = textwrap.dedent(f"""
+                            ERROR:
+                                Corrupted UserIP Database File (Settings)
 
-                        INFOS:
-                            UserIP database file:
-                            \"{ini_path}\"
-                            has an invalid settings value:
+                            INFOS:
+                                UserIP database file:
+                                \"{ini_path}\"
+                                has an invalid settings value:
 
-                            {setting}={value}
+                                {setting}={value}
 
-                            For more information on formatting, please refer to the
-                            documentation:
-                                https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-                    """.removeprefix("\n").removesuffix("\n"))
-                    terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+                                For more information on formatting, please refer to the
+                                documentation:
+                                    https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                        """.removeprefix("\n").removesuffix("\n"))
+                        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+                        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                    return None, None
 
                 if need_rewrite_current_setting:
                     corrected_ini_data_lines[-1] = f"{setting}={settings[setting]}"
@@ -1876,6 +1875,35 @@ def parse_userip_ini_file(ini_path: Path):
             else:
                 userip[username] = [ip]
 
+    list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
+    number_of_settings_missing = len(list_of_missing_settings)
+
+    if number_of_settings_missing > 0:
+        if not ini_path in UserIP_Databases.notified_settings_conflicts:
+            UserIP_Databases.notified_settings_conflicts.add(ini_path)
+            msgbox_title = TITLE
+            msgbox_message = textwrap.dedent(f"""
+                ERROR:
+                    Missing setting{plural(number_of_settings_missing)} in UserIP Database File
+
+                INFOS:
+                    UserIP database file:
+                    \"{ini_path}\"
+                    has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
+
+                    {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
+
+                    For more information on formatting, please refer to the
+                    documentation:
+                        https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+            """.removeprefix("\n").removesuffix("\n"))
+            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+        return None, None
+
+    if ini_path in UserIP_Databases.notified_settings_conflicts:
+        UserIP_Databases.notified_settings_conflicts.remove(ini_path)
+
     # Basically always have a newline ending
     if len(corrected_ini_data_lines) > 1:
         if not corrected_ini_data_lines[-1] == "":
@@ -1884,28 +1912,7 @@ def parse_userip_ini_file(ini_path: Path):
     fixed_ini_data = "\n".join(corrected_ini_data_lines)
 
     if not ini_data == fixed_ini_data:
-        ini_path.write_text(fixed_ini_data)
-
-    list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
-    number_of_settings_missing = len(list_of_missing_settings)
-
-    if number_of_settings_missing > 0:
-        stdout_crash_text = textwrap.dedent(f"""
-            ERROR:
-                Missing setting{plural(number_of_settings_missing)} in UserIP Database File
-
-            INFOS:
-                UserIP database file:
-                \"{ini_path}\"
-                has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
-
-                {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
-
-                For more information on formatting, please refer to the
-                documentation:
-                    https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-        """.removeprefix("\n").removesuffix("\n"))
-        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+        ini_path.write_text(fixed_ini_data, encoding="utf-8")
 
     return UserIP_Settings(
         settings["ENABLED"],
@@ -1929,7 +1936,7 @@ def is_file_need_newline_ending(file):
 def terminate_process_tree(pid: int = None):
     """Terminates the process with the given PID and all its child processes.
        Defaults to the current process if no PID is specified."""
-    pid = pid or os.getpid()
+    pid = pid or psutil.Process().pid
 
     try:
         parent = psutil.Process(pid)
@@ -2032,7 +2039,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.1.9 - 10/11/2024 (01:18)"
+VERSION = "v1.2.0 - 21/11/2024 (23:02)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -2048,8 +2055,6 @@ USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICA
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
 WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
-
-s = create_unsafe_https_session()
 
 cls()
 title(f"Searching for a new update - {TITLE}")
@@ -2112,7 +2117,7 @@ if not is_pyinstaller_compiled():
 
     third_party_packages = {
         "colorama": "0.4.6",
-        "geoip2": "4.8.0",
+        "geoip2": "4.8.1",
         "prettytable": "3.12.0",
         "psutil": "6.1.0",
         "requests": "2.32.3",
@@ -2254,102 +2259,141 @@ geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_read
 cls()
 title(f"Initializing MacLookup module - {TITLE}")
 print(f"\nInitializing MacLookup module ...\n")
-mac_lookup = MacLookup(bypass_fetch_error=True)
+if Settings.CAPTURE_ARP:
+    mac_lookup = MacLookup(bypass_fetch_error=True)
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
 print(f"\nCapture network interface selection ...\n")
-if Settings.CAPTURE_ARP:
-    cached_arp_dict = get_and_parse_arp_cache()
+wmi_namespace: _wmi_namespace = wmi.WMI()
+if not isinstance(wmi_namespace, _wmi_namespace):
+    raise TypeError(f"Expected '_wmi_namespace' object, got '{type(wmi_namespace)}'")
+
+for _, _, name in get_tshark_interfaces():
+    Interface(name)
 
 net_io_stats = psutil.net_io_counters(pernic=True)
-net_if_addrs = psutil.net_if_addrs()
 
-for interface, stats in net_io_stats.items():
-    if interface not in net_if_addrs:
+for interface_name, interface_stats in net_io_stats.items():
+    i = Interface.get_interface_by_name(interface_name)
+    if not i:
         continue
 
-    ip_addresses: list[str] = []
-    mac_addresses: list[str] = []
+    i.packets_sent = interface_stats.packets_sent
+    i.packets_recv = interface_stats.packets_recv
 
-    for addr in net_if_addrs[interface]:
-        if addr.family == socket.AF_INET:
-            ip_addresses.append(addr.address)
-        elif addr.family == psutil.AF_LINK:
-            mac_addresses.append(addr.address)
-
-    if not ip_addresses:
+for interface in iterate_network_adapter_details():
+    i = Interface.get_interface_by_name(interface.NetConnectionID)
+    if not i:
         continue
 
-    if len(mac_addresses) > 1:
+    i.Description = interface.Description
+    i.GUID = interface.GUID
+    i.Installed = interface.Installed
+    if interface.InterfaceIndex is not None and i.InterfaceIndex != "N/A":
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                 Developer didn't expect this scenario to be possible.
 
             INFOS:
-                The IP address has multiple MAC addresses.
+                \"WMI\" Python's module returned more then one
+                interface for a given interface Index.
 
             DEBUG:
-                interface: {interface}
-                ip_addresses: {ip_addresses}
-                mac_addresses: {mac_addresses}
+                i.InterfaceIndex: {i.InterfaceIndex}
+                interface.InterfaceIndex: {interface.InterfaceIndex}
         """.removeprefix("\n").removesuffix("\n"))
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+    i.InterfaceIndex = interface.InterfaceIndex
+    i.mac_address = interface.MACAddress
+    i.manufacturer = interface.Manufacturer
+    i.Name = interface.Name
+    i.NetEnabled = interface.NetEnabled
+    i.PhysicalAdapter = interface.PhysicalAdapter
+    i.ProductName = interface.ProductName
 
-    ip_addresses = [ip for ip in ip_addresses if is_private_device_ipv4(ip)]
-    if not ip_addresses:
+for configuration in iterate_network_ip_details():
+    i = Interface.get_interface_by_id(configuration.InterfaceIndex)
+    if not i:
         continue
 
-    mac_address = format_mac_address(mac_addresses[0]) if mac_addresses else None
+    if configuration.IPAddress is not None:
+        ip_addresses = configuration.IPAddress
+        if isinstance(ip_addresses, str):
+            ip_addresses = [ip_addresses]
+        elif not isinstance(ip_addresses, (list, tuple)):
+            ip_addresses = []
 
-    organization_name = (
-        get_organization_name(mac_address)
-        or "N/A"
-    )
-
-    Interface(interface, ip_addresses, mac_address, organization_name, stats.packets_sent, stats.packets_recv)
-
-    if not Settings.CAPTURE_ARP:
-        continue
-
-    for ip_address in ip_addresses:
-        for interface_info in cached_arp_dict.values():
-            if (
-                not interface_info["interface_name"] == interface
-                or not interface_info["interface_ip_address"] == ip_address
-                or not interface_info["interface_arp_output"]
-            ):
+        for ip in ip_addresses:
+            if not is_ipv4_address(ip):
                 continue
 
-            arp_info: dict[str, str] = [
-                {
-                    "ip_address": entry["ip_address"],
-                    "mac_address": entry["mac_address"],
-                    "organization_name": (
-                        get_organization_name(entry["mac_address"])
-                        or "N/A"
-                    )
-                }
-                for entry in interface_info["interface_arp_output"]
-                if is_private_device_ipv4(entry["ip_address"])
-            ]
+            if ip not in i.ip_addresses:
+                i.ip_addresses.append(ip)
 
-            Interface.get_interface_by_name(interface).add_arp_info(ip_address, mac_address, arp_info)
+    if configuration.MACAddress is not None:
+        if i.mac_address != configuration.MACAddress:
+            stdout_crash_text = textwrap.dedent(f"""
+                ERROR:
+                    Developer didn't expect this scenario to be possible.
+
+                INFOS:
+                    The IP address has multiple MAC addresses.
+
+                DEBUG:
+                    i.name: {i.name}
+                    i.mac_address: {i.mac_address}
+                    configuration.MACAddress: {configuration.MACAddress}
+            """.removeprefix("\n").removesuffix("\n"))
+            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+        i.mac_address = configuration.MACAddress
+    i.IPEnabled = configuration.IPEnabled
+    i.SettingID = configuration.SettingID
+
+if Settings.CAPTURE_ARP:
+    cached_arp_dict = get_and_parse_arp_cache()
+
+    for interface_index, interface_info in cached_arp_dict.items():
+        i = Interface.get_interface_by_id(interface_index)
+        if not i:
+            continue
+
+        if (
+            not interface_info["interface_name"] == i.Name
+            or not interface_info["interface_ip_address"] in i.ip_addresses
+            or not interface_info["interface_arp_output"]
+        ):
+            continue
+
+        arp_info: dict[str, str] = [
+            {
+                "ip_address": entry["ip_address"],
+                "mac_address": format_mac_address(entry["mac_address"]),
+                "organization_name": (
+                    get_mac_address_organization_name(entry["mac_address"])
+                    or "N/A"
+                )
+            }
+            for entry in interface_info["interface_arp_output"]
+            if is_valid_non_special_ipv4(entry["ip_address"])
+        ]
+
+        i.add_arp_info(interface_info["interface_ip_address"], arp_info)
 
 table = PrettyTable()
-table.field_names = ["#", "Interface", "Packets Sent", "Packets Received", "IP Address", "MAC Address", "Organization Name"]
+table.field_names = ["#", "Interface", "Packets Sent", "Packets Received", "IP Address", "MAC Address", "Manufacturer"]
 table.align["#"] = "c"
 table.align["Interface"] = "l"
 table.align["Packets Sent"] = "c"
 table.align["Packets Received"] = "c"
 table.align["IP Address"] = "l"
 table.align["MAC Address"] = "c"
-table.align["Organization Name"] = "c"
+table.align["Manufacturer"] = "c"
 
 interfaces_options: dict[int, dict[str, Optional[str]]] = {}
 counter = 0
 
-for interface in Interface.get_all_interfaces():
+for interface in Interface.all_interfaces:
     if (
         Settings.CAPTURE_INTERFACE_NAME is not None
         and Settings.CAPTURE_INTERFACE_NAME.lower() == interface.name.lower()
@@ -2358,33 +2402,40 @@ for interface in Interface.get_all_interfaces():
         Settings.CAPTURE_INTERFACE_NAME = interface.name
         Settings.reconstruct_settings()
 
-    for ip_address in interface.ip_addresses:
-        counter += 1
+    if interface.ip_addresses:
+        for ip_address in interface.ip_addresses:
+            counter += 1
+            interfaces_options[counter] = {
+                "is_arp": False,
+                "Interface": interface.name,
+                "IP Address": ip_address,
+                "MAC Address": interface.mac_address
+            }
 
+            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, ip_address, interface.mac_address, interface.manufacturer])
+    else:
+        counter += 1
         interfaces_options[counter] = {
             "is_arp": False,
             "Interface": interface.name,
-            "IP Address": ip_address,
+            "IP Address": "N/A",
             "MAC Address": interface.mac_address
         }
 
-        table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, ip_address, interface.mac_address, interface.organization_name])
+        table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, "N/A", interface.mac_address, interface.manufacturer])
 
-    if not Settings.CAPTURE_ARP:
-        continue
+    if Settings.CAPTURE_ARP:
+        for ip_address, info in interface.arp_infos.items():
+            for detail in info["details"]:
+                counter += 1
+                interfaces_options[counter] = {
+                    "is_arp": True,
+                    "Interface": interface.name,
+                    "IP Address": detail["ip_address"],
+                    "MAC Address": detail["mac_address"]
+                }
 
-    for ip_address, info in interface.get_all_arp_infos().items():
-        for detail in info["details"]:
-            counter += 1
-
-            interfaces_options[counter] = {
-                "is_arp": True,
-                "Interface": interface.name,
-                "IP Address": detail["ip_address"],
-                "MAC Address": detail["mac_address"]
-            }
-
-            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{interface.name} (ARP)", "N/A", "N/A", detail["ip_address"], detail["mac_address"], detail["organization_name"]])
+                table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{interface.name} (ARP)", "N/A", "N/A", detail["ip_address"], detail["mac_address"], detail["organization_name"]])
 
 user_interface_selection = None
 
@@ -2431,31 +2482,33 @@ cls()
 title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
 print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 need_rewrite_settings = False
+fixed__capture_mac_address = interfaces_options[user_interface_selection]["MAC Address"] if interfaces_options[user_interface_selection]["MAC Address"] != "N/A" else None
+fixed__capture_ip_address = interfaces_options[user_interface_selection]["IP Address"] if interfaces_options[user_interface_selection]["IP Address"] != "N/A" else None
 
 if not Settings.CAPTURE_INTERFACE_NAME == interfaces_options[user_interface_selection]["Interface"]:
     Settings.CAPTURE_INTERFACE_NAME = interfaces_options[user_interface_selection]["Interface"]
     need_rewrite_settings = True
 
-if not Settings.CAPTURE_MAC_ADDRESS == interfaces_options[user_interface_selection]["MAC Address"]:
-    Settings.CAPTURE_MAC_ADDRESS = interfaces_options[user_interface_selection]["MAC Address"]
+if not Settings.CAPTURE_MAC_ADDRESS == fixed__capture_mac_address:
+    Settings.CAPTURE_MAC_ADDRESS = fixed__capture_mac_address
     need_rewrite_settings = True
 
-if not Settings.CAPTURE_IP_ADDRESS == interfaces_options[user_interface_selection]["IP Address"]:
-    Settings.CAPTURE_IP_ADDRESS = interfaces_options[user_interface_selection]["IP Address"]
+if not Settings.CAPTURE_IP_ADDRESS == fixed__capture_ip_address:
+    Settings.CAPTURE_IP_ADDRESS = fixed__capture_ip_address
     need_rewrite_settings = True
 
 if need_rewrite_settings:
     Settings.reconstruct_settings()
 
-capture_filter: list[str]  = [
-    f"((src host {Settings.CAPTURE_IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {Settings.CAPTURE_IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))",
-    "udp"
-]
+capture_filter: list[str] = ["ip", "udp"]
 display_filter: list[str] = []
-excluded_protocols = []
+excluded_protocols: list[str] = []
+
+if Settings.CAPTURE_IP_ADDRESS:
+    capture_filter.append(f"((src host {Settings.CAPTURE_IP_ADDRESS} and (not (dst net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))) or (dst host {Settings.CAPTURE_IP_ADDRESS} and (not (src net 10.0.0.0/8 or 100.64.0.0/10 or 172.16.0.0/12 or 192.168.0.0/16 or 224.0.0.0/4))))")
 
 if not Settings.CAPTURE_VPN_MODE:
-    capture_filter.append(f"not (broadcast or multicast)")
+    capture_filter.append("not (broadcast or multicast)")
 capture_filter.append("not (portrange 0-1023 or port 5353)")
 
 if Settings.CAPTURE_PROGRAM_PRESET:
@@ -2750,7 +2803,7 @@ def iplookup_core():
 
             throttle_until()
 
-tshark_latency = []
+tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
@@ -2832,7 +2885,7 @@ def stdout_render_core():
                 # username1=192.168.1.1
                 # username2=127.0.0.1
                 # username3=255.255.255.255
-            """.removeprefix("\n").removesuffix("\n"))
+            """.removeprefix("\n"))
 
             USERIP_DATABASES_PATH.mkdir(parents=True, exist_ok=True)
 
@@ -2841,10 +2894,19 @@ def stdout_render_core():
                     file_content = f"{DEFAULT_USERIP_FILE_HEADER}\n\n{settings}\n\n{DEFAULT_USERIP_FILE_FOOTER}"
                     userip_path.write_text(file_content, encoding="utf-8")
 
+            # Remove deleted files from notified settings conflicts
+            # TODO:
+            # I should also warn again on another error, but it'd probably requiere a DICT then.
+            # I have things more important to code atm.
+            for path in set(UserIP_Databases.notified_settings_conflicts):
+                if not path.exists() or not path.is_file():
+                    UserIP_Databases.notified_settings_conflicts.remove(path)
+
             UserIP_Databases.reset()
             for userip_path in USERIP_DATABASES_PATH.glob("*.ini"):
                 parsed_settings, parsed_data = parse_userip_ini_file(userip_path)
-                UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
+                if parsed_settings is not None and parsed_data is not None:
+                    UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
             UserIP_Databases.build()
 
             last_userip_parse_time = time.perf_counter()
@@ -2943,7 +3005,7 @@ def stdout_render_core():
                     field_names[i] += " \u2193"
                     break
 
-        global iplookup_core__thread, global_pps_counter, tshark_latency
+        global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
 
         session_connected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         session_disconnected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
@@ -2995,8 +3057,10 @@ def stdout_render_core():
         global_pps_rate = 0
         last_userip_parse_time = None
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_IP_ADDRESS)), len(str(Settings.CAPTURE_INTERFACE_NAME)), len(str(is_arp_enabled)))
-        stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{Settings.CAPTURE_IP_ADDRESS}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+        displayed__capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+
+        padding_width = calculate_padding_width(109, 44, len(displayed__capture_ip_address), len(str(Settings.CAPTURE_INTERFACE_NAME)), len(str(is_arp_enabled)))
+        stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
         two_take_one__plugin__ip_to_usernames: dict[str, list[str]] = {}
 
         # NOTE: The log file content is read only once because the plugin is no longer supported.
@@ -3119,32 +3183,28 @@ def stdout_render_core():
             else:
                 len_session_disconnected_message = f"showing {len(session_disconnected)}/{len(session_disconnected_all)}"
 
-            printer.cache_print("")
+            current_time = datetime.now()
+            one_second_ago = current_time - timedelta(seconds=1)
 
-            if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
-                printer.cache_print("-" * 109)
-                printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-                printer.cache_print("  * https://github.com/BUZZARDGTA")
-                printer.cache_print("")
-                printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
-                printer.cache_print("")
+            # Filter packets received in the last second
+            recent_packets = [(pkt_time, pkt_latency) for pkt_time, pkt_latency in tshark_packets_latencies if pkt_time >= one_second_ago]
 
-            printer.cache_print(f"-" * 109)
-            printer.cache_print(f"                         Welcome in {TITLE_VERSION}")
-            printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-            printer.cache_print(f"-   " * 28)
-            printer.cache_print(stdout__scanning_on_network_interface)
-            tshark_average_latency = sum(tshark_latency, timedelta(0)) / len(tshark_latency) if tshark_latency else timedelta(0)
-            tshark_latency = []
+            # Update latencies list to only keep recent packets
+            tshark_packets_latencies[:] = recent_packets
 
-            # Convert the average latency to seconds and round it to 1 decimal place
-            average_latency_seconds = tshark_average_latency.total_seconds()
-            average_latency_rounded = round(average_latency_seconds, 1)
+            # Calculate average latency
+            if recent_packets:
+                total_latency_seconds = sum(pkt_latency.total_seconds() for _, pkt_latency in recent_packets)
+                avg_latency_seconds = total_latency_seconds / len(recent_packets)
+                avg_latency_rounded = round(avg_latency_seconds, 1)
+            else:
+                avg_latency_seconds = 0.0
+                avg_latency_rounded = 0.0
 
-            if tshark_average_latency >= timedelta(seconds=0.90 * Settings.CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 90% threshold
+            # Determine latency color
+            if avg_latency_seconds >= 0.90 * Settings.CAPTURE_OVERFLOW_TIMER:
                 latency_color = Fore.RED
-            elif tshark_average_latency >= timedelta(seconds=0.75 * Settings.CAPTURE_OVERFLOW_TIMER):  # Check if average latency exceeds 75% threshold
+            elif avg_latency_seconds >= 0.75 * Settings.CAPTURE_OVERFLOW_TIMER:
                 latency_color = Fore.YELLOW
             else:
                 latency_color = Fore.GREEN
@@ -3165,9 +3225,26 @@ def stdout_render_core():
             else:
                 pps_color = Fore.GREEN
 
+            printer.cache_print("")
+
+            if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
+                printer.cache_print("-" * 109)
+                printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
+                printer.cache_print("  * https://github.com/BUZZARDGTA")
+                printer.cache_print("")
+                printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
+                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
+                printer.cache_print("")
+
+            printer.cache_print(f"-" * 109)
+            printer.cache_print(f"                         Welcome in {TITLE_VERSION}")
+            printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+            printer.cache_print(f"-   " * 28)
+            printer.cache_print(stdout__scanning_on_network_interface)
+
             color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
-            padding_width = calculate_padding_width(109, 71, len(str(plural(average_latency_seconds))), len(str(average_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
-            printer.cache_print(f"{' ' * padding_width}Captured packets average second{plural(average_latency_seconds)} latency:{latency_color}{average_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
+            padding_width = calculate_padding_width(109, 71, len(str(plural(avg_latency_seconds))), len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
+            printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
             printer.cache_print(f"-" * 109)
 
             stdout_connected_players_table = PrettyTable()
@@ -3267,9 +3344,6 @@ def stdout_render_core():
             printer.cache_print(stdout_disconnected_players_table.get_string())
             printer.cache_print("")
 
-            cls()
-            printer.flush_cache()
-
             if Settings.STDOUT_SESSIONS_LOGGING:
                 logging_connected_players_table = PrettyTable()
                 logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
@@ -3335,17 +3409,29 @@ def stdout_render_core():
                     stdout_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
                     f.write(stdout_without_vt100)
 
+            cls()
+            printer.flush_cache()
+
             og_process_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
 
             if Settings.STDOUT_REFRESHING_TIMER == 0:
-                safe_print("\033[K" + f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})", end="\r")
-                time.sleep(0.1)
-                continue
+                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
+                    safe_print("\033[K" + f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)})", end="\r")
+                    continue
+                else:
+                    safe_print("\033[K" + f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})", end="\r")
+                    continue
 
-            if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 1.0:
-                safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
-                time.sleep(0.1)
-                continue
+            if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
+                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 0.1:
+                    safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
+                    time.sleep(0.1)
+                    continue
+            else:
+                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 1.0:
+                    safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
+                    time.sleep(0.1)
+                    continue
 
             while True:
                 total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
@@ -3381,19 +3467,57 @@ def packet_callback(packet: Packet):
     packet_datetime = packet.frame.datetime
 
     packet_latency = datetime.now() - packet_datetime
-    tshark_latency.append(packet_latency)
+    tshark_packets_latencies.append((packet_datetime, packet_latency))
     if packet_latency >= timedelta(seconds=Settings.CAPTURE_OVERFLOW_TIMER):
         tshark_restarted_times += 1
         raise PacketCaptureOverflow("Packet capture time exceeded 3 seconds.")
 
-    if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
-        target_ip = packet.ip.dst
-        target_port = packet.udp.dstport
-    elif packet.ip.dst == Settings.CAPTURE_IP_ADDRESS:
-        target_ip = packet.ip.src
-        target_port = packet.udp.srcport
+    if Settings.CAPTURE_IP_ADDRESS:
+        if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
+            target_ip = packet.ip.dst
+            target_port = packet.udp.dstport
+        elif packet.ip.dst == Settings.CAPTURE_IP_ADDRESS:
+            target_ip = packet.ip.src
+            target_port = packet.udp.srcport
+        else:
+            stdout_crash_text = textwrap.dedent(f"""
+                ERROR:
+                    Developer didn't expect this scenario to be possible.
+
+                INFOS:
+                    Neither source nor destination IP address matches the specified <CAPTURE_IP_ADDRESS>.
+
+                DEBUG:
+                    Settings.CAPTURE_IP_ADDRESS: {Settings.CAPTURE_IP_ADDRESS}
+                    packet.ip.src: {packet.ip.src}
+                    packet.ip.dst: {packet.ip.dst}
+            """.removeprefix("\n").removesuffix("\n"))
+            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
     else:
-        raise ValueError("Neither the source nor destination address matches the specified <CAPTURE_IP_ADDRESS>.")
+        is_src_private_ip = is_private_device_ipv4(packet.ip.src)
+        is_dst_private_ip = is_private_device_ipv4(packet.ip.dst)
+
+        if is_src_private_ip and is_dst_private_ip:
+            return
+        elif is_src_private_ip:
+            target_ip = packet.ip.dst
+            target_port = packet.udp.dstport
+        elif is_dst_private_ip:
+            target_ip = packet.ip.src
+            target_port = packet.udp.srcport
+        else:
+            stdout_crash_text = textwrap.dedent(f"""
+                ERROR:
+                    Developer didn't expect this scenario to be possible.
+
+                INFOS:
+                    Neither source nor destination is a private IP address.
+
+                DEBUG:
+                    packet.ip.src: {packet.ip.src}
+                    packet.ip.dst: {packet.ip.dst}
+            """.removeprefix("\n").removesuffix("\n"))
+            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     if not target_port:
         stdout_crash_text = textwrap.dedent(f"""
