@@ -1290,7 +1290,14 @@ def get_and_parse_arp_cache():
 
             if ip_address and isinstance(ip_address, str) and is_ipv4_address(ip_address) and interface_idx_hex and is_hex(interface_idx_hex):
                 interface_index = hex_to_int(interface_idx_hex)
-                interface_name = Interface.get_interface_by_id(interface_index).Name
+                interface = Interface.get_interface_by_id(interface_index)
+
+                # checks for None and handles it before proceeding
+                if interface is None:
+                    print(f"Warning: No interface found for index {interface_index}")
+                    continue
+                interface_name = interface.Name
+
                 if interface_name:
                     current_interface = {
                         "interface_name": Interface.get_interface_by_id(interface_index).Name,
