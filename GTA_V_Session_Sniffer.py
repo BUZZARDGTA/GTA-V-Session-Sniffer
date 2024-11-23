@@ -639,72 +639,45 @@ class Settings(DefaultSettings):
         if need_rewrite_settings:
             Settings.reconstruct_settings()
 
+class Adapter_Properties:
+    def __init__(self,
+        interface_index = "N/A",
+        manufacturer    = "N/A"
+    ):
+        self.InterfaceIndex: Union[Literal["N/A"], int] = interface_index
+        self.Manufacturer  : Union[Literal["N/A"], str] = manufacturer
+
 class Interface:
     all_interfaces: list["Interface"] = []
 
     def __init__(self, name: str):
         self.name = name
 
-        self.ip_addresses: list[str] = []
-        self.mac_address = "N/A"
-        self.manufacturer = "N/A"
-        self.packets_sent = "N/A"
-        self.packets_recv = "N/A"
-        self.arp_infos: dict[str, dict] = {}
+        self.ip_addresses     : list[Optional[str]]                       = []
+        self.mac_address      : Union[Literal["N/A"], str]                = "N/A"
+        self.organization_name: Union[Literal["N/A"], str]                = "N/A"
+        self.packets_sent     : Union[Literal["N/A"], int]                = "N/A"
+        self.packets_recv     : Union[Literal["N/A"], int]                = "N/A"
+        self.arp_infos        : dict[str, Optional[list[dict[str, str]]]] = {}
 
-        self.Description = "N/A"
-        self.GUID = "N/A"
-        self.Installed = "N/A"
-        self.InterfaceIndex = "N/A"
-        self.Name = "N/A"
-        self.NetEnabled = "N/A"
-        self.PhysicalAdapter = "N/A"
-        self.ProductName = "N/A"
-
-        self.IPEnabled = "N/A"
-        self.SettingID = "N/A"
+        self.adapter_properties = Adapter_Properties()
 
         Interface.all_interfaces.append(self)
 
-    def add_arp_info(self, ip_address: str, details: dict[str, str]):
+    def add_arp_infos(self, ip_address: str, arp_infos: list[dict[str, str]]):
         """
-        Add ARP information for the given interface IP.
+        Add ARP informations for the given interface IP address.
+        """
+        if self.arp_infos.get(ip_address) is None:
+            self.arp_infos[ip_address] = []
 
-        Args:
-            ip_address (str): IP address.
-            mac_address (str): MAC address.
-            details (Dict[str, str]): Details related to ARP.
-        """
-        if ip_address:
-            arp_info = {"details": details or {}}
-            self.arp_infos[ip_address] = arp_info
+        for arp_info in arp_infos:
+            if arp_info not in self.arp_infos[ip_address]:
+                self.arp_infos[ip_address].append(arp_info)
 
-    def update_arp_info(self, ip_address: str, details: dict[str, str]):
+    def get_arp_infos(self, ip_address: str):
         """
-        Update ARP information for the given IP address.
-
-        Args:
-            ip_address (str): IP address.
-            details (Optional[Dict[str, str]]): Updated details related to ARP.
-        """
-        if ip_address in self.arp_infos:
-            self.arp_infos[ip_address]["details"].update(details or {})
-
-    def get_infos(self):
-        """
-        Get information about all attributes of the Interface class for the given instance.
-        """
-        info_dict = self.__dict__.copy()
-        # Remove any internal attributes or methods
-        info_dict.pop("arp_infos", None)
-        return info_dict
-
-    def get_arp_info_by_ip(self, ip_address: str):
-        """
-        Get ARP information for the given IP address.
-
-        Args:
-            ip_address (str): IP address.
+        Get ARP informations for the given interface IP address.
         """
         return self.arp_infos.get(ip_address)
 
@@ -718,7 +691,7 @@ class Interface:
     @classmethod
     def get_interface_by_id(cls, interface_index: int):
         for interface in cls.all_interfaces:
-            if interface.InterfaceIndex == interface_index:
+            if interface.adapter_properties.InterfaceIndex == interface_index:
                 return interface
         return None
 
@@ -1241,7 +1214,7 @@ def get_mac_address_organization_name(mac_address: Optional[str]):
         return None
 
     oui_or_mal_infos: list[dict[str, str]] = mac_lookup.lookup(mac_address)
-    if not oui_or_mal_infos:
+    if oui_or_mal_infos is None:
         return None
 
     for oui_or_mal in oui_or_mal_infos:
@@ -1286,38 +1259,34 @@ def get_and_parse_arp_cache():
             current_interface = {}
 
             ip_address = new_interface_match.group('IP_ADDRESS')
+            if ip_address is None or not isinstance(ip_address, str) or not is_ipv4_address(ip_address):
+                continue
             interface_idx_hex = new_interface_match.group('INTERFACE_IDX_HEX')
+            if interface_idx_hex is None or not isinstance(interface_idx_hex, str) or not is_hex(interface_idx_hex):
+                continue
 
-            if ip_address and isinstance(ip_address, str) and is_ipv4_address(ip_address) and interface_idx_hex and is_hex(interface_idx_hex):
-                interface_index = hex_to_int(interface_idx_hex)
-                interface = Interface.get_interface_by_id(interface_index)
+            interface_index = hex_to_int(interface_idx_hex)
 
-                # checks for None and handles it before proceeding
-                if interface is None:
-                    print(f"Warning: No interface found for index {interface_index}")
-                    continue
-                interface_name = interface.Name
-
-                if interface_name:
-                    current_interface = {
-                        "interface_name": Interface.get_interface_by_id(interface_index).Name,
-                        "interface_ip_address": ip_address,
-                        "interface_arp_output": []
-                    }
-                    cached_arp_dict[interface_index] = current_interface
-
+            current_interface = {
+                "interface_ip_address": ip_address,
+                "interface_arp_output": []
+            }
+            cached_arp_dict[interface_index] = current_interface
             continue
 
         entry_match = RE_ENTRY_PATTERN.match(line)
         if entry_match and current_interface:
             ip_address = entry_match.group('IP_ADDRESS')
+            if ip_address is None or not isinstance(ip_address, str) or not is_ipv4_address(ip_address):
+                continue
             mac_address = entry_match.group('MAC_ADDRESS')
+            if mac_address is None or not isinstance(mac_address, str) or not is_mac_address(mac_address):
+                continue
 
-            if ip_address and isinstance(ip_address, str) and is_ipv4_address(ip_address) and mac_address and isinstance(mac_address, str) and is_mac_address(mac_address):
-                current_interface["interface_arp_output"].append({
-                    "ip_address": ip_address,
-                    "mac_address": mac_address
-                })
+            current_interface["interface_arp_output"].append({
+                "ip_address": ip_address,
+                "mac_address": mac_address
+            })
 
     return cached_arp_dict
 
@@ -1326,8 +1295,6 @@ def iterate_network_adapter_details(**kwargs):
     interfaces: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapter(**kwargs)
     if not isinstance(interfaces, list):
         raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
-    if not interfaces:
-        return None
 
     for interface in interfaces:
         if not isinstance(interface, _wmi_object):
@@ -1341,8 +1308,6 @@ def iterate_network_ip_details(**kwargs):
     configurations: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapterConfiguration(**kwargs)
     if not isinstance(configurations, list):
         raise TypeError(f"Expected 'list', got '{type(configurations)}'")
-    if not configurations:
-        return None
 
     for configuration in configurations:
         if not isinstance(configuration, _wmi_object):
@@ -1632,10 +1597,10 @@ def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "l
             continue
         setting_name = match.group("key")
         if not isinstance(setting_name, str):
-            raise TypeError(f"Expected 'str' object, got '{type(setting_name)}'")
+            raise TypeError(f'Expected "str" object, got "{type(setting_name)}"')
         setting_value = match.group("value")
         if not isinstance(setting_value, str):
-            raise TypeError(f"Expected 'str' object, got '{type(setting_value)}'")
+            raise TypeError(f'Expected "str" object, got "{type(setting_value)}"')
 
         corrected_setting_name = setting_name.strip()
         if corrected_setting_name == "":
@@ -1707,14 +1672,14 @@ def parse_userip_ini_file(ini_path: Path):
                     corrected_ini_data_lines = corrected_ini_data_lines[:-1]
                 continue
             if not isinstance(setting, str):
-                raise TypeError(f"Expected 'str' object, got '{type(setting)}'")
+                raise TypeError(f'Expected "str" object, got "{type(setting)}"')
             value = match.group("value")
             if value is None:
                 if corrected_ini_data_lines:
                     corrected_ini_data_lines = corrected_ini_data_lines[:-1]
                 continue
             if not isinstance(value, str):
-                raise TypeError(f"Expected 'str' object, got '{type(value)}'")
+                raise TypeError(f'Expected "str" object, got "{type(value)}"')
 
             setting = setting.strip()
             if not setting:
@@ -1859,12 +1824,12 @@ def parse_userip_ini_file(ini_path: Path):
             if username is None:
                 continue
             if not isinstance(username, str):
-                raise TypeError(f"Expected 'str' object, got '{type(username)}'")
+                raise TypeError(f'Expected "str" object, got "{type(username)}"')
             ip = match.group("ip")
             if ip is None:
                 continue
             if not isinstance(ip, str):
-                raise TypeError(f"Expected 'str' object, got '{type(ip)}'")
+                raise TypeError(f'Expected "str" object, got "{type(ip)}"')
 
             username = username.strip()
             if not username:
@@ -2046,7 +2011,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.0 - 21/11/2024 (23:02)"
+VERSION = "v1.2.1 - 23/11/2024 (02:02)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -2274,13 +2239,12 @@ title(f"Capture network interface selection - {TITLE}")
 print(f"\nCapture network interface selection ...\n")
 wmi_namespace: _wmi_namespace = wmi.WMI()
 if not isinstance(wmi_namespace, _wmi_namespace):
-    raise TypeError(f"Expected '_wmi_namespace' object, got '{type(wmi_namespace)}'")
+    raise TypeError(f'Expected "_wmi_namespace" object, got "{type(wmi_namespace)}"')
 
 for _, _, name in get_tshark_interfaces():
     Interface(name)
 
 net_io_stats = psutil.net_io_counters(pernic=True)
-
 for interface_name, interface_stats in net_io_stats.items():
     i = Interface.get_interface_by_name(interface_name)
     if not i:
@@ -2289,90 +2253,110 @@ for interface_name, interface_stats in net_io_stats.items():
     i.packets_sent = interface_stats.packets_sent
     i.packets_recv = interface_stats.packets_recv
 
-for interface in iterate_network_adapter_details():
-    i = Interface.get_interface_by_name(interface.NetConnectionID)
+for config in iterate_network_adapter_details():
+    i = Interface.get_interface_by_name(config.NetConnectionID)
     if not i:
         continue
 
-    i.Description = interface.Description
-    i.GUID = interface.GUID
-    i.Installed = interface.Installed
-    if interface.InterfaceIndex is not None and i.InterfaceIndex != "N/A":
-        stdout_crash_text = textwrap.dedent(f"""
-            ERROR:
-                Developer didn't expect this scenario to be possible.
+    if config.MACAddress is not None:
+        if not isinstance(config.MACAddress, str):
+            raise TypeError(f'Expected "str" object, got "{type(config.MACAddress)}"')
+        if i.mac_address != "N/A":
+            stdout_crash_text = textwrap.dedent(f"""
+                ERROR:
+                    Developer didn't expect this scenario to be possible.
 
-            INFOS:
-                \"WMI\" Python's module returned more then one
-                interface for a given interface Index.
+                INFOS:
+                    \"WMI\" Python's module returned more then one
+                    mac address for a given interface.
 
-            DEBUG:
-                i.InterfaceIndex: {i.InterfaceIndex}
-                interface.InterfaceIndex: {interface.InterfaceIndex}
-        """.removeprefix("\n").removesuffix("\n"))
-        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-    i.InterfaceIndex = interface.InterfaceIndex
-    i.mac_address = interface.MACAddress
-    i.manufacturer = interface.Manufacturer
-    i.Name = interface.Name
-    i.NetEnabled = interface.NetEnabled
-    i.PhysicalAdapter = interface.PhysicalAdapter
-    i.ProductName = interface.ProductName
+                DEBUG:
+                    i.name: {i.name}
+                    i.mac_address: {i.mac_address}
+                    config.MACAddress: {config.MACAddress}
+            """.removeprefix("\n").removesuffix("\n"))
+            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+        i.mac_address = config.MACAddress
+        i.organization_name = (
+            get_mac_address_organization_name(i.mac_address)
+            or "N/A"
+        )
 
-for configuration in iterate_network_ip_details():
-    i = Interface.get_interface_by_id(configuration.InterfaceIndex)
+    if config.InterfaceIndex is not None:
+        if not isinstance(config.InterfaceIndex, int):
+            raise TypeError(f'Expected "int" object, got "{type(config.InterfaceIndex)}"')
+        if i.adapter_properties.InterfaceIndex != "N/A":
+            stdout_crash_text = textwrap.dedent(f"""
+                ERROR:
+                    Developer didn't expect this scenario to be possible.
+
+                INFOS:
+                    \"WMI\" Python's module returned more then one
+                    index for a given interface.
+
+                DEBUG:
+                    i.name: {i.name}
+                    i.InterfaceIndex: {i.InterfaceIndex}
+                    config.InterfaceIndex: {config.InterfaceIndex}
+            """.removeprefix("\n").removesuffix("\n"))
+            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+        i.adapter_properties.InterfaceIndex = config.InterfaceIndex
+
+    if config.Manufacturer is not None:
+        if not isinstance(config.Manufacturer, str):
+            raise TypeError(f'Expected "str" object, got "{type(config.Manufacturer)}"')
+        i.adapter_properties.Manufacturer = config.Manufacturer
+
+for config in iterate_network_ip_details():
+    i = Interface.get_interface_by_id(config.InterfaceIndex)
     if not i:
         continue
 
-    if configuration.IPAddress is not None:
-        ip_addresses = configuration.IPAddress
-        if isinstance(ip_addresses, str):
-            ip_addresses = [ip_addresses]
-        elif not isinstance(ip_addresses, (list, tuple)):
-            ip_addresses = []
+    if config.IPAddress is not None:
+        if not isinstance(config.IPAddress, tuple):
+            raise TypeError(f'Expected "tuple" object, got "{type(config.IPAddress)}"')
 
-        for ip in ip_addresses:
+        for ip in config.IPAddress:
             if not is_ipv4_address(ip):
                 continue
 
             if ip not in i.ip_addresses:
                 i.ip_addresses.append(ip)
 
-    if configuration.MACAddress is not None:
-        if i.mac_address != configuration.MACAddress:
+    if config.MACAddress is not None:
+        if not isinstance(config.MACAddress, str):
+            raise TypeError(f'Expected "str" object, got "{type(config.MACAddress)}"')
+        if i.mac_address != config.MACAddress:
             stdout_crash_text = textwrap.dedent(f"""
                 ERROR:
                     Developer didn't expect this scenario to be possible.
 
                 INFOS:
-                    The IP address has multiple MAC addresses.
+                    An interface IP address has multiple MAC addresses.
 
                 DEBUG:
                     i.name: {i.name}
                     i.mac_address: {i.mac_address}
-                    configuration.MACAddress: {configuration.MACAddress}
+                    config.MACAddress: {config.MACAddress}
             """.removeprefix("\n").removesuffix("\n"))
             terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-        i.mac_address = configuration.MACAddress
-    i.IPEnabled = configuration.IPEnabled
-    i.SettingID = configuration.SettingID
+        i.mac_address = config.MACAddress
 
 if Settings.CAPTURE_ARP:
     cached_arp_dict = get_and_parse_arp_cache()
 
-    for interface_index, interface_info in cached_arp_dict.items():
-        i = Interface.get_interface_by_id(interface_index)
+    for arp_interface_index, arp_interface_info in cached_arp_dict.items():
+        i = Interface.get_interface_by_id(arp_interface_index)
         if not i:
             continue
 
         if (
-            not interface_info["interface_name"] == i.Name
-            or not interface_info["interface_ip_address"] in i.ip_addresses
-            or not interface_info["interface_arp_output"]
+            not arp_interface_info["interface_ip_address"] in i.ip_addresses
+            or not arp_interface_info["interface_arp_output"]
         ):
             continue
 
-        arp_info: dict[str, str] = [
+        arp_infos: list[Optional[dict[str, str]]] = [
             {
                 "ip_address": entry["ip_address"],
                 "mac_address": format_mac_address(entry["mac_address"]),
@@ -2381,11 +2365,12 @@ if Settings.CAPTURE_ARP:
                     or "N/A"
                 )
             }
-            for entry in interface_info["interface_arp_output"]
+            for entry in arp_interface_info["interface_arp_output"]
             if is_valid_non_special_ipv4(entry["ip_address"])
         ]
 
-        i.add_arp_info(interface_info["interface_ip_address"], arp_info)
+        if arp_infos:
+            i.add_arp_infos(arp_interface_info["interface_ip_address"], arp_infos)
 
 table = PrettyTable()
 table.field_names = ["#", "Interface", "Packets Sent", "Packets Received", "IP Address", "MAC Address", "Manufacturer"]
@@ -2400,49 +2385,58 @@ table.align["Manufacturer"] = "c"
 interfaces_options: dict[int, dict[str, Optional[str]]] = {}
 counter = 0
 
-for interface in Interface.all_interfaces:
+for i in Interface.all_interfaces:
     if (
         Settings.CAPTURE_INTERFACE_NAME is not None
-        and Settings.CAPTURE_INTERFACE_NAME.lower() == interface.name.lower()
-        and not Settings.CAPTURE_INTERFACE_NAME == interface.name
+        and Settings.CAPTURE_INTERFACE_NAME.lower() == i.name.lower()
+        and not Settings.CAPTURE_INTERFACE_NAME == i.name
     ):
-        Settings.CAPTURE_INTERFACE_NAME = interface.name
+        Settings.CAPTURE_INTERFACE_NAME = i.name
         Settings.reconstruct_settings()
 
-    if interface.ip_addresses:
-        for ip_address in interface.ip_addresses:
+    if i.adapter_properties.Manufacturer == "N/A":
+        manufacturer_or_organization_name = i.organization_name
+    else:
+        manufacturer_or_organization_name = i.adapter_properties.Manufacturer
+
+    if i.ip_addresses:
+        for ip_address in i.ip_addresses:
             counter += 1
             interfaces_options[counter] = {
                 "is_arp": False,
-                "Interface": interface.name,
+                "Interface": i.name,
                 "IP Address": ip_address,
-                "MAC Address": interface.mac_address
+                "MAC Address": i.mac_address
             }
 
-            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, ip_address, interface.mac_address, interface.manufacturer])
+            table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", i.name, i.packets_sent, i.packets_recv, ip_address, i.mac_address, manufacturer_or_organization_name])
     else:
         counter += 1
         interfaces_options[counter] = {
             "is_arp": False,
-            "Interface": interface.name,
+            "Interface": i.name,
             "IP Address": "N/A",
-            "MAC Address": interface.mac_address
+            "MAC Address": i.mac_address
         }
 
-        table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", interface.name, interface.packets_sent, interface.packets_recv, "N/A", interface.mac_address, interface.manufacturer])
+        table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", i.name, i.packets_sent, i.packets_recv, "N/A", i.mac_address, manufacturer_or_organization_name])
 
     if Settings.CAPTURE_ARP:
-        for ip_address, info in interface.arp_infos.items():
-            for detail in info["details"]:
+        for ip in i.ip_addresses:
+            arp_infos = i.get_arp_infos(ip)
+            if not arp_infos:
+                continue
+
+            for arp_info in arp_infos:
                 counter += 1
                 interfaces_options[counter] = {
                     "is_arp": True,
-                    "Interface": interface.name,
-                    "IP Address": detail["ip_address"],
-                    "MAC Address": detail["mac_address"]
+                    "Interface": i.name,
+                    "IP Address": arp_info["ip_address"],
+                    "MAC Address": arp_info["mac_address"]
                 }
 
-                table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{interface.name} (ARP)", "N/A", "N/A", detail["ip_address"], detail["mac_address"], detail["organization_name"]])
+                table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{i.name} (ARP)", "N/A", "N/A", arp_info["ip_address"], arp_info["mac_address"], arp_info["organization_name"]])
 
 user_interface_selection = None
 
@@ -2766,15 +2760,15 @@ def iplookup_core():
             iplookup_results = response.json()
 
             if not isinstance(iplookup_results, list):
-                raise TypeError(f"Expected 'list' object, got '{type(iplookup_results)}'")
+                raise TypeError(f'Expected "list" object, got "{type(iplookup_results)}"')
 
             for iplookup in iplookup_results:
                 if not isinstance(iplookup, dict):
-                    raise TypeError(f"Expected 'dict' object, got '{type(iplookup)}'")
+                    raise TypeError(f'Expected "dict" object, got "{type(iplookup)}"')
 
                 player_ip_looked_up: str = iplookup.get("query", None)
                 if not isinstance(player_ip_looked_up, str):
-                    raise TypeError(f"Expected 'str' object, got '{type(player_ip_looked_up)}'")
+                    raise TypeError(f'Expected "str" object, got "{type(player_ip_looked_up)}"')
 
                 ip_api_instance = IPAPI()
                 ip_api_instance.is_initialized = True
