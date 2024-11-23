@@ -327,8 +327,8 @@ username3=255.255.255.255
 - The GTA V game port is `6672`; unfortunately, I don't have any clue what the other ports mean.
 - If somebody joins the session, you can obtain their IP address from the most recent entry in "connected players" list.
 - If somebody leaves the session, you can obtain their IP address from the most recent entry in "disconnected players" list.
-- One way to obtain someone's IP address is to save all entries from "connected players" list during the current session while they are connected to your session.<br />
-  When you find that person in another session, do the same thing and compare the "connected players" list, if an IP address matches, it likely means you've obtained their IP address.
+- One way to obtain someone's IP address is by saving all entries from the "connected players" list during the current session. Save each IPs under the in-game username(s) you are tracking in the `UserIP Databases\Searchlist.ini` file.
+  In a future session, if you receive a notification from the searchlist database and the person you're searching for is in your session, it confirms that you have successfully obtained their IP address.
 - A similar method to the above one is that you can notice when someone has been flagged as disconnected and reconnected to your session by monitoring the "Rejoins" field.<br />
   This can help you track a player who has been seen in another session, or joined your session again.
 - You can invite them to your private lobby; in this case, the only IP address displayed will be that of your victim.
@@ -361,5 +361,6 @@ You can also contact me privately via:
 
 [@Grub4K](https://github.com/Grub4K) - General help during the source code development.<br />
 [@\_txshia\_](https://instagram.com/_txshia_) - Testings of the script on Xbox One console.<br />
+[@2jang](https://github.com/2jang) - Helped me fixing ARP parsing issues (https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues/7 and https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/pull/8)<br />
 @anonymous - Testings of the script on PS5 console.<br />
 @Rosalyn - Giving me the force and motivation.<br />
