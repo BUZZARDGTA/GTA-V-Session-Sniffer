@@ -1627,277 +1627,6 @@ def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "l
 
     return ini_db, need_rewrite_ini
 
-def parse_userip_ini_file(ini_path: Path):
-    def process_ini_line_output(line: str):
-        return line.strip()
-
-    if not ini_path.exists():
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
-                                str(ini_path.absolute()))
-    if not ini_path.is_file():
-        raise InvalidFileError(str(ini_path.absolute()))
-
-    settings: dict[str, Union[bool, str, int, float]] = {}
-    userip: dict[str, list[str]] = {}
-    current_section = None
-    matched_settings = []
-    ini_data = ini_path.read_text("utf-8")
-    corrected_ini_data_lines = []
-
-    for line in map(process_ini_line_output, ini_data.splitlines(keepends=True)):
-        corrected_ini_data_lines.append(line)
-
-        if line.startswith("[") and line.endswith("]"):
-            # we basically adding a newline if the previous line is not a newline for eyes visiblitly or idk how we say that
-            if corrected_ini_data_lines and len(corrected_ini_data_lines) > 1:
-                if not corrected_ini_data_lines[-2] == "":
-                    corrected_ini_data_lines.insert(-1, "")  # Insert an empty string before the last line
-            current_section = line[1:-1]
-            continue
-
-        if current_section is None:
-            continue
-
-        elif current_section == "Settings":
-            match = RE_SETTINGS_INI_PARSER_PATTERN.search(line)
-            if not match:
-                # If it's a newline or a comment we don't really care about rewritting at this point.
-                if not line.startswith((";", "#")) or line == "":
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-
-            setting = match.group("key")
-            if setting is None:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-            if not isinstance(setting, str):
-                raise TypeError(f'Expected "str" object, got "{type(setting)}"')
-            value = match.group("value")
-            if value is None:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-            if not isinstance(value, str):
-                raise TypeError(f'Expected "str" object, got "{type(value)}"')
-
-            setting = setting.strip()
-            if not setting:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-            value = value.strip()
-            if not value:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-
-            if not setting in USERIP_INI_SETTINGS_LIST:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-
-            if setting in settings:
-                if corrected_ini_data_lines:
-                    corrected_ini_data_lines = corrected_ini_data_lines[:-1]
-                continue
-            else:
-                matched_settings.append(setting)
-                need_rewrite_current_setting = False
-                is_setting_corrupted = False
-
-                if setting == "ENABLED":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
-                    except InvalidBooleanValueError:
-                        is_setting_corrupted = True
-                elif setting == "COLOR":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
-                    except InvalidNoneTypeValueError:
-                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"])
-                        if case_insensitive_match:
-                            settings[setting] = normalized_match
-                            if not case_sensitive_match:
-                                need_rewrite_current_setting = True
-                        else:
-                            is_setting_corrupted = True
-                elif setting == "LOG":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
-                    except InvalidBooleanValueError:
-                        is_setting_corrupted = True
-                elif setting == "NOTIFICATIONS":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
-                    except InvalidBooleanValueError:
-                        is_setting_corrupted = True
-                elif setting == "VOICE_NOTIFICATIONS":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
-                    except InvalidBooleanValueError:
-                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Male", "Female"])
-                        if case_insensitive_match:
-                            settings[setting] = normalized_match
-                            if not case_sensitive_match:
-                                need_rewrite_current_setting = True
-                        else:
-                            is_setting_corrupted = True
-                elif setting == "PROTECTION":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
-                    except InvalidBooleanValueError:
-                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"])
-                        if case_insensitive_match:
-                            settings[setting] = normalized_match
-                            if not case_sensitive_match:
-                                need_rewrite_current_setting = True
-                        else:
-                            is_setting_corrupted = True
-                elif setting == "PROTECTION_PROCESS_PATH":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
-                    except InvalidNoneTypeValueError:
-                        stripped_value = value.strip("\"'")
-                        if not value == stripped_value:
-                            is_setting_corrupted = True
-                        settings[setting] = Path(stripped_value.replace("\\", "/"))
-                elif setting == "PROTECTION_RESTART_PROCESS_PATH":
-                    try:
-                        settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
-                    except InvalidNoneTypeValueError:
-                        stripped_value = value.strip("\"'")
-                        if not value == stripped_value:
-                            is_setting_corrupted = True
-                        settings[setting] = Path(stripped_value.replace("\\", "/"))
-                elif setting == "PROTECTION_SUSPEND_PROCESS_MODE":
-                        case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Auto", "Manual"])
-                        if case_insensitive_match:
-                            settings[setting] = normalized_match
-                            if not case_sensitive_match:
-                                need_rewrite_current_setting = True
-                        else:
-                            try:
-                                if "." in value:
-                                    PROTECTION_SUSPEND_PROCESS_MODE = float(value)
-                                else:
-                                    PROTECTION_SUSPEND_PROCESS_MODE = int(value)
-                            except (ValueError, TypeError):
-                                is_setting_corrupted = True
-                            else:
-                                if PROTECTION_SUSPEND_PROCESS_MODE >= 0:
-                                    settings[setting] = PROTECTION_SUSPEND_PROCESS_MODE
-                                else:
-                                    is_setting_corrupted = True
-
-                if is_setting_corrupted:
-                    if not ini_path in UserIP_Databases.notified_settings_conflicts:
-                        UserIP_Databases.notified_settings_conflicts.add(ini_path)
-                        msgbox_title = TITLE
-                        msgbox_message = textwrap.dedent(f"""
-                            ERROR:
-                                Corrupted UserIP Database File (Settings)
-
-                            INFOS:
-                                UserIP database file:
-                                \"{ini_path}\"
-                                has an invalid settings value:
-
-                                {setting}={value}
-
-                                For more information on formatting, please refer to the
-                                documentation:
-                                    https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-                        """.removeprefix("\n").removesuffix("\n"))
-                        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-                        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
-                    return None, None
-
-                if need_rewrite_current_setting:
-                    corrected_ini_data_lines[-1] = f"{setting}={settings[setting]}"
-
-        elif current_section == "UserIP":
-            match = RE_USERIP_INI_PARSER_PATTERN.search(line)
-            if not match:
-                continue
-            username = match.group("username")
-            if username is None:
-                continue
-            if not isinstance(username, str):
-                raise TypeError(f'Expected "str" object, got "{type(username)}"')
-            ip = match.group("ip")
-            if ip is None:
-                continue
-            if not isinstance(ip, str):
-                raise TypeError(f'Expected "str" object, got "{type(ip)}"')
-
-            username = username.strip()
-            if not username:
-                continue
-            ip = ip.strip()
-            if not ip:
-                continue
-
-            if not is_ipv4_address(ip):
-                continue
-
-            if username in userip:
-                if ip not in userip[username]:
-                    userip[username].append(ip)
-            else:
-                userip[username] = [ip]
-
-    list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
-    number_of_settings_missing = len(list_of_missing_settings)
-
-    if number_of_settings_missing > 0:
-        if not ini_path in UserIP_Databases.notified_settings_conflicts:
-            UserIP_Databases.notified_settings_conflicts.add(ini_path)
-            msgbox_title = TITLE
-            msgbox_message = textwrap.dedent(f"""
-                ERROR:
-                    Missing setting{plural(number_of_settings_missing)} in UserIP Database File
-
-                INFOS:
-                    UserIP database file:
-                    \"{ini_path}\"
-                    has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
-
-                    {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
-
-                    For more information on formatting, please refer to the
-                    documentation:
-                        https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-            """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
-        return None, None
-
-    if ini_path in UserIP_Databases.notified_settings_conflicts:
-        UserIP_Databases.notified_settings_conflicts.remove(ini_path)
-
-    # Basically always have a newline ending
-    if len(corrected_ini_data_lines) > 1:
-        if not corrected_ini_data_lines[-1] == "":
-            corrected_ini_data_lines.append("")
-
-    fixed_ini_data = "\n".join(corrected_ini_data_lines)
-
-    if not ini_data == fixed_ini_data:
-        ini_path.write_text(fixed_ini_data, encoding="utf-8")
-
-    return UserIP_Settings(
-        settings["ENABLED"],
-        settings["COLOR"],
-        settings["LOG"],
-        settings["NOTIFICATIONS"],
-        settings["VOICE_NOTIFICATIONS"],
-        settings["PROTECTION"],
-        settings["PROTECTION_PROCESS_PATH"],
-        settings["PROTECTION_RESTART_PROCESS_PATH"],
-        settings["PROTECTION_SUSPEND_PROCESS_MODE"]
-    ), userip
-
 def is_file_need_newline_ending(file):
     file = Path(file)
     if file.stat().st_size == 0:
@@ -2808,6 +2537,278 @@ tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
+        def parse_userip_ini_file(ini_path: Path):
+            def process_ini_line_output(line: str):
+                return line.strip()
+
+            if not ini_path.exists():
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
+                                        str(ini_path.absolute()))
+            if not ini_path.is_file():
+                raise InvalidFileError(str(ini_path.absolute()))
+
+            settings: dict[str, Union[bool, str, int, float]] = {}
+            userip: dict[str, list[str]] = {}
+            current_section = None
+            matched_settings = []
+            ini_data = ini_path.read_text("utf-8")
+            corrected_ini_data_lines = []
+
+            for line in map(process_ini_line_output, ini_data.splitlines(keepends=True)):
+                corrected_ini_data_lines.append(line)
+
+                if line.startswith("[") and line.endswith("]"):
+                    # we basically adding a newline if the previous line is not a newline for eyes visiblitly or idk how we say that
+                    if corrected_ini_data_lines and len(corrected_ini_data_lines) > 1:
+                        if not corrected_ini_data_lines[-2] == "":
+                            corrected_ini_data_lines.insert(-1, "")  # Insert an empty string before the last line
+                    current_section = line[1:-1]
+                    continue
+
+                if current_section is None:
+                    continue
+
+                elif current_section == "Settings":
+                    match = RE_SETTINGS_INI_PARSER_PATTERN.search(line)
+                    if not match:
+                        # If it's a newline or a comment we don't really care about rewritting at this point.
+                        if not line.startswith((";", "#")) or line == "":
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+
+                    setting = match.group("key")
+                    if setting is None:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+                    if not isinstance(setting, str):
+                        raise TypeError(f'Expected "str" object, got "{type(setting)}"')
+                    value = match.group("value")
+                    if value is None:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+                    if not isinstance(value, str):
+                        raise TypeError(f'Expected "str" object, got "{type(value)}"')
+
+                    setting = setting.strip()
+                    if not setting:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+                    value = value.strip()
+                    if not value:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+
+                    if not setting in USERIP_INI_SETTINGS_LIST:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+
+                    if setting in settings:
+                        if corrected_ini_data_lines:
+                            corrected_ini_data_lines = corrected_ini_data_lines[:-1]
+                        continue
+                    else:
+                        matched_settings.append(setting)
+                        need_rewrite_current_setting = False
+                        is_setting_corrupted = False
+
+                        if setting == "ENABLED":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                            except InvalidBooleanValueError:
+                                is_setting_corrupted = True
+                        elif setting == "COLOR":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                            except InvalidNoneTypeValueError:
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"])
+                                if case_insensitive_match:
+                                    settings[setting] = normalized_match
+                                    if not case_sensitive_match:
+                                        need_rewrite_current_setting = True
+                                else:
+                                    is_setting_corrupted = True
+                        elif setting == "LOG":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                            except InvalidBooleanValueError:
+                                is_setting_corrupted = True
+                        elif setting == "NOTIFICATIONS":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
+                            except InvalidBooleanValueError:
+                                is_setting_corrupted = True
+                        elif setting == "VOICE_NOTIFICATIONS":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
+                            except InvalidBooleanValueError:
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Male", "Female"])
+                                if case_insensitive_match:
+                                    settings[setting] = normalized_match
+                                    if not case_sensitive_match:
+                                        need_rewrite_current_setting = True
+                                else:
+                                    is_setting_corrupted = True
+                        elif setting == "PROTECTION":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_bool(value, only_match_against=False)
+                            except InvalidBooleanValueError:
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Suspend_Process", "Exit_Process", "Restart_Process", "Shutdown_PC", "Restart_PC"])
+                                if case_insensitive_match:
+                                    settings[setting] = normalized_match
+                                    if not case_sensitive_match:
+                                        need_rewrite_current_setting = True
+                                else:
+                                    is_setting_corrupted = True
+                        elif setting == "PROTECTION_PROCESS_PATH":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                            except InvalidNoneTypeValueError:
+                                stripped_value = value.strip("\"'")
+                                if not value == stripped_value:
+                                    is_setting_corrupted = True
+                                settings[setting] = Path(stripped_value.replace("\\", "/"))
+                        elif setting == "PROTECTION_RESTART_PROCESS_PATH":
+                            try:
+                                settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
+                            except InvalidNoneTypeValueError:
+                                stripped_value = value.strip("\"'")
+                                if not value == stripped_value:
+                                    is_setting_corrupted = True
+                                settings[setting] = Path(stripped_value.replace("\\", "/"))
+                        elif setting == "PROTECTION_SUSPEND_PROCESS_MODE":
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["Auto", "Manual"])
+                                if case_insensitive_match:
+                                    settings[setting] = normalized_match
+                                    if not case_sensitive_match:
+                                        need_rewrite_current_setting = True
+                                else:
+                                    try:
+                                        if "." in value:
+                                            PROTECTION_SUSPEND_PROCESS_MODE = float(value)
+                                        else:
+                                            PROTECTION_SUSPEND_PROCESS_MODE = int(value)
+                                    except (ValueError, TypeError):
+                                        is_setting_corrupted = True
+                                    else:
+                                        if PROTECTION_SUSPEND_PROCESS_MODE >= 0:
+                                            settings[setting] = PROTECTION_SUSPEND_PROCESS_MODE
+                                        else:
+                                            is_setting_corrupted = True
+
+                        if is_setting_corrupted:
+                            if not ini_path in UserIP_Databases.notified_settings_conflicts:
+                                UserIP_Databases.notified_settings_conflicts.add(ini_path)
+                                msgbox_title = TITLE
+                                msgbox_message = textwrap.dedent(f"""
+                                    ERROR:
+                                        Corrupted UserIP Database File (Settings)
+
+                                    INFOS:
+                                        UserIP database file:
+                                        \"{ini_path}\"
+                                        has an invalid settings value:
+
+                                        {setting}={value}
+
+                                        For more information on formatting, please refer to the
+                                        documentation:
+                                            https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                                """.removeprefix("\n").removesuffix("\n"))
+                                msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+                                threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                            return None, None
+
+                        if need_rewrite_current_setting:
+                            corrected_ini_data_lines[-1] = f"{setting}={settings[setting]}"
+
+                elif current_section == "UserIP":
+                    match = RE_USERIP_INI_PARSER_PATTERN.search(line)
+                    if not match:
+                        continue
+                    username = match.group("username")
+                    if username is None:
+                        continue
+                    if not isinstance(username, str):
+                        raise TypeError(f'Expected "str" object, got "{type(username)}"')
+                    ip = match.group("ip")
+                    if ip is None:
+                        continue
+                    if not isinstance(ip, str):
+                        raise TypeError(f'Expected "str" object, got "{type(ip)}"')
+
+                    username = username.strip()
+                    if not username:
+                        continue
+                    ip = ip.strip()
+                    if not ip:
+                        continue
+
+                    if not is_ipv4_address(ip):
+                        continue
+
+                    if username in userip:
+                        if ip not in userip[username]:
+                            userip[username].append(ip)
+                    else:
+                        userip[username] = [ip]
+
+            list_of_missing_settings = [setting for setting in USERIP_INI_SETTINGS_LIST if setting not in matched_settings]
+            number_of_settings_missing = len(list_of_missing_settings)
+
+            if number_of_settings_missing > 0:
+                if not ini_path in UserIP_Databases.notified_settings_conflicts:
+                    UserIP_Databases.notified_settings_conflicts.add(ini_path)
+                    msgbox_title = TITLE
+                    msgbox_message = textwrap.dedent(f"""
+                        ERROR:
+                            Missing setting{plural(number_of_settings_missing)} in UserIP Database File
+
+                        INFOS:
+                            UserIP database file:
+                            \"{ini_path}\"
+                            has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
+
+                            {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
+
+                            For more information on formatting, please refer to the
+                            documentation:
+                                https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                    """.removeprefix("\n").removesuffix("\n"))
+                    msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+                    threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                return None, None
+
+            if ini_path in UserIP_Databases.notified_settings_conflicts:
+                UserIP_Databases.notified_settings_conflicts.remove(ini_path)
+
+            # Basically always have a newline ending
+            if len(corrected_ini_data_lines) > 1:
+                if not corrected_ini_data_lines[-1] == "":
+                    corrected_ini_data_lines.append("")
+
+            fixed_ini_data = "\n".join(corrected_ini_data_lines)
+
+            if not ini_data == fixed_ini_data:
+                ini_path.write_text(fixed_ini_data, encoding="utf-8")
+
+            return UserIP_Settings(
+                settings["ENABLED"],
+                settings["COLOR"],
+                settings["LOG"],
+                settings["NOTIFICATIONS"],
+                settings["VOICE_NOTIFICATIONS"],
+                settings["PROTECTION"],
+                settings["PROTECTION_PROCESS_PATH"],
+                settings["PROTECTION_RESTART_PROCESS_PATH"],
+                settings["PROTECTION_SUSPEND_PROCESS_MODE"]
+            ), userip
+
+
         def update_userip_databases(last_userip_parse_time: Optional[float]):
             DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
                 ;;-----------------------------------------------------------------------------
@@ -2906,8 +2907,9 @@ def stdout_render_core():
             UserIP_Databases.reset()
             for userip_path in USERIP_DATABASES_PATH.glob("*.ini"):
                 parsed_settings, parsed_data = parse_userip_ini_file(userip_path)
-                if parsed_settings is not None and parsed_data is not None:
-                    UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
+                if parsed_settings is None or parsed_data is None:
+                    continue
+                UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
             UserIP_Databases.build()
 
             last_userip_parse_time = time.perf_counter()
@@ -3060,7 +3062,7 @@ def stdout_render_core():
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         displayed__capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
 
-        padding_width = calculate_padding_width(109, 44, len(displayed__capture_ip_address), len(str(Settings.CAPTURE_INTERFACE_NAME)), len(str(is_arp_enabled)))
+        padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_INTERFACE_NAME)), len(displayed__capture_ip_address), len(str(is_arp_enabled)))
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
         two_take_one__plugin__ip_to_usernames: dict[str, list[str]] = {}
 
@@ -3244,8 +3246,14 @@ def stdout_render_core():
             printer.cache_print(stdout__scanning_on_network_interface)
 
             color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
-            padding_width = calculate_padding_width(109, 71, len(str(plural(avg_latency_seconds))), len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
+            padding_width = calculate_padding_width(109, 75, len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
             printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
+            if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_conflicts):
+                padding_width = calculate_padding_width(109, 42, len(str(plural(number_of_conflicting_ip_in_userip_files))), len(str(number_of_conflicting_ip_in_userip_files)))
+                printer.cache_print(f"{' ' * padding_width}Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP files: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}")
+            if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_conflicts):
+                padding_width = calculate_padding_width(109, 47, len(str(plural(number_of_corrupted_userip_settings_files))), len(str(number_of_corrupted_userip_settings_files)))
+                printer.cache_print(f"{' ' * padding_width}Number of corrupted setting(s) in UserIP file{plural(number_of_corrupted_userip_settings_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}")
             printer.cache_print(f"-" * 109)
 
             stdout_connected_players_table = PrettyTable()
