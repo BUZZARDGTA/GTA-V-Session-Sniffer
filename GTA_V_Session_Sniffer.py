@@ -361,12 +361,12 @@ class Settings(DefaultSettings):
         "Last Port": "ports.last",
         "Intermediate Ports": "ports.intermediate",
         "First Port": "ports.first",
-        "Country": "iplookup.country",
-        "City": "iplookup.city",
-        "ASN": "iplookup.asn",
-        "Mobile": "iplookup.mobile",
-        "VPN": "iplookup.proxy",
-        "Hosting": "iplookup.hosting"
+        "Country": "iplookup.maxmind.country",
+        "City": "iplookup.maxmind.city",
+        "ASN": "iplookup.maxmind.asn",
+        "Mobile": "iplookup.ipapi.mobile",
+        "VPN": "iplookup.ipapi.proxy",
+        "Hosting": "iplookup.ipapi.hosting"
     }
 
     @classmethod
