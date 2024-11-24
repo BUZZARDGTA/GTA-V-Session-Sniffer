@@ -332,21 +332,27 @@ class DefaultSettings:
     STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
-    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "City"]
+    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "City", "Continent", "R. Code", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
     STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME = True
     STDOUT_DATE_FIELDS_SHOW_DATE = False
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
     STDOUT_FIELD_COUNTRY_MAX_LEN = 20
     STDOUT_FIELD_CITY_MAX_LEN = 20
-    STDOUT_FIELD_ASN_MAX_LEN = 20
+    STDOUT_FIELD_CONTINENT_MAX_LEN = 20
+    STDOUT_FIELD_REGION_MAX_LEN = 20
+    STDOUT_FIELD_ORGANIZATION_MAX_LEN = 20
+    STDOUT_FIELD_ISP_MAX_LEN = 20
+    STDOUT_FIELD_ASN_ISP_MAX_LEN = 20
+    STDOUT_FIELD_AS_MAX_LEN = 20
+    STDOUT_FIELD_AS_NAME_MAX_LEN = 20
     STDOUT_DISCONNECTED_PLAYERS_TIMER = 10.0
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
     STDOUT_REFRESHING_TIMER = 3
     USERIP_ENABLED = True
 
 class Settings(DefaultSettings):
-    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Country", "City", "ASN", "Mobile", "VPN", "Hosting"]
+    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Country", "City", "Continent", "Region", "R. Code", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "AS Name", "Mobile", "VPN", "Hosting"]
 
     stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
@@ -363,7 +369,21 @@ class Settings(DefaultSettings):
         "First Port": "ports.first",
         "Country": "iplookup.maxmind.country",
         "City": "iplookup.maxmind.city",
-        "ASN": "iplookup.maxmind.asn",
+        "Continent": "iplookup.ipapi.continent",
+        "Region": "iplookup.ipapi.region",
+        "R. Code": "iplookup.ipapi.region_code",
+        "District": "iplookup.ipapi.district",
+        "ZIP Code": "iplookup.ipapi.zip_code",
+        "Lat": "iplookup.ipapi.lat",
+        "Lon": "iplookup.ipapi.lon",
+        "Time Zone": "iplookup.ipapi.time_zone",
+        "Offset": "iplookup.ipapi.offset",
+        "Currency": "iplookup.ipapi.currency",
+        "Organization": "iplookup.ipapi.org",
+        "ISP": "iplookup.ipapi.isp",
+        "ASN / ISP": "iplookup.maxmind.asn",
+        "AS": "iplookup.ipapi._as",
+        "AS Name": "iplookup.ipapi.as_name",
         "Mobile": "iplookup.ipapi.mobile",
         "VPN": "iplookup.ipapi.proxy",
         "Hosting": "iplookup.ipapi.hosting"
@@ -581,14 +601,74 @@ class Settings(DefaultSettings):
                             Settings.STDOUT_FIELD_CITY_MAX_LEN = stdout_field_city_max_len
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_ASN_MAX_LEN":
+                elif setting_name == "STDOUT_FIELD_CONTINENT_MAX_LEN":
                     try:
-                        stdout_field_asn_max_len = int(setting_value)
+                        stdout_field_continent_max_len = int(setting_value)
                     except (ValueError, TypeError):
                         need_rewrite_settings = True
                     else:
-                        if stdout_field_asn_max_len >= 1:
-                            Settings.STDOUT_FIELD_ASN_MAX_LEN = stdout_field_asn_max_len
+                        if stdout_field_continent_max_len >= 1:
+                            Settings.STDOUT_FIELD_CONTINENT_MAX_LEN = stdout_field_continent_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_REGION_MAX_LEN":
+                    try:
+                        stdout_field_region_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_region_max_len >= 1:
+                            Settings.STDOUT_FIELD_REGION_MAX_LEN = stdout_field_region_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_ORGANIZATION_MAX_LEN":
+                    try:
+                        stdout_field_organization_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_organization_max_len >= 1:
+                            Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN = stdout_field_organization_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_ISP_MAX_LEN":
+                    try:
+                        stdout_field_isp_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_isp_max_len >= 1:
+                            Settings.STDOUT_FIELD_ISP_MAX_LEN = stdout_field_isp_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_ASN_ISP_MAX_LEN":
+                    try:
+                        stdout_field_asn_isp_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_asn_isp_max_len >= 1:
+                            Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN = stdout_field_asn_isp_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_AS_MAX_LEN":
+                    try:
+                        stdout_field_as_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_as_max_len >= 1:
+                            Settings.STDOUT_FIELD_AS_MAX_LEN = stdout_field_as_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_AS_NAME_MAX_LEN":
+                    try:
+                        stdout_field_as_name_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_as_name_max_len >= 1:
+                            Settings.STDOUT_FIELD_AS_NAME_MAX_LEN = stdout_field_as_name_max_len
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "STDOUT_DISCONNECTED_PLAYERS_TIMER":
@@ -765,39 +845,44 @@ class MaxMind_GeoLite2:
     def __init__(self):
         self.is_initialized = False
 
-        self.country: Optional[str] = None
-        self.country_short: Optional[str] = None
-        self.country_iso: Optional[str] = None
-        self.city: Optional[str] = None
-        self.city_short: Optional[str] = None
-        self.asn: Optional[str] = None
-        self.asn_short: Optional[str] = None
+        self.country: Union[Literal["..."], str] = "..."
+        self.country_short: Union[Literal["..."], str] = "..."
+        self.country_iso: Union[Literal["..."], str] = "..."
+        self.city: Union[Literal["..."], str] = "..."
+        self.city_short: Union[Literal["..."], str] = "..."
+        self.asn: Union[Literal["..."], str] = "..."
+        self.asn_short: Union[Literal["..."], str] = "..."
 
 class IPAPI:
     def __init__(self):
         self.is_initialized = False
 
-        self.continent: Optional[str] = None
-        self.continentCode: Optional[str] = None
-        self.country: Optional[str] = None
-        self.countryCode: Optional[str] = None
-        self.region: Optional[str] = None
-        self.regionName: Optional[str] = None
-        self.city: Optional[str] = None
-        self.district: Optional[str] = None
-        self.zipcode: Optional[str] = None
-        self.lat: Optional[str] = None
-        self.lon: Optional[str] = None
-        self.timezone: Optional[str] = None
-        self.offset: Optional[str] = None
-        self.currency: Optional[str] = None
-        self.isp: Optional[str] = None
-        self.org: Optional[str] = None
-        self.asnumber: Optional[str] = None
-        self.asname: Optional[str] = None
-        self.mobile: Optional[str] = None
-        self.proxy: Optional[str] = None
-        self.hosting: Optional[str] = None
+        self.continent: Union[Literal["..."], str] = "..."
+        self.continent_code: Union[Literal["..."], str] = "..."
+        self.country: Union[Literal["..."], str] = "..."
+        self.country_code: Union[Literal["..."], str] = "..."
+        self.region: Union[Literal["..."], str] = "..."
+        self.region_short: Union[Literal["..."], str] = "..."
+        self.region_code: Union[Literal["..."], str] = "..."
+        self.city: Union[Literal["..."], str] = "..."
+        self.district: Union[Literal["..."], str] = "..."
+        self.zip_code: Union[Literal["..."], str] = "..."
+        self.lat: Union[Literal["..."], float] = "..."
+        self.lon: Union[Literal["..."], float] = "..."
+        self.time_zone: Union[Literal["..."], str] = "..."
+        self.offset: Union[Literal["..."], int] = "..."
+        self.currency: Union[Literal["..."], str] = "..."
+        self.isp: Union[Literal["..."], str] = "..."
+        self.isp_short: Union[Literal["..."], str] = "..."
+        self.org: Union[Literal["..."], str] = "..."
+        self.org_short: Union[Literal["..."], str] = "..."
+        self._as: Union[Literal["..."], str] = "..."
+        self._as_short: Union[Literal["..."], str] = "..."
+        self.as_name: Union[Literal["..."], str] = "..."
+        self.as_name_short: Union[Literal["..."], str] = "..."
+        self.mobile: Union[Literal["..."], bool] = "..."
+        self.proxy: Union[Literal["..."], bool] = "..."
+        self.hosting: Union[Literal["..."], bool] = "..."
 
 class Player_IPLookup:
     def __init__(self):
@@ -1194,7 +1279,7 @@ def is_valid_non_special_ipv4(ip_address: str):
 
     return True
 
-def get_minimum_padding(var: str | int, max_padding: int, padding: int):
+def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
     current_padding = len(str(var))
 
     if current_padding <= padding:
@@ -1294,11 +1379,11 @@ def iterate_network_adapter_details(**kwargs):
     """Yields network adapter info using WMI."""
     interfaces: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapter(**kwargs)
     if not isinstance(interfaces, list):
-        raise TypeError(f"Expected 'list', got '{type(interfaces)}'")
+        raise TypeError(f'Expected "list", got "{type(interfaces)}"')
 
     for interface in interfaces:
         if not isinstance(interface, _wmi_object):
-            raise TypeError(f"Expected '_wmi_object', got '{type(interface)}'")
+            raise TypeError(f'Expected "_wmi_object", got "{type(interface)}"')
 
         yield(interface)
 
@@ -1307,11 +1392,11 @@ def iterate_network_ip_details(**kwargs):
     # Get network adapter configurations
     configurations: list[_wmi_object] = wmi_namespace.Win32_NetworkAdapterConfiguration(**kwargs)
     if not isinstance(configurations, list):
-        raise TypeError(f"Expected 'list', got '{type(configurations)}'")
+        raise TypeError(f'Expected "list", got "{type(configurations)}"')
 
     for configuration in configurations:
         if not isinstance(configuration, _wmi_object):
-            raise TypeError(f"Expected '_wmi_object', got '{type(configuration)}'")
+            raise TypeError(f'Expected "_wmi_object", got "{type(configuration)}"')
 
         yield(configuration)
 
@@ -1393,7 +1478,7 @@ def get_asn_info(ip_address: str):
         else:
             asn = str(response.autonomous_system_organization)
 
-    asn_short = truncate_with_ellipsis(asn, Settings.STDOUT_FIELD_ASN_MAX_LEN)
+    asn_short = truncate_with_ellipsis(asn, Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN)
 
     return asn, asn_short
 
@@ -2396,10 +2481,9 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                     Continent: {player.iplookup.ipapi.continent}
                     Country: {player.iplookup.maxmind.country}
                     City: {player.iplookup.maxmind.city}
-                    Organization: {player.iplookup.ipapi.org}
                     ISP: {player.iplookup.ipapi.isp}
-                    AS: {player.iplookup.ipapi.asnumber}
-                    AS Name: {player.iplookup.maxmind.asn}
+                    Organization: {player.iplookup.ipapi.org}
+                    AS Name: {player.iplookup.ipapi.as_name}
                     Mobile (cellular) connection: {player.iplookup.ipapi.mobile}
                     Proxy, VPN or Tor exit address: {player.iplookup.ipapi.proxy}
                     Hosting, colocated or data center: {player.iplookup.ipapi.hosting}
@@ -2501,27 +2585,116 @@ def iplookup_core():
 
                 ip_api_instance = IPAPI()
                 ip_api_instance.is_initialized = True
-                ip_api_instance.continent = iplookup.get("continent", "N/A")
-                ip_api_instance.continentCode = iplookup.get("continentCode", "N/A")
-                ip_api_instance.country = iplookup.get("country", "N/A")
-                ip_api_instance.countryCode = iplookup.get("countryCode", "N/A")
-                ip_api_instance.region = iplookup.get("region", "N/A")
-                ip_api_instance.regionName = iplookup.get("regionName", "N/A")
-                ip_api_instance.city = iplookup.get("city", "N/A")
-                ip_api_instance.district = iplookup.get("district", "N/A")
-                ip_api_instance.zipcode = iplookup.get("zip", "N/A")
-                ip_api_instance.lat = iplookup.get("lat", "N/A")
-                ip_api_instance.lon = iplookup.get("lon", "N/A")
-                ip_api_instance.timezone = iplookup.get("timezone", "N/A")
-                ip_api_instance.offset = iplookup.get("offset", "N/A")
-                ip_api_instance.currency = iplookup.get("currency", "N/A")
-                ip_api_instance.isp = iplookup.get("isp", "N/A")
-                ip_api_instance.org = iplookup.get("org", "N/A")
-                ip_api_instance.asnumber = iplookup.get("as", "N/A")
-                ip_api_instance.asname = iplookup.get("asname", "N/A")
-                ip_api_instance.mobile = iplookup.get("mobile", "N/A")
-                ip_api_instance.proxy = iplookup.get("proxy", "N/A")
-                ip_api_instance.hosting = iplookup.get("hosting", "N/A")
+
+                continent = iplookup.get("continent", "N/A")
+                if not isinstance(continent, str):
+                    raise TypeError(f'Expected "str" object, got "{type(continent)}"')
+                ip_api_instance.continent = continent
+
+                continent_code = iplookup.get("continentCode", "N/A")
+                if not isinstance(continent_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(continent_code)}"')
+                ip_api_instance.continent_code = continent_code
+
+                country = iplookup.get("country", "N/A")
+                if not isinstance(country, str):
+                    raise TypeError(f'Expected "str" object, got "{type(country)}"')
+                ip_api_instance.country = country
+
+                country_code = iplookup.get("countryCode", "N/A")
+                if not isinstance(country_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(country_code)}"')
+                ip_api_instance.country_code = country_code
+
+                region = iplookup.get("regionName", "N/A")
+                if not isinstance(region, str):
+                    raise TypeError(f'Expected "str" object, got "{type(region)}"')
+                ip_api_instance.region = region
+                ip_api_instance.region_short = truncate_with_ellipsis(region, Settings.STDOUT_FIELD_REGION_MAX_LEN)
+
+                region_code = iplookup.get("region", "N/A")
+                if not isinstance(region_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(region_code)}"')
+                ip_api_instance.region_code = region_code
+
+                city = iplookup.get("city", "N/A")
+                if not isinstance(city, str):
+                    raise TypeError(f'Expected "str" object, got "{type(city)}"')
+                ip_api_instance.city = city
+
+                district = iplookup.get("district", "N/A")
+                if not isinstance(district, str):
+                    raise TypeError(f'Expected "str" object, got "{type(district)}"')
+                ip_api_instance.district = district
+
+                zip_code = iplookup.get("zip", "N/A")
+                if not isinstance(zip_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(zip_code)}"')
+                ip_api_instance.zip_code = zip_code
+
+                lat = iplookup.get("lat", "N/A")
+                if not isinstance(lat, (float, int)):
+                    raise TypeError(f'Expected "float | int" object, got "{type(lat)}"')
+                ip_api_instance.lat = lat
+
+                lon = iplookup.get("lon", "N/A")
+                if not isinstance(lon, (float, int)):
+                    raise TypeError(f'Expected "float | int" object, got "{type(lon)}"')
+                ip_api_instance.lon = lon
+
+                time_zone = iplookup.get("timezone", "N/A")
+                if not isinstance(time_zone, str):
+                    raise TypeError(f'Expected "str" object, got "{type(time_zone)}"')
+                ip_api_instance.time_zone = time_zone
+
+                offset = iplookup.get("offset", "N/A")
+                if not isinstance(offset, int):
+                    raise TypeError(f'Expected "int" object, got "{type(offset)}"')
+                ip_api_instance.offset = offset
+
+                currency = iplookup.get("currency", "N/A")
+                if not isinstance(currency, str):
+                    raise TypeError(f'Expected "str" object, got "{type(currency)}"')
+                ip_api_instance.currency = currency
+
+                isp = iplookup.get("isp", "N/A")
+                if not isinstance(isp, str):
+                    raise TypeError(f'Expected "str" object, got "{type(isp)}"')
+                ip_api_instance.isp = isp
+                ip_api_instance.isp_short = truncate_with_ellipsis(isp, Settings.STDOUT_FIELD_ISP_MAX_LEN)
+
+                org = iplookup.get("org", "N/A")
+                if not isinstance(org, str):
+                    raise TypeError(f'Expected "str" object, got "{type(org)}"')
+                ip_api_instance.org = org
+                ip_api_instance.org_short = truncate_with_ellipsis(org, Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN)
+
+                _as = iplookup.get("as", "N/A")
+                if not isinstance(_as, str):
+                    raise TypeError(f'Expected "str" object, got "{type(_as)}"')
+                ip_api_instance._as = _as
+                ip_api_instance._as_short = truncate_with_ellipsis(_as, Settings.STDOUT_FIELD_AS_MAX_LEN)
+
+                as_name = iplookup.get("asname", "N/A")
+                if not isinstance(as_name, str):
+                    raise TypeError(f'Expected "str" object, got "{type(as_name)}"')
+                ip_api_instance.as_name = as_name
+                ip_api_instance.as_name_short = truncate_with_ellipsis(as_name, Settings.STDOUT_FIELD_AS_NAME_MAX_LEN)
+
+                mobile = iplookup.get("mobile", "N/A")
+                if not isinstance(mobile, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(mobile)}"')
+                ip_api_instance.mobile = mobile
+
+                proxy = iplookup.get("proxy", "N/A")
+                if not isinstance(proxy, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(proxy)}"')
+                ip_api_instance.proxy = proxy
+
+                hosting = iplookup.get("hosting", "N/A")
+                if not isinstance(hosting, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(hosting)}"')
+                ip_api_instance.hosting = hosting
 
                 with IPLookup.lock:
                     IPLookup.remove_pending_ip(player_ip_looked_up)
@@ -3090,7 +3263,9 @@ def stdout_render_core():
                 return
 
             session_connected__padding_country_name = 0
+            session_connected__padding_continent_name = 0
             session_disconnected__padding_country_name = 0
+            session_disconnected__padding_continent_name = 0
             session_connected: list[Player] = []
             session_disconnected: list[Player] = []
             main_loop__t1 = time.perf_counter()
@@ -3135,6 +3310,7 @@ def stdout_render_core():
                     session_disconnected.append(player)
                 else:
                     session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.country, session_connected__padding_country_name, 27)
+                    session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.continent, session_connected__padding_continent_name, 13)
 
                     if (player_timedelta := (datetime.now() - player.pps.t1)).total_seconds() >= 1.0:
                         player.pps.rate = round(player.pps.counter / player_timedelta.total_seconds())
@@ -3177,6 +3353,7 @@ def stdout_render_core():
 
             for player in session_disconnected:
                 session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.country, session_disconnected__padding_country_name, 27)
+                session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.continent, session_disconnected__padding_continent_name, 13)
 
             if (
                 Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER == 0
@@ -3292,8 +3469,36 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso}){player_reset}")
                 if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.city_short}{player_reset}")
-                if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.continent_code}){player_reset}")
+                if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.region_short}{player_reset}")
+                if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.region_code}{player_reset}")
+                if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.district}{player_reset}")
+                if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.zip_code}{player_reset}")
+                if "Lat" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.lat}{player_reset}")
+                if "Lon" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.lon}{player_reset}")
+                if "Time Zone" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.time_zone}{player_reset}")
+                if "Offset" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.offset}{player_reset}")
+                if "Currency" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.currency}{player_reset}")
+                if "Organization" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.org_short}{player_reset}")
+                if "ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.isp_short}{player_reset}")
+                if "ASN / ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.asn_short}{player_reset}")
+                if "AS" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi._as_short}{player_reset}")
+                if "AS Name" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.as_name_short}{player_reset}")
                 if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.mobile}{player_reset}")
                 if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
@@ -3335,11 +3540,39 @@ def stdout_render_core():
                 if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
                 if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso}){player_reset}")
+                    row.append(f"{player_color}{player.iplookup.maxmind.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.country_iso}){player_reset}")
                 if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.city_short}{player_reset}")
-                if "ASN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.continent_code}){player_reset}")
+                if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.region_short}{player_reset}")
+                if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.region_code}{player_reset}")
+                if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.district}{player_reset}")
+                if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.zip_code}{player_reset}")
+                if "Lat" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.lat}{player_reset}")
+                if "Lon" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.lon}{player_reset}")
+                if "Time Zone" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.time_zone}{player_reset}")
+                if "Offset" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.offset}{player_reset}")
+                if "Currency" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.currency}{player_reset}")
+                if "Organization" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.org_short}{player_reset}")
+                if "ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.isp_short}{player_reset}")
+                if "ASN / ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.asn_short}{player_reset}")
+                if "AS" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi._as_short}{player_reset}")
+                if "AS Name" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.ipapi.as_name_short}{player_reset}")
                 if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.mobile}{player_reset}")
                 if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
@@ -3374,7 +3607,21 @@ def stdout_render_core():
                     row.append(f"{player.ports.first}")
                     row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
                     row.append(f"{player.iplookup.maxmind.city}")
+                    row.append(f"{player.iplookup.ipapi.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.continent_code})")
+                    row.append(f"{player.iplookup.ipapi.region}")
+                    row.append(f"{player.iplookup.ipapi.region_code}")
+                    row.append(f"{player.iplookup.ipapi.district}")
+                    row.append(f"{player.iplookup.ipapi.zip_code}")
+                    row.append(f"{player.iplookup.ipapi.lat}")
+                    row.append(f"{player.iplookup.ipapi.lon}")
+                    row.append(f"{player.iplookup.ipapi.time_zone}")
+                    row.append(f"{player.iplookup.ipapi.offset}")
+                    row.append(f"{player.iplookup.ipapi.currency}")
+                    row.append(f"{player.iplookup.ipapi.org}")
+                    row.append(f"{player.iplookup.ipapi.isp}")
                     row.append(f"{player.iplookup.maxmind.asn}")
+                    row.append(f"{player.iplookup.ipapi._as}")
+                    row.append(f"{player.iplookup.ipapi.as_name}")
                     row.append(f"{player.iplookup.ipapi.mobile}")
                     row.append(f"{player.iplookup.ipapi.proxy}")
                     row.append(f"{player.iplookup.ipapi.hosting}")
@@ -3398,9 +3645,23 @@ def stdout_render_core():
                     row.append(f"{player.ports.last}")
                     row.append(f"{format_player_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.maxmind.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
+                    row.append(f"{player.iplookup.maxmind.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.country_iso})")
                     row.append(f"{player.iplookup.maxmind.city}")
+                    row.append(f"{player.iplookup.ipapi.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.continent_code})")
+                    row.append(f"{player.iplookup.ipapi.region}")
+                    row.append(f"{player.iplookup.ipapi.region_code}")
+                    row.append(f"{player.iplookup.ipapi.district}")
+                    row.append(f"{player.iplookup.ipapi.zip_code}")
+                    row.append(f"{player.iplookup.ipapi.lat}")
+                    row.append(f"{player.iplookup.ipapi.lon}")
+                    row.append(f"{player.iplookup.ipapi.time_zone}")
+                    row.append(f"{player.iplookup.ipapi.offset}")
+                    row.append(f"{player.iplookup.ipapi.currency}")
+                    row.append(f"{player.iplookup.ipapi.org}")
+                    row.append(f"{player.iplookup.ipapi.isp}")
                     row.append(f"{player.iplookup.maxmind.asn}")
+                    row.append(f"{player.iplookup.ipapi._as}")
+                    row.append(f"{player.iplookup.ipapi.as_name}")
                     row.append(f"{player.iplookup.ipapi.mobile}")
                     row.append(f"{player.iplookup.ipapi.proxy}")
                     row.append(f"{player.iplookup.ipapi.hosting}")
