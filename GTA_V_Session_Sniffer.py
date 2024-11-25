@@ -335,6 +335,8 @@ class DefaultSettings:
     STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "City", "Continent", "R. Code", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
     STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME = True
     STDOUT_DATE_FIELDS_SHOW_DATE = False
+    STDOUT_FIELD_SHOW_COUNTRY_CODE = True
+    STDOUT_FIELD_SHOW_CONTINENT_CODE = True
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
     STDOUT_FIELD_COUNTRY_MAX_LEN = 20
@@ -563,6 +565,16 @@ class Settings(DefaultSettings):
                 elif setting_name == "STDOUT_DATE_FIELDS_SHOW_DATE":
                     try:
                         Settings.STDOUT_DATE_FIELDS_SHOW_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_SHOW_CONTINENT_CODE":
+                    try:
+                        Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_SHOW_COUNTRY_CODE":
+                    try:
+                        Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY":
@@ -844,13 +856,12 @@ class Player_DateTime:
 class MaxMind_GeoLite2_Compiled:
     def __init__(self):
         self.country = "..."
-        self.country_iso = "..."
+        self.country_code = "..."
         self.country_short = "..."
         self.city = "..."
         self.city_short = "..."
         self.asn = "..."
         self.asn_short = "..."
-
 
 class MaxMind_GeoLite2:
     def __init__(self):
@@ -858,7 +869,7 @@ class MaxMind_GeoLite2:
         self.compiled = MaxMind_GeoLite2_Compiled()
 
         self.country: Optional[str] = None
-        self.country_iso: Optional[str] = None
+        self.country_code: Optional[str] = None
         self.city: Optional[str] = None
         self.asn: Optional[str] = None
 
@@ -868,7 +879,7 @@ class MaxMind_GeoLite2:
         and all other values are converted to their string representation.
         """
         self.compiled.country = "..." if self.country is None else str(self.country)
-        self.compiled.country_iso = "..." if self.country_iso is None else str(self.country_iso)
+        self.compiled.country_code = "..." if self.country_code is None else str(self.country_code)
         self.compiled.country_short = "..." if self.country is None else truncate_with_ellipsis(str(self.country), Settings.STDOUT_FIELD_COUNTRY_MAX_LEN)
         self.compiled.city = "..." if self.city is None else str(self.city)
         self.compiled.city_short = "..." if self.city is None else truncate_with_ellipsis(str(self.city), Settings.STDOUT_FIELD_CITY_MAX_LEN)
@@ -1517,7 +1528,7 @@ def truncate_with_ellipsis(string: str, max_length: int):
 
 def get_country_info(ip_address: str):
     country_name = "N/A"
-    country_iso = "N/A"
+    country_code = "N/A"
 
     if geoip2_enabled:
         try:
@@ -1526,9 +1537,9 @@ def get_country_info(ip_address: str):
             pass
         else:
             country_name = str(response.country.name)
-            country_iso = str(response.country.iso_code)
+            country_code = str(response.country.iso_code)
 
-    return country_name, country_iso
+    return country_name, country_code
 
 def get_city_info(ip_address: str):
     city = "N/A"
@@ -2548,7 +2559,7 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                     User{plural(len(player.userip.usernames))}: {', '.join(player.userip.usernames)}
                     IP: {player.ip}
                     Port{plural(len(player.ports.list))}: {', '.join(map(str, reversed(player.ports.list)))}
-                    Country Code: {player.iplookup.maxmind.compiled.country_iso}
+                    Country Code: {player.iplookup.maxmind.compiled.country_code}
                     Detection Type: {player.userip.detection.type}
                     Database: {player.userip.database_name}
                     ############# IP Lookup ##############
@@ -3372,7 +3383,7 @@ def stdout_render_core():
                             threading.Thread(target=process_userip_task, args=(player, "disconnected"), daemon=True).start()
 
                 if not player.iplookup.maxmind.is_initialized:
-                    player.iplookup.maxmind.country, player.iplookup.maxmind.country_iso = get_country_info(player.ip)
+                    player.iplookup.maxmind.country, player.iplookup.maxmind.country_code = get_country_info(player.ip)
                     player.iplookup.maxmind.city = get_city_info(player.ip)
                     player.iplookup.maxmind.asn = get_asn_info(player.ip)
 
@@ -3538,16 +3549,22 @@ def stdout_render_core():
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
                 if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_iso}){player_reset}")
-                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
                 if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
+                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
+                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
+                    else:
+                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
+                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
+                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
+                    else:
+                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
                 if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
                 if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
+                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
                 if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
                 if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
@@ -3612,16 +3629,22 @@ def stdout_render_core():
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
                 if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_iso}){player_reset}")
-                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
                 if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
+                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
+                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
+                    else:
+                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
+                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
+                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
+                    else:
+                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
                 if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
                 if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
+                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
                 if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
                 if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
@@ -3678,7 +3701,7 @@ def stdout_render_core():
                     row.append(f"{player.ports.last}")
                     row.append(f"{format_player_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_iso})")
+                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
                     row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
                     row.append(f"{player.iplookup.ipapi.compiled.region}")
@@ -3718,7 +3741,7 @@ def stdout_render_core():
                     row.append(f"{player.ports.last}")
                     row.append(f"{format_player_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_iso})")
+                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
                     row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
                     row.append(f"{player.iplookup.ipapi.compiled.region}")
