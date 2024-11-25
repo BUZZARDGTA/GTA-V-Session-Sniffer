@@ -1,9 +1,9 @@
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
+from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet
 from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
-from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.https_utils.unsafe_https import s
 
 # --------------------------------------------
@@ -15,12 +15,12 @@ import colorama
 import requests
 import geoip2.errors
 import geoip2.database
-from colorama import Fore, Back, Style
-from wmi import _wmi_namespace, _wmi_object
-from prettytable import PrettyTable, TableStyle
+from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from rich.text import Text
+from wmi import _wmi_namespace, _wmi_object
+from prettytable import PrettyTable, TableStyle
+from colorama import Fore, Back, Style
 
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
@@ -332,7 +332,7 @@ class DefaultSettings:
     STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
-    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "City", "Continent", "R. Code", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
+    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
     STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME = True
     STDOUT_DATE_FIELDS_SHOW_DATE = False
     STDOUT_FIELD_SHOW_COUNTRY_CODE = True
@@ -354,7 +354,7 @@ class DefaultSettings:
     USERIP_ENABLED = True
 
 class Settings(DefaultSettings):
-    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Country", "City", "Continent", "Region", "R. Code", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "AS Name", "Mobile", "VPN", "Hosting"]
+    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "AS Name", "Mobile", "VPN", "Hosting"]
 
     stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
@@ -369,11 +369,11 @@ class Settings(DefaultSettings):
         "Last Port": "ports.last",
         "Intermediate Ports": "ports.intermediate",
         "First Port": "ports.first",
-        "Country": "iplookup.maxmind.compiled.country",
-        "City": "iplookup.maxmind.compiled.city",
         "Continent": "iplookup.ipapi.compiled.continent",
+        "Country": "iplookup.maxmind.compiled.country",
         "Region": "iplookup.ipapi.compiled.region",
         "R. Code": "iplookup.ipapi.compiled.region_code",
+        "City": "iplookup.maxmind.compiled.city",
         "District": "iplookup.ipapi.compiled.district",
         "ZIP Code": "iplookup.ipapi.compiled.zip_code",
         "Lat": "iplookup.ipapi.compiled.lat",
@@ -603,16 +603,6 @@ class Settings(DefaultSettings):
                             Settings.STDOUT_FIELD_COUNTRY_MAX_LEN = stdout_field_country_max_len
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_CITY_MAX_LEN":
-                    try:
-                        stdout_field_city_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_city_max_len >= 1:
-                            Settings.STDOUT_FIELD_CITY_MAX_LEN = stdout_field_city_max_len
-                        else:
-                            need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_CONTINENT_MAX_LEN":
                     try:
                         stdout_field_continent_max_len = int(setting_value)
@@ -631,6 +621,16 @@ class Settings(DefaultSettings):
                     else:
                         if stdout_field_region_max_len >= 1:
                             Settings.STDOUT_FIELD_REGION_MAX_LEN = stdout_field_region_max_len
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "STDOUT_FIELD_CITY_MAX_LEN":
+                    try:
+                        stdout_field_city_max_len = int(setting_value)
+                    except (ValueError, TypeError):
+                        need_rewrite_settings = True
+                    else:
+                        if stdout_field_city_max_len >= 1:
+                            Settings.STDOUT_FIELD_CITY_MAX_LEN = stdout_field_city_max_len
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_ORGANIZATION_MAX_LEN":
@@ -2565,6 +2565,7 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                     ############# IP Lookup ##############
                     Continent: {player.iplookup.ipapi.compiled.continent}
                     Country: {player.iplookup.maxmind.compiled.country}
+                    Region: {player.iplookup.ipapi.compiled.region}
                     City: {player.iplookup.maxmind.compiled.city}
                     Organization: {player.iplookup.ipapi.compiled.org}
                     ISP: {player.iplookup.ipapi.compiled.isp}
@@ -3701,11 +3702,11 @@ def stdout_render_core():
                     row.append(f"{player.ports.last}")
                     row.append(f"{format_player_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
                     row.append(f"{player.iplookup.ipapi.compiled.region}")
                     row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                    row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.district}")
                     row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
                     row.append(f"{player.iplookup.ipapi.compiled.lat}")
@@ -3741,11 +3742,11 @@ def stdout_render_core():
                     row.append(f"{player.ports.last}")
                     row.append(f"{format_player_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
                     row.append(f"{player.iplookup.ipapi.compiled.region}")
                     row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                    row.append(f"{player.iplookup.maxmind.compiled.city}")
                     row.append(f"{player.iplookup.ipapi.compiled.district}")
                     row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
                     row.append(f"{player.iplookup.ipapi.compiled.lat}")
