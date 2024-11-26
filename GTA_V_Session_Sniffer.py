@@ -1185,29 +1185,32 @@ class UserIP_Databases:
     userip_databases: list[tuple[str, UserIP_Settings, dict[str, list[str]]]] = []
     userip_infos_by_ip: dict[str, UserIP] = {}
     ips_set: set[str] = set()
-    notified_settings_conflicts: set[Path] = set()
-    notified_conflicts: set[str] = set()
+    notified_settings_corrupted: set[Path] = set()
+    notified_ip_invalid: set[str] = set()
+    notified_ip_conflicts: set[str] = set()
 
     @staticmethod
-    def _notify_conflict(database_name: str, username: str, ip: str, conflicting_userip: UserIP):
+    def _notify_conflict(initial_userip_entry: UserIP, conflicting_database_name: str, conflicting_username: str, conflicting_ip: str):
         msgbox_title = TITLE
-        msgbox_message = f"""
+        msgbox_message = textwrap.indent(textwrap.dedent(f"""
             ERROR:
                 UserIP databases IP conflict
 
             INFOS:
-                The same IP cannot be assigned to multiple databases.
-                Users assigned to this IP will be ignored until the conflict is resolved.
+                The same IP cannot be assigned to multiple
+                databases.
+                Users assigned to this IP will be ignored until
+                the conflict is resolved.
 
             DEBUG:
-                "{USERIP_DATABASES_PATH}\\{database_name}.ini":
-                {username}={ip}
+                \"{USERIP_DATABASES_PATH}\\{initial_userip_entry.database_name}.ini\":
+                {', '.join(initial_userip_entry.usernames)}={initial_userip_entry.ip}
 
-                "{USERIP_DATABASES_PATH}\\{conflicting_userip.database_name}.ini":
-                {', '.join(conflicting_userip.usernames)}={ip}
-        """
+                \"{USERIP_DATABASES_PATH}\\{conflicting_database_name}.ini\":
+                {conflicting_username}={conflicting_ip}
+        """.removeprefix("\n").removesuffix("\n")), "    ")
         msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message.strip(), msgbox_style), daemon=True).start()
+        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
     @classmethod
     def add(cls, database_name: str, settings: UserIP_Settings, user_ips: dict[str, list[str]]):
@@ -1235,24 +1238,12 @@ class UserIP_Databases:
         This method updates the dictionaries without clearing their content entirely, and avoids duplicates.
         """
         userip_infos_by_ip: dict[str, UserIP] = {}
+        unresolved_conflicts: set[str] = set()
         ips_set: set[str] = set()
 
         for database_name, settings, user_ips in cls.userip_databases:
             for username, ips in user_ips.items():
                 for ip in ips:
-                    conflict_key = f"{ip}:{database_name}"
-
-                    if ip in userip_infos_by_ip and not userip_infos_by_ip[ip].database_name == database_name:
-                        if conflict_key not in cls.notified_conflicts:
-                            cls._notify_conflict(database_name, username, ip, userip_infos_by_ip[ip])
-                            cls.notified_conflicts.add(conflict_key)
-                        continue
-
-                    if conflict_key in cls.notified_conflicts:
-                        cls.notified_conflicts.remove(conflict_key)
-
-                    ips_set.add(ip)
-
                     if ip not in userip_infos_by_ip:
                         userip_infos_by_ip[ip] = UserIP(
                             ip = ip,
@@ -1260,9 +1251,21 @@ class UserIP_Databases:
                             settings = settings,
                             usernames = [username]
                         )
+                        ips_set.add(ip)
+
+                    if not userip_infos_by_ip[ip].database_name == database_name:
+                        if ip not in cls.notified_ip_conflicts:
+                            cls._notify_conflict(userip_infos_by_ip[ip], database_name, username, ip)
+                            cls.notified_ip_conflicts.add(ip)
+                        unresolved_conflicts.add(ip)
+                        continue
 
                     if username not in userip_infos_by_ip[ip].usernames:
                         userip_infos_by_ip[ip].usernames.append(username)
+
+        resolved_conflicts = cls.notified_ip_conflicts - unresolved_conflicts
+        for resolved_ip in resolved_conflicts:
+            cls.notified_ip_conflicts.remove(resolved_ip)
 
         cls.userip_infos_by_ip = userip_infos_by_ip
         cls.ips_set = ips_set
@@ -1910,7 +1913,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.1 - 23/11/2024 (02:02)"
+VERSION = "v1.2.2 - 26/11/2024 (00:22)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -2794,7 +2797,7 @@ tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
-        def parse_userip_ini_file(ini_path: Path):
+        def parse_userip_ini_file(ini_path: Path, unresolved_ip_invalid: set[str]):
             def process_ini_line_output(line: str):
                 return line.strip()
 
@@ -2958,10 +2961,10 @@ def stdout_render_core():
                                             is_setting_corrupted = True
 
                         if is_setting_corrupted:
-                            if not ini_path in UserIP_Databases.notified_settings_conflicts:
-                                UserIP_Databases.notified_settings_conflicts.add(ini_path)
+                            if not ini_path in UserIP_Databases.notified_settings_corrupted:
+                                UserIP_Databases.notified_settings_corrupted.add(ini_path)
                                 msgbox_title = TITLE
-                                msgbox_message = textwrap.dedent(f"""
+                                msgbox_message = textwrap.indent(textwrap.dedent(f"""
                                     ERROR:
                                         Corrupted UserIP Database File (Settings)
 
@@ -2974,8 +2977,8 @@ def stdout_render_core():
 
                                         For more information on formatting, please refer to the
                                         documentation:
-                                            https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-                                """.removeprefix("\n").removesuffix("\n"))
+                                        https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                                """.removeprefix("\n").removesuffix("\n")), "    ")
                                 msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
                                 threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
                             return None, None
@@ -3006,6 +3009,23 @@ def stdout_render_core():
                         continue
 
                     if not is_ipv4_address(ip):
+                        unresolved_ip_invalid.add(f"{ini_path.name}={username}={ip}")
+                        if not f"{ini_path.name}={username}={ip}" in UserIP_Databases.notified_ip_invalid:
+                            msgbox_title = TITLE
+                            msgbox_message = textwrap.indent(textwrap.dedent(f"""
+                                ERROR:
+                                    UserIP databases invalid IP address
+
+                                INFOS:
+                                    The IP address from an entry is invalid (not an IP address).
+
+                                DEBUG:
+                                    \"{ini_path}\":
+                                    {username}={ip}
+                            """.removeprefix("\n").removesuffix("\n")), "    ")
+                            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+                            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                            UserIP_Databases.notified_ip_invalid.add(f"{ini_path.name}={username}={ip}")
                         continue
 
                     if username in userip:
@@ -3018,30 +3038,29 @@ def stdout_render_core():
             number_of_settings_missing = len(list_of_missing_settings)
 
             if number_of_settings_missing > 0:
-                if not ini_path in UserIP_Databases.notified_settings_conflicts:
-                    UserIP_Databases.notified_settings_conflicts.add(ini_path)
+                if not ini_path in UserIP_Databases.notified_settings_corrupted:
+                    UserIP_Databases.notified_settings_corrupted.add(ini_path)
                     msgbox_title = TITLE
-                    msgbox_message = textwrap.dedent(f"""
+                    msgbox_message = textwrap.indent(textwrap.dedent(f"""
                         ERROR:
                             Missing setting{plural(number_of_settings_missing)} in UserIP Database File
 
                         INFOS:
-                            UserIP database file:
+                            {number_of_settings_missing} missing setting{plural(number_of_settings_missing)} in UserIP database file:
                             \"{ini_path}\"
-                            has {number_of_settings_missing} missing setting{plural(number_of_settings_missing)}:
 
                             {"\n                ".join(f"<{setting.upper()}>" for setting in list_of_missing_settings)}
 
                             For more information on formatting, please refer to the
                             documentation:
-                                https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
-                    """.removeprefix("\n").removesuffix("\n"))
+                            https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
+                    """.removeprefix("\n").removesuffix("\n")), "    ")
                     msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
                     threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
                 return None, None
-
-            if ini_path in UserIP_Databases.notified_settings_conflicts:
-                UserIP_Databases.notified_settings_conflicts.remove(ini_path)
+            else:
+                if ini_path in UserIP_Databases.notified_settings_corrupted:
+                    UserIP_Databases.notified_settings_corrupted.remove(ini_path)
 
             # Basically always have a newline ending
             if len(corrected_ini_data_lines) > 1:
@@ -3157,16 +3176,24 @@ def stdout_render_core():
             # TODO:
             # I should also warn again on another error, but it'd probably requiere a DICT then.
             # I have things more important to code atm.
-            for path in set(UserIP_Databases.notified_settings_conflicts):
+            for path in set(UserIP_Databases.notified_settings_corrupted):
                 if not path.exists() or not path.is_file():
-                    UserIP_Databases.notified_settings_conflicts.remove(path)
+                    UserIP_Databases.notified_settings_corrupted.remove(path)
 
             UserIP_Databases.reset()
+
+            unresolved_ip_invalid: set[str] = set()
+
             for userip_path in USERIP_DATABASES_PATH.glob("*.ini"):
-                parsed_settings, parsed_data = parse_userip_ini_file(userip_path)
+                parsed_settings, parsed_data = parse_userip_ini_file(userip_path, unresolved_ip_invalid)
                 if parsed_settings is None or parsed_data is None:
                     continue
                 UserIP_Databases.add(userip_path.stem, parsed_settings, parsed_data)
+
+            resolved_ip_invalids = UserIP_Databases.notified_ip_invalid - unresolved_ip_invalid
+            for resolved_database_entry in resolved_ip_invalids:
+                UserIP_Databases.notified_ip_invalid.remove(resolved_database_entry)
+
             UserIP_Databases.build()
 
             last_userip_parse_time = time.perf_counter()
@@ -3508,14 +3535,18 @@ def stdout_render_core():
             printer.cache_print(stdout__scanning_on_network_interface)
 
             color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
+            num_of_userip_files = len(UserIP_Databases.userip_databases)
             padding_width = calculate_padding_width(109, 75, len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
             printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
-            if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_conflicts):
-                padding_width = calculate_padding_width(109, 42, len(str(plural(number_of_conflicting_ip_in_userip_files))), len(str(number_of_conflicting_ip_in_userip_files)))
-                printer.cache_print(f"{' ' * padding_width}Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP files: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}")
-            if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_conflicts):
-                padding_width = calculate_padding_width(109, 47, len(str(plural(number_of_corrupted_userip_settings_files))), len(str(number_of_corrupted_userip_settings_files)))
-                printer.cache_print(f"{' ' * padding_width}Number of corrupted setting(s) in UserIP file{plural(number_of_corrupted_userip_settings_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}")
+            if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
+                padding_width = calculate_padding_width(109, 35, len(str(plural(number_of_ip_invalid_in_userip_files))), len(str(plural(num_of_userip_files))), len(str(number_of_ip_invalid_in_userip_files)))
+                printer.cache_print(f"{' ' * padding_width}Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}")
+            if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_ip_conflicts):
+                padding_width = calculate_padding_width(109, 39, len(str(plural(number_of_conflicting_ip_in_userip_files))), len(str(plural(num_of_userip_files))), len(str(number_of_conflicting_ip_in_userip_files)))
+                printer.cache_print(f"{' ' * padding_width}Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}")
+            if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_corrupted):
+                padding_width = calculate_padding_width(109, 47, len(str(plural(number_of_corrupted_userip_settings_files))), len(str(plural(num_of_userip_files))), len(str(number_of_corrupted_userip_settings_files)))
+                printer.cache_print(f"{' ' * padding_width}Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}")
             printer.cache_print(f"-" * 109)
 
             stdout_connected_players_table = PrettyTable()

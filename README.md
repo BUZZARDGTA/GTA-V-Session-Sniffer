@@ -123,6 +123,12 @@ Shows or not the elapsed time from which a player has been captured in "First Se
 #### <STDOUT_DATE_FIELDS_SHOW_DATE>
 Shows or not the date from which a player has been captured in "First Seen", "Last Rejoin" and "Last Seen" fields.
 
+#### <STDOUT_FIELD_SHOW_CONTINENT_CODE>
+Specify whether to display the continent's ISO 2-letter code in parentheses next to the continent name.
+
+#### <STDOUT_FIELD_SHOW_COUNTRY_CODE>
+Specify whether to display the country's ISO 2-letter code in parentheses next to the country name.
+
 #### <STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY>
 Specifies the fields from the connected players by which you want the output data to be sorted.<br>
 Valid values include any field names. For example: Last Rejoin
@@ -137,8 +143,26 @@ Maximum allowed length for the "Country" field.
 #### <STDOUT_FIELD_CITY_MAX_LEN>
 Maximum allowed length for the "City" field.
 
-#### <STDOUT_FIELD_ASN_MAX_LEN>
-Maximum allowed length for the "ASN" field.
+#### <STDOUT_FIELD_CONTINENT_MAX_LEN>
+Maximum allowed length for the "Continent" field.
+
+#### <STDOUT_FIELD_REGION_MAX_LEN>
+Maximum allowed length for the "Region" field.
+
+#### <STDOUT_FIELD_ORGANIZATION_MAX_LEN>
+Maximum allowed length for the "Organization" field.
+
+#### <STDOUT_FIELD_ISP_MAX_LEN>
+Maximum allowed length for the "ISP" field.
+
+#### <STDOUT_FIELD_ASN_ISP_MAX_LEN>
+Maximum allowed length for the "ASN / ISP" field.
+
+#### <STDOUT_FIELD_AS_MAX_LEN>
+Maximum allowed length for the "AS" field.
+
+#### <STDOUT_FIELD_AS_NAME_MAX_LEN>
+Maximum allowed length for the "AS Name" field.
 
 #### <STDOUT_DISCONNECTED_PLAYERS_TIMER>
 The duration after which a player will be moved as disconnected on the console if no packets are received within this time.<br>
