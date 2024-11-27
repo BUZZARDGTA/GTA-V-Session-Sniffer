@@ -333,8 +333,9 @@ class DefaultSettings:
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
     STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
-    STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME = True
     STDOUT_DATE_FIELDS_SHOW_DATE = False
+    STDOUT_DATE_FIELDS_SHOW_TIME = False
+    STDOUT_DATE_FIELDS_SHOW_ELAPSED = True
     STDOUT_FIELD_SHOW_COUNTRY_CODE = True
     STDOUT_FIELD_SHOW_CONTINENT_CODE = True
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
@@ -557,14 +558,19 @@ class Settings(DefaultSettings):
                             Settings.STDOUT_FIELDS_TO_HIDE = filtered_stdout_fields_to_hide
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME":
-                    try:
-                        Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME, need_rewrite_current_setting = custom_str_to_bool(setting_value)
-                    except InvalidBooleanValueError:
-                        need_rewrite_settings = True
                 elif setting_name == "STDOUT_DATE_FIELDS_SHOW_DATE":
                     try:
                         Settings.STDOUT_DATE_FIELDS_SHOW_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_TIME":
+                    try:
+                        Settings.STDOUT_DATE_FIELDS_SHOW_TIME, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_ELAPSED":
+                    try:
+                        Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_SHOW_CONTINENT_CODE":
@@ -1913,7 +1919,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.2 - 26/11/2024 (00:22)"
+VERSION = "v1.2.3 - 27/11/2024 (20:58)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -2068,7 +2074,7 @@ if Settings.STDOUT_FIELDS_TO_HIDE:
 
                     You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
 
-                    Do you want to replace:
+                    Would you like to replace:
                     {sort_field_name}={sort_field_value}
                     with its default value:
                     {sort_field_name}={default_sort_value}
@@ -2084,6 +2090,31 @@ if Settings.STDOUT_FIELDS_TO_HIDE:
 
                 # Reconstruct the settings after applying changes
                 Settings.reconstruct_settings()
+
+if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED is False:
+    msgbox_title = TITLE
+    msgbox_message = textwrap.dedent(f"""
+        ERROR in your custom \"Settings.ini\" file:
+
+        At least one of these settings must be set to \"True\" value:
+        <STDOUT_DATE_FIELDS_SHOW_DATE>
+        <STDOUT_DATE_FIELDS_SHOW_TIME>
+        <STDOUT_DATE_FIELDS_SHOW_ELAPSED>
+
+        Would you like to apply their default values and continue?
+    """.removeprefix("\n").removesuffix("\n"))
+    msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+
+    if errorlevel != Msgbox.ReturnValues.IDYES:
+        terminate_script("EXIT")
+
+    for setting_name in ["STDOUT_DATE_FIELDS_SHOW_DATE", "STDOUT_DATE_FIELDS_SHOW_TIME", "STDOUT_DATE_FIELDS_SHOW_ELAPSED"]:
+        # Replace the incorrect field with its default value
+        setattr(Settings, setting_name, getattr(DefaultSettings, setting_name))
+
+        # Reconstruct the settings after applying changes
+        Settings.reconstruct_settings()
 
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.8\" is installed on your system - {TITLE}")
@@ -3218,34 +3249,48 @@ def stdout_render_core():
 
             return padding_width
 
-        def format_player_datetime(datetime_object: datetime, is_stdout_processing = True):
-            if is_stdout_processing and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED_TIME:
-                elapsed = datetime.now() - datetime_object
+        def format_player_stdout_datetime(datetime_object: datetime) -> str:
+            formatted_elapsed = None
 
-                hours, remainder = divmod(elapsed.total_seconds(), 3600)
+            if Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED:
+                elapsed_time = datetime.now() - datetime_object
+
+                hours, remainder = divmod(elapsed_time.total_seconds(), 3600)
                 minutes, remainder = divmod(remainder, 60)
                 seconds, milliseconds = divmod(remainder * 1000, 1000)
 
-                elapsed_str = []
+                elapsed_parts: list[str] = []
                 if hours >= 1:
-                    elapsed_str.append(f"{int(hours):02}h")
-                if elapsed_str or minutes >= 1:
-                    elapsed_str.append(f"{int(minutes):02}m")
-                if elapsed_str or seconds >= 1:
-                    elapsed_str.append(f"{int(seconds):02}s")
-                if not elapsed_str and milliseconds > 0:
-                    elapsed_str.append(f"{int(milliseconds):03}ms")
+                    elapsed_parts.append(f"{int(hours):02}h")
+                if elapsed_parts or minutes >= 1:
+                    elapsed_parts.append(f"{int(minutes):02}m")
+                if elapsed_parts or seconds >= 1:
+                    elapsed_parts.append(f"{int(seconds):02}s")
+                if not elapsed_parts and milliseconds > 0:
+                    elapsed_parts.append(f"{int(milliseconds):03}ms")
 
-                elapsed_display = f" ({' '.join(elapsed_str)})"
-            else:
-                elapsed_display = ""
+                formatted_elapsed = " ".join(elapsed_parts)
 
+                if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False:
+                    return formatted_elapsed
+
+            parts = []
             if Settings.STDOUT_DATE_FIELDS_SHOW_DATE:
-                formatted_datetime = f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}{elapsed_display}"
-            else:
-                formatted_datetime = f"{datetime_object.strftime('%H:%M:%S.%f')[:-3]}{elapsed_display}"
+                parts.append(datetime_object.strftime("%m/%d/%Y"))
+            if Settings.STDOUT_DATE_FIELDS_SHOW_TIME:
+                parts.append(datetime_object.strftime("%H:%M:%S.%f")[:-3])
 
-            return formatted_datetime
+            formatted_stdout_datetime = " ".join(parts)
+            if not formatted_stdout_datetime:
+                raise ValueError("Invalid settings: Both date and time are disabled.")
+
+            if formatted_elapsed:
+                formatted_stdout_datetime += f" ({formatted_elapsed})"
+
+            return formatted_stdout_datetime
+
+        def format_player_logging_datetime(datetime_object: datetime):
+            return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
 
         def format_player_usernames(player_usernames: list[str]):
             if player_usernames:
@@ -3566,8 +3611,8 @@ def stdout_render_core():
                     player_reset = Fore.RESET
 
                 row = []
-                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
                 if Settings.USERIP_ENABLED:
                     row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
@@ -3646,9 +3691,9 @@ def stdout_render_core():
                     player_reset = Fore.RESET
 
                 row = []
-                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_seen)}{player_reset}")
                 if Settings.USERIP_ENABLED:
                     row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
@@ -3722,8 +3767,8 @@ def stdout_render_core():
                 logging_connected_players_table.align = "l"
                 for player in session_connected:
                     row = []
-                    row.append(f"{format_player_datetime(player.datetime.first_seen, False)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_rejoin, False)}")
+                    row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                    row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
                     row.append(f"{format_player_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
@@ -3762,9 +3807,9 @@ def stdout_render_core():
                 logging_disconnected_players_table.align = "l"
                 for player in session_disconnected_all:
                     row = []
-                    row.append(f"{format_player_datetime(player.datetime.first_seen, False)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_rejoin, False)}")
-                    row.append(f"{format_player_datetime(player.datetime.last_seen, False)}")
+                    row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                    row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
+                    row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
                     row.append(f"{format_player_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
