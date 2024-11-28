@@ -3415,6 +3415,9 @@ def stdout_render_core():
                             modmenu__plugins__ip_to_usernames[ip].append(username)
 
         while True:
+            if ScriptControl.has_crashed():
+                return
+
             if STAND__PLUGIN__LOG_PATH.exists() and STAND__PLUGIN__LOG_PATH.is_file():
                 with STAND__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
                     for line in f:
@@ -3432,9 +3435,6 @@ def stdout_render_core():
                                 modmenu__plugins__ip_to_usernames[ip] = []
                             if not username in modmenu__plugins__ip_to_usernames[ip]:
                                 modmenu__plugins__ip_to_usernames[ip].append(username)
-
-            if ScriptControl.has_crashed():
-                return
 
             session_connected__padding_country_name = 0
             session_connected__padding_continent_name = 0
