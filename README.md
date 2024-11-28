@@ -20,7 +20,9 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
 | Grand Theft Auto 5                  |      PC, Xbox One, PS5      |
 | Minecraft Bedrock Edition (Friends) |           PC, PS3           |
 
-~~\*_Since v1.1.4, you can now view usernames in real-time on PC with 2Take1 Mod Menu and [GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua).<br />_~~
+\*_Since v1.1.4, you can now view usernames in real-time on PC using either 2Take1 or Stand mod menus:_
+- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br />
+- _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)<br />_
 
 \*\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br />
 But please note that additional servers (e.g., game servers) won't be filtered from the script's output if they are not indexed within the list above_
