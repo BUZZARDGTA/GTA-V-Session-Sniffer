@@ -3418,6 +3418,14 @@ def stdout_render_core():
             if ScriptControl.has_crashed():
                 return
 
+            session_connected__padding_country_name = 0
+            session_connected__padding_continent_name = 0
+            session_disconnected__padding_country_name = 0
+            session_disconnected__padding_continent_name = 0
+            session_connected: list[Player] = []
+            session_disconnected: list[Player] = []
+            main_loop__t1 = time.perf_counter()
+
             if STAND__PLUGIN__LOG_PATH.exists() and STAND__PLUGIN__LOG_PATH.is_file():
                 with STAND__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
                     for line in f:
@@ -3435,14 +3443,6 @@ def stdout_render_core():
                                 modmenu__plugins__ip_to_usernames[ip] = []
                             if not username in modmenu__plugins__ip_to_usernames[ip]:
                                 modmenu__plugins__ip_to_usernames[ip].append(username)
-
-            session_connected__padding_country_name = 0
-            session_connected__padding_continent_name = 0
-            session_disconnected__padding_country_name = 0
-            session_disconnected__padding_continent_name = 0
-            session_connected: list[Player] = []
-            session_disconnected: list[Player] = []
-            main_loop__t1 = time.perf_counter()
 
             if Settings.USERIP_ENABLED:
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
