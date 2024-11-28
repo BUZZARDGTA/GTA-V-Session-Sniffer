@@ -1006,7 +1006,7 @@ class Player_UserIp:
     def reset(self):
         self._initialize()
 
-class Player_TwoTakeOne:
+class Player_ModMenus:
     def __init__(self):
         self.usernames: list[Optional[str]] = []
 
@@ -1027,7 +1027,7 @@ class Player:
         self.datetime = Player_DateTime(packet_datetime)
         self.iplookup = Player_IPLookup()
         self.userip = Player_UserIp()
-        self.two_take_one = Player_TwoTakeOne()
+        self.mod_menus = Player_ModMenus()
 
     def reset(self, port: int, packet_datetime: datetime):
         self.packets = 1
@@ -1919,18 +1919,19 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.3 - 27/11/2024 (20:58)"
+VERSION = "v1.2.4 - 28/11/2024 (22:37)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
 SESSIONS_LOGGING_PATH = Path("Sessions Logging") / datetime.now().strftime("%Y/%m/%d") / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
 USERIP_LOGGING_PATH = Path("UserIP_Logging.log")
 TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
+STAND__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/Stand/Lua Scripts/GTA_V_Session_Sniffer-plugin/log.txt"
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
 RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>[^;#]+)")
-RE_TWO_TAKE_ONE_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
+RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
@@ -3392,13 +3393,13 @@ def stdout_render_core():
 
         padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_INTERFACE_NAME)), len(displayed__capture_ip_address), len(str(is_arp_enabled)))
         stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
-        two_take_one__plugin__ip_to_usernames: dict[str, list[str]] = {}
+        modmenu__plugins__ip_to_usernames: dict[str, list[str]] = {}
 
         # NOTE: The log file content is read only once because the plugin is no longer supported.
         if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
             with TWO_TAKE_ONE__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
                 for line in f:
-                    match = RE_TWO_TAKE_ONE_USER_PATTERN.match(line)
+                    match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
                     if match:
                         username = match.group("username")
                         if not isinstance(username, str):
@@ -3408,12 +3409,30 @@ def stdout_render_core():
                         if not isinstance(ip, str):
                             continue
 
-                        if ip not in two_take_one__plugin__ip_to_usernames:
-                            two_take_one__plugin__ip_to_usernames[ip] = []
-                        if not username in two_take_one__plugin__ip_to_usernames[ip]:
-                            two_take_one__plugin__ip_to_usernames[ip].append(username)
+                        if ip not in modmenu__plugins__ip_to_usernames:
+                            modmenu__plugins__ip_to_usernames[ip] = []
+                        if not username in modmenu__plugins__ip_to_usernames[ip]:
+                            modmenu__plugins__ip_to_usernames[ip].append(username)
 
         while True:
+            if STAND__PLUGIN__LOG_PATH.exists() and STAND__PLUGIN__LOG_PATH.is_file():
+                with STAND__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
+                        if match:
+                            username = match.group("username")
+                            if not isinstance(username, str):
+                                continue
+
+                            ip = match.group("ip")
+                            if not isinstance(ip, str):
+                                continue
+
+                            if ip not in modmenu__plugins__ip_to_usernames:
+                                modmenu__plugins__ip_to_usernames[ip] = []
+                            if not username in modmenu__plugins__ip_to_usernames[ip]:
+                                modmenu__plugins__ip_to_usernames[ip].append(username)
+
             if ScriptControl.has_crashed():
                 return
 
@@ -3436,13 +3455,12 @@ def stdout_render_core():
                     else:
                         player.userip.reset()
 
-                if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
-                    if player.ip in two_take_one__plugin__ip_to_usernames:
-                        for username in two_take_one__plugin__ip_to_usernames[player.ip]:
-                            if username not in player.two_take_one.usernames:
-                                player.two_take_one.usernames.append(username)
+                if modmenu__plugins__ip_to_usernames and player.ip in modmenu__plugins__ip_to_usernames:
+                    for username in modmenu__plugins__ip_to_usernames[player.ip]:
+                        if username not in player.mod_menus.usernames:
+                            player.mod_menus.usernames.append(username)
 
-                player.usernames = concat_lists_no_duplicates(player.two_take_one.usernames, player.userip.usernames)
+                player.usernames = concat_lists_no_duplicates(player.mod_menus.usernames, player.userip.usernames)
 
                 if (
                     not player.datetime.left
