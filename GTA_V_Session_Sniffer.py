@@ -2164,8 +2164,7 @@ geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_read
 cls()
 title(f"Initializing MacLookup module - {TITLE}")
 print(f"\nInitializing MacLookup module ...\n")
-if Settings.CAPTURE_ARP:
-    mac_lookup = MacLookup(bypass_fetch_error=True)
+mac_lookup = MacLookup(bypass_fetch_error=True)
 
 cls()
 title(f"Capture network interface selection - {TITLE}")
