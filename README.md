@@ -20,7 +20,7 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
 | Grand Theft Auto 5                  |      PC, Xbox One, PS5      |
 | Minecraft Bedrock Edition (Friends) |           PC, PS3           |
 
-\*_Since v1.1.4, you can now view usernames in real-time on PC using either 2Take1 or Stand mod menus:_
+\*_Since v1.1.4, you can now view usernames in real-time on PC using either ~~2Take1~~ or Stand mod menus:_
 - ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br />
 - _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)<br />_
 
