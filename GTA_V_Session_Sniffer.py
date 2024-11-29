@@ -35,6 +35,7 @@ import enum
 import errno
 import ctypes
 import signal
+import winreg
 import logging
 import textwrap
 import winsound
@@ -1347,6 +1348,41 @@ def is_hex(string: str):
     except (ValueError, TypeError):
         return False
 
+def get_documents_folder():
+    """
+    Retrieves the path to the current user's 'Documents' folder by querying the Windows registry.
+
+    Returns:
+        str: The Path object to the 'Documents' folder.
+    """
+
+    """ NOTE: Alternative code:
+    import os
+    import sys
+    from pathlib import Path
+
+    # Windows - Use SHGetKnownFolderPath for Documents
+    from win32com.shell import shell, shellcon
+
+    # Get the Documents folder path
+    documents_path = Path(shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents, 0))
+
+    # Append the desired file path
+    log_path = documents_path / "Cherax" / "Lua" / "GTA_V_Session_Sniffer-plugin" / "log.txt"
+
+    print(log_path)
+    """
+
+    reg_key = R"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key) as key:
+        documents_path, _ = winreg.QueryValueEx(key, "Personal")
+
+    if not isinstance(documents_path, str):
+        raise TypeError(f'Expected "str", got "{type(documents_path)}"')
+
+    return Path(documents_path)
+
 def is_ipv4_address(ip_address: str):
     try:
         return IPv4Address(ip_address).version == 4
@@ -1919,7 +1955,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.4 - 28/11/2024 (22:37)"
+VERSION = "v1.2.5 - 29/11/2024 (18:02)"
 TITLE_VERSION = f"{TITLE} {VERSION}"
 SETTINGS_PATH = Path("Settings.ini")
 USERIP_DATABASES_PATH = Path("UserIP Databases")
@@ -1927,6 +1963,7 @@ SESSIONS_LOGGING_PATH = Path("Sessions Logging") / datetime.now().strftime("%Y/%
 USERIP_LOGGING_PATH = Path("UserIP_Logging.log")
 TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
 STAND__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/Stand/Lua Scripts/GTA_V_Session_Sniffer-plugin/log.txt"
+CHERAX__PLUGIN__LOG_PATH = get_documents_folder() / "Cherax/Lua/GTA_V_Session_Sniffer-plugin/log.txt"
 TTS_PATH = resource_path(Path("TTS/"))
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
 RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
@@ -3426,23 +3463,24 @@ def stdout_render_core():
             session_disconnected: list[Player] = []
             main_loop__t1 = time.perf_counter()
 
-            if STAND__PLUGIN__LOG_PATH.exists() and STAND__PLUGIN__LOG_PATH.is_file():
-                with STAND__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
-                        if match:
-                            username = match.group("username")
-                            if not isinstance(username, str):
-                                continue
+            for log_path in [STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH]:
+                if log_path.exists() and log_path.is_file():
+                    with log_path.open("r", encoding="utf-8") as f:
+                        for line in f:
+                            match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
+                            if match:
+                                username = match.group("username")
+                                if not isinstance(username, str):
+                                    continue
 
-                            ip = match.group("ip")
-                            if not isinstance(ip, str):
-                                continue
+                                ip = match.group("ip")
+                                if not isinstance(ip, str):
+                                    continue
 
-                            if ip not in modmenu__plugins__ip_to_usernames:
-                                modmenu__plugins__ip_to_usernames[ip] = []
-                            if not username in modmenu__plugins__ip_to_usernames[ip]:
-                                modmenu__plugins__ip_to_usernames[ip].append(username)
+                                if ip not in modmenu__plugins__ip_to_usernames:
+                                    modmenu__plugins__ip_to_usernames[ip] = []
+                                if not username in modmenu__plugins__ip_to_usernames[ip]:
+                                    modmenu__plugins__ip_to_usernames[ip].append(username)
 
             if Settings.USERIP_ENABLED:
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
