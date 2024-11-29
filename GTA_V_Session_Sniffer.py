@@ -2098,36 +2098,32 @@ Settings.load_from_settings_file(SETTINGS_PATH)
 cls()
 title(f"Checking your custom settings from \"Settings.ini\" - {TITLE}")
 print("\nChecking your custom settings from \"Settings.ini\" ...\n")
-if Settings.STDOUT_FIELDS_TO_HIDE:
-    for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
-        # Check for both connected and disconnected player sort fields
-        for sort_field_name, sort_field_value, default_sort_value in [
-            ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-            ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
-        ]:
-            if field_name in sort_field_value:
-                msgbox_title = TITLE
-                msgbox_message = textwrap.dedent(f"""
-                    ERROR in your custom \"Settings.ini\" file:
+for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
+    for sort_field_name, sort_field_value, default_sort_value in [
+        ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+        ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+    ]:
+        if field_name in sort_field_value:
+            msgbox_title = TITLE
+            msgbox_message = textwrap.dedent(f"""
+                ERROR in your custom \"Settings.ini\" file:
 
-                    You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
+                You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
 
-                    Would you like to replace:
-                    {sort_field_name}={sort_field_value}
-                    with its default value:
-                    {sort_field_name}={default_sort_value}
-                """.removeprefix("\n").removesuffix("\n"))
-                msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-                errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+                Would you like to replace:
+                {sort_field_name}={sort_field_value}
+                with its default value:
+                {sort_field_name}={default_sort_value}
+            """.removeprefix("\n").removesuffix("\n"))
+            msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
 
-                if errorlevel != Msgbox.ReturnValues.IDYES:
-                    terminate_script("EXIT")
+            if errorlevel != Msgbox.ReturnValues.IDYES:
+                terminate_script("EXIT")
 
-                # Replace the incorrect field with its default value
-                setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name))
+            setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name)) # Replace the incorrect field with its default value
 
-                # Reconstruct the settings after applying changes
-                Settings.reconstruct_settings()
+            Settings.reconstruct_settings()
 
 if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED is False:
     msgbox_title = TITLE
@@ -3330,15 +3326,7 @@ def stdout_render_core():
             return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
 
         def format_player_usernames(player_usernames: list[str]):
-            if player_usernames:
-                if len(player_usernames) > 1:
-                    player_usernames = f"{', '.join(player_usernames)}"
-                else:
-                    player_usernames = player_usernames[0]
-            else:
-                player_usernames = "N/A"
-
-            return f"{player_color}{player_usernames}{player_reset}"
+            return f"{player_color}{", ".join(player_usernames) if player_usernames else "N/A"}{player_reset}"
 
         def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
             if pps_rate == 0:
@@ -3368,28 +3356,45 @@ def stdout_render_core():
             else:
                 return ""
 
-        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
-            for i, field in enumerate(field_names):
-                if field == target_field:
-                    field_names[i] += " \u2193"
-                    break
+        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str) -> list[str]:
+            updated_field_names = [
+                field + " \u2193" if field == target_field else field
+                for field in field_names
+            ]
+            return updated_field_names
+
 
         global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
 
-        session_connected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
-        session_disconnected_sorted_key = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
+        SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
+        SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
+        FIELDS_TO_HIDE_IN_STDOUT = set(Settings.STDOUT_FIELDS_TO_HIDE)
 
-        stdout_connected_players_table__field_names = [
+        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+        displayed__capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+        padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_INTERFACE_NAME)), len(displayed__capture_ip_address), len(str(is_arp_enabled)))
+        STDOUT__SCANNING_ON_NETWORK_INTERFACE = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+        is_arp_enabled = displayed__capture_ip_address = padding_width = None
+
+        STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
             for field_name in [
                 field_name
                 for field_name in Settings.stdout_fields_mapping.keys()
                 if not field_name == "Last Seen"
             ]
-            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ]
-        add_down_arrow_char_to_sorted_table_field(stdout_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
-        logging_connected_players_table__field_names = [
+            if field_name not in FIELDS_TO_HIDE_IN_STDOUT and (Settings.USERIP_ENABLED or field_name != "Usernames")
+        ], Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+        STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES  = add_down_arrow_char_to_sorted_table_field([
+            field_name
+            for field_name in [
+                field_name
+                for field_name in Settings.stdout_fields_mapping.keys()
+                if not field_name == "PPS"
+            ]
+            if field_name not in FIELDS_TO_HIDE_IN_STDOUT and (Settings.USERIP_ENABLED or field_name != "Usernames")
+        ], Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES    = add_down_arrow_char_to_sorted_table_field([
             field_name
             for field_name in [
                 field_name
@@ -3397,20 +3402,8 @@ def stdout_render_core():
                 if not field_name == "Last Seen"
             ]
             if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ]
-        add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
-
-        stdout_disconnected_players_table__field_names = [
-            field_name
-            for field_name in [
-                field_name
-                for field_name in Settings.stdout_fields_mapping.keys()
-                if not field_name == "PPS"
-            ]
-            if field_name not in Settings.STDOUT_FIELDS_TO_HIDE and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ]
-        add_down_arrow_char_to_sorted_table_field(stdout_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
-        logging_disconnected_players_table__field_names = [
+        ], Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+        LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
             for field_name in [
                 field_name
@@ -3418,20 +3411,15 @@ def stdout_render_core():
                 if not field_name == "PPS"
             ]
             if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ]
-        add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        ], Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
         printer = PrintCacher()
         global_pps_t1 = time.perf_counter()
         global_pps_rate = 0
         last_userip_parse_time = None
-        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        displayed__capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+        last_mod_menus_logs_parse_time = None
 
-        padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_INTERFACE_NAME)), len(displayed__capture_ip_address), len(str(is_arp_enabled)))
-        stdout__scanning_on_network_interface = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
         modmenu__plugins__ip_to_usernames: dict[str, list[str]] = {}
-
         # NOTE: The log file content is read only once because the plugin is no longer supported.
         if TWO_TAKE_ONE__PLUGIN__LOG_PATH.exists() and TWO_TAKE_ONE__PLUGIN__LOG_PATH.is_file():
             with TWO_TAKE_ONE__PLUGIN__LOG_PATH.open("r", encoding="utf-8") as f:
@@ -3463,24 +3451,27 @@ def stdout_render_core():
             session_disconnected: list[Player] = []
             main_loop__t1 = time.perf_counter()
 
-            for log_path in [STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH]:
-                if log_path.exists() and log_path.is_file():
-                    with log_path.open("r", encoding="utf-8") as f:
-                        for line in f:
-                            match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
-                            if match:
-                                username = match.group("username")
-                                if not isinstance(username, str):
-                                    continue
+            if last_mod_menus_logs_parse_time is None or time.perf_counter() - last_mod_menus_logs_parse_time >= 1.0:
+                last_mod_menus_logs_parse_time = time.perf_counter()
 
-                                ip = match.group("ip")
-                                if not isinstance(ip, str):
-                                    continue
+                for log_path in [STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH]:
+                    if log_path.exists() and log_path.is_file():
+                        with log_path.open("r", encoding="utf-8") as f:
+                            for line in f:
+                                match = RE_MODMENU_LOGS_USER_PATTERN.match(line)
+                                if match:
+                                    username = match.group("username")
+                                    if not isinstance(username, str):
+                                        continue
 
-                                if ip not in modmenu__plugins__ip_to_usernames:
-                                    modmenu__plugins__ip_to_usernames[ip] = []
-                                if not username in modmenu__plugins__ip_to_usernames[ip]:
-                                    modmenu__plugins__ip_to_usernames[ip].append(username)
+                                    ip = match.group("ip")
+                                    if not isinstance(ip, str):
+                                        continue
+
+                                    if ip not in modmenu__plugins__ip_to_usernames:
+                                        modmenu__plugins__ip_to_usernames[ip] = []
+                                    if not username in modmenu__plugins__ip_to_usernames[ip]:
+                                        modmenu__plugins__ip_to_usernames[ip].append(username)
 
             if Settings.USERIP_ENABLED:
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
@@ -3532,8 +3523,8 @@ def stdout_render_core():
 
                     session_connected.append(player)
 
-            session_connected.sort(key=attrgetter(session_connected_sorted_key))
-            session_disconnected.sort(key=attrgetter(session_disconnected_sorted_key))
+            session_connected.sort(key=attrgetter(SESSION_CONNECTED_SORTED_KEY))
+            session_disconnected.sort(key=attrgetter(SESSION_DISCONNECTED_SORTED_KEY))
 
             if Settings.CAPTURE_PROGRAM_PRESET == "GTA5":
                 if SessionHost.player:
@@ -3632,7 +3623,7 @@ def stdout_render_core():
             printer.cache_print(f"                         Welcome in {TITLE_VERSION}")
             printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
             printer.cache_print(f"-   " * 28)
-            printer.cache_print(stdout__scanning_on_network_interface)
+            printer.cache_print(STDOUT__SCANNING_ON_NETWORK_INTERFACE)
 
             color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
             num_of_userip_files = len(UserIP_Databases.userip_databases)
@@ -3652,7 +3643,7 @@ def stdout_render_core():
             stdout_connected_players_table = PrettyTable()
             stdout_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
             stdout_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-            stdout_connected_players_table.field_names = stdout_connected_players_table__field_names
+            stdout_connected_players_table.field_names = STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
             stdout_connected_players_table.align = "l"
             for player in session_connected:
                 if (
@@ -3675,64 +3666,64 @@ def stdout_render_core():
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}{player_reset}")
                 row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
-                if "Last Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Last Port" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Intermediate Ports" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "First Port" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Continent" not in FIELDS_TO_HIDE_IN_STDOUT:
                     if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Country" not in FIELDS_TO_HIDE_IN_STDOUT:
                     if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Region" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
-                if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "R. Code" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "City" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
-                if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "District" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ZIP Code" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Lat" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Lon" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Time Zone" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Offset" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Currency" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Organization" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.org_short}{player_reset}")
-                if "ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp_short}{player_reset}")
-                if "ASN / ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ASN / ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
-                if "AS" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "AS Name" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "AS Name" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
-                if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "VPN" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Hosting" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
                 stdout_connected_players_table.add_row(row)
 
             stdout_disconnected_players_table = PrettyTable()
             stdout_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
             stdout_disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len_session_disconnected_message}):"
-            stdout_disconnected_players_table.field_names = stdout_disconnected_players_table__field_names
+            stdout_disconnected_players_table.field_names = STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
             stdout_disconnected_players_table.align = "l"
             for player in session_disconnected:
                 if (
@@ -3755,57 +3746,57 @@ def stdout_render_core():
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{player_color}{player.ip}{player_reset}")
-                if "Last Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Last Port" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Intermediate Ports" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "First Port" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Continent" not in FIELDS_TO_HIDE_IN_STDOUT:
                     if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Country" not in FIELDS_TO_HIDE_IN_STDOUT:
                     if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Region" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
-                if "R. Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "R. Code" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "City" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
-                if "District" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "District" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ZIP Code" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Lat" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Lon" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Time Zone" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Offset" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Currency" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Organization" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.org_short}{player_reset}")
-                if "ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp_short}{player_reset}")
-                if "ASN / ISP" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "ASN / ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
-                if "AS" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "AS Name" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "AS Name" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
-                if "Mobile" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "VPN" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in Settings.STDOUT_FIELDS_TO_HIDE:
+                if "Hosting" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
                 stdout_disconnected_players_table.add_row(row)
 
@@ -3818,7 +3809,7 @@ def stdout_render_core():
                 logging_connected_players_table = PrettyTable()
                 logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
                 logging_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
-                logging_connected_players_table.field_names = logging_connected_players_table__field_names
+                logging_connected_players_table.field_names = LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
                 logging_connected_players_table.align = "l"
                 for player in session_connected:
                     row = []
@@ -3858,7 +3849,7 @@ def stdout_render_core():
                 logging_disconnected_players_table = PrettyTable()
                 logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
                 logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected_all))} who've left your session ({len(session_disconnected_all)}):"
-                logging_disconnected_players_table.field_names = logging_disconnected_players_table__field_names
+                logging_disconnected_players_table.field_names = LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
                 logging_disconnected_players_table.align = "l"
                 for player in session_disconnected_all:
                     row = []
@@ -3921,12 +3912,12 @@ def stdout_render_core():
                     continue
 
             if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 0.1:
+                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
                     safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
                     time.sleep(0.1)
                     continue
             else:
-                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER + 1.0:
+                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
                     safe_print("\033[K" + f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ...", end="\r")
                     time.sleep(0.1)
                     continue
