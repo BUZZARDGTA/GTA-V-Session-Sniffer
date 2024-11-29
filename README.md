@@ -6,7 +6,7 @@ Compatible with both PC and all consoles (PlayStation and Xbox).<br />
 Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
 
 To be clear, the script does not explicitly indicate which IP corresponds to which in-game username\*.<br />
-This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen consoles.
+This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.
 
 - Scan players who:
   - Are trying to connect.
