@@ -3326,7 +3326,7 @@ def stdout_render_core():
             return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
 
         def format_player_usernames(player_usernames: list[str]):
-            return f"{player_color}{", ".join(player_usernames) if player_usernames else "N/A"}{player_reset}"
+            return f"{player_color}{', '.join(player_usernames) if player_usernames else 'N/A'}{player_reset}"
 
         def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
             if pps_rate == 0:
@@ -3356,7 +3356,7 @@ def stdout_render_core():
             else:
                 return ""
 
-        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str) -> list[str]:
+        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
             updated_field_names = [
                 field + " \u2193" if field == target_field else field
                 for field in field_names
