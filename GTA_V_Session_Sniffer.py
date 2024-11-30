@@ -1624,7 +1624,7 @@ def show_error__tshark_not_detected():
 
     msgbox_title = TITLE
     msgbox_message = textwrap.dedent(f"""
-        ERROR: Could not detect \"TShark (Wireshark) v4.2.8\" installed on your system.
+        ERROR: Could not detect \"TShark (Wireshark) v4.2.9\" installed on your system.
 
         Opening the \"Wireshark\" project download page for you.
         You can then download and install it from there and press \"Retry\".
@@ -1974,7 +1974,7 @@ RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>
 RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
+WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaabc9099c)."
 WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 
 cls()
@@ -2154,8 +2154,8 @@ if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELD
         Settings.reconstruct_settings()
 
 cls()
-title(f"Checking that \"Tshark (Wireshark) v4.2.8\" is installed on your system - {TITLE}")
-print("\nChecking that \"Tshark (Wireshark) v4.2.8\" is installed on your system ...\n")
+title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
+print("\nChecking that \"Tshark (Wireshark) v4.2.9\" is installed on your system ...\n")
 while True:
     try:
         TSHARK_PATH = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
