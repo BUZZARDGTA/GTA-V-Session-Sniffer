@@ -217,7 +217,7 @@ class Version:
             self._date_time = datetime.strptime(version[9:19], "%d/%m/%Y")
 
     def __str__(self):
-        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f" ({self.time})" if self.time else ""}"
+        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f' ({self.time})' if self.time else ''}"
 
 class Updater:
     def __init__(self, current_version: Version):
