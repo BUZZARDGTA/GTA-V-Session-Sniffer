@@ -795,20 +795,20 @@ class Interface:
         return None
 
 class ThirdPartyServers(enum.Enum):
-    PC_Discord = ["66.22.196.0/22", "66.22.200.0/21", "66.22.208.0/20", "66.22.224.0/20", "66.22.240.0/21", "66.22.248.0/24"]
-    PC_Valve = ["103.10.124.0/23", "103.28.54.0/23", "146.66.152.0/21", "155.133.224.0/19", "162.254.192.0/21", "185.25.180.0/22", "205.196.6.0/24"] # Valve = Steam
-    PC_Google = ["34.0.0.0/9", "34.128.0.0/10", "35.184.0.0/13", "35.192.0.0/11", "35.224.0.0/12", "35.240.0.0/13"]
-    PC_multicast = ["224.0.0.0/4"]
-    PC_UK_Ministry_of_Defence = ["25.0.0.0/8"]
-    PC_Servers_Com = ["173.237.26.0/24"]
-    PC_Others = ["113.117.15.193/32"]
-    GTAV_PC_and_PS3_TakeTwo = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
-    GTAV_PC_Microsoft = ["52.139.128.0/18"]
-    GTAV_PC_DoD_Network_Information_Center = ["26.0.0.0/8"]
-    GTAV_PC_BattlEye = ["51.89.97.102/32", "51.89.99.255/32"]
-    GTAV_XboxOne_Microsoft = ["52.159.128.0/17", "52.160.0.0/16", "40.74.0.0/18"]
-    PS5_Amazon = ["52.40.62.0/25"]
-    MinecraftBedrockEdition_PC_and_PS3_Microsoft = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
+    PC_DISCORD = ["66.22.196.0/22", "66.22.200.0/21", "66.22.208.0/20", "66.22.224.0/20", "66.22.240.0/21", "66.22.248.0/24"]
+    PC_VALVE = ["103.10.124.0/23", "103.28.54.0/23", "146.66.152.0/21", "155.133.224.0/19", "162.254.192.0/21", "185.25.180.0/22", "205.196.6.0/24"] # Valve = Steam
+    PC_GOOGLE = ["34.0.0.0/9", "34.128.0.0/10", "35.184.0.0/13", "35.192.0.0/11", "35.224.0.0/12", "35.240.0.0/13"]
+    PC_MULTICAST = ["224.0.0.0/4"]
+    PC_UK_MINISTRY_OF_DEFENCE = ["25.0.0.0/8"]
+    PC_SERVERS_COM = ["173.237.26.0/24"]
+    PC_OTHERS = ["113.117.15.193/32"]
+    GTAV_PC_AND_PS3_TAKETWO = ["104.255.104.0/23", "104.255.106.0/24", "185.56.64.0/22", "192.81.241.0/24", "192.81.244.0/23"]
+    GTAV_PC_MICROSOFT = ["52.139.128.0/18"]
+    GTAV_PC_DOD_NETWORK_INFORMATION_CENTER = ["26.0.0.0/8"]
+    GTAV_PC_BATTLEYE = ["51.89.97.102/32", "51.89.99.255/32"]
+    GTAV_XBOXONE_MICROSOFT = ["52.159.128.0/17", "52.160.0.0/16", "40.74.0.0/18"]
+    PS5_AMAZON = ["52.40.62.0/25"]
+    MINECRAFTBEDROCKEDITION_PC_AND_PS3_MICROSOFT = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
 class PrintCacher:
     def __init__(self):
@@ -862,65 +862,65 @@ class Player_DateTime:
 
 class MaxMind_GeoLite2_Compiled:
     def __init__(self):
-        self.country = "..."
-        self.country_code = "..."
+        self.country       = "..."
+        self.country_code  = "..."
         self.country_short = "..."
-        self.city = "..."
-        self.city_short = "..."
-        self.asn = "..."
-        self.asn_short = "..."
+        self.city          = "..."
+        self.city_short    = "..."
+        self.asn           = "..."
+        self.asn_short     = "..."
 
 class MaxMind_GeoLite2:
     def __init__(self):
         self.is_initialized = False
         self.compiled = MaxMind_GeoLite2_Compiled()
 
-        self.country: Optional[str] = None
+        self.country:      Optional[str] = None
         self.country_code: Optional[str] = None
-        self.city: Optional[str] = None
-        self.asn: Optional[str] = None
+        self.city:         Optional[str] = None
+        self.asn:          Optional[str] = None
 
     def compile(self):
         """
         Populate the `compiled` subclass with processed values where `None` is replaced with "..."
         and all other values are converted to their string representation.
         """
-        self.compiled.country = "..." if self.country is None else str(self.country)
-        self.compiled.country_code = "..." if self.country_code is None else str(self.country_code)
-        self.compiled.country_short = "..." if self.country is None else truncate_with_ellipsis(str(self.country), Settings.STDOUT_FIELD_COUNTRY_MAX_LEN)
-        self.compiled.city = "..." if self.city is None else str(self.city)
-        self.compiled.city_short = "..." if self.city is None else truncate_with_ellipsis(str(self.city), Settings.STDOUT_FIELD_CITY_MAX_LEN)
-        self.compiled.asn = "..." if self.asn is None else str(self.asn)
-        self.compiled.asn_short = "..." if self.asn is None else truncate_with_ellipsis(str(self.asn), Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN)
+        self.compiled.country        = "..." if self.country      is None else str(self.country)
+        self.compiled.country_code   = "..." if self.country_code is None else str(self.country_code)
+        self.compiled.country_short  = "..." if self.country      is None else truncate_with_ellipsis(str(self.country), Settings.STDOUT_FIELD_COUNTRY_MAX_LEN)
+        self.compiled.city           = "..." if self.city         is None else str(self.city)
+        self.compiled.city_short     = "..." if self.city         is None else truncate_with_ellipsis(str(self.city), Settings.STDOUT_FIELD_CITY_MAX_LEN)
+        self.compiled.asn            = "..." if self.asn          is None else str(self.asn)
+        self.compiled.asn_short      = "..." if self.asn          is None else truncate_with_ellipsis(str(self.asn), Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN)
 
 class IPAPI_Compiled:
     def __init__(self):
-        self.continent = "..."
+        self.continent      = "..."
         self.continent_code = "..."
-        self.country = "..."
-        self.country_code = "..."
-        self.region = "..."
-        self.region_short = "..."
-        self.region_code = "..."
-        self.city = "..."
-        self.district = "..."
-        self.zip_code = "..."
-        self.lat = "..."
-        self.lon = "..."
-        self.time_zone = "..."
-        self.offset = "..."
-        self.currency = "..."
-        self.org = "..."
-        self.org_short = "..."
-        self.isp = "..."
-        self.isp_short = "..."
-        self._as = "..."
-        self.as_short = "..."
-        self.as_name = "..."
-        self.as_name_short = "..."
-        self.mobile = "..."
-        self.proxy = "..."
-        self.hosting = "..."
+        self.country        = "..."
+        self.country_code   = "..."
+        self.region         = "..."
+        self.region_short   = "..."
+        self.region_code    = "..."
+        self.city           = "..."
+        self.district       = "..."
+        self.zip_code       = "..."
+        self.lat            = "..."
+        self.lon            = "..."
+        self.time_zone      = "..."
+        self.offset         = "..."
+        self.currency       = "..."
+        self.org            = "..."
+        self.org_short      = "..."
+        self.isp            = "..."
+        self.isp_short      = "..."
+        self._as            = "..."
+        self.as_short       = "..."
+        self.as_name        = "..."
+        self.as_name_short  = "..."
+        self.mobile         = "..."
+        self.proxy          = "..."
+        self.hosting        = "..."
 
 
 class IPAPI:
@@ -928,59 +928,59 @@ class IPAPI:
         self.is_initialized = False
         self.compiled = IPAPI_Compiled()
 
-        self.continent: Optional[str] = None
-        self.continent_code: Optional[str] = None
-        self.country: Optional[str] = None
-        self.country_code: Optional[str] = None
-        self.region: Optional[str] = None
-        self.region_code: Optional[str] = None
-        self.city: Optional[str] = None
-        self.district: Optional[str] = None
-        self.zip_code: Optional[str] = None
-        self.lat: Optional[Union[float, int]] = None
-        self.lon: Optional[Union[float, int]] = None
-        self.time_zone: Optional[str] = None
-        self.offset: Optional[int] = None
-        self.currency: Optional[str] = None
-        self.org: Optional[str] = None
-        self.isp: Optional[str] = None
-        self._as: Optional[str] = None
-        self.as_name: Optional[str] = None
-        self.mobile: Optional[bool] = None
-        self.proxy: Optional[bool] = None
-        self.hosting: Optional[bool] = None
+        self.continent:      Optional[Union[Literal["N/A"], str]]               = None
+        self.continent_code: Optional[Union[Literal["N/A"], str]]               = None
+        self.country:        Optional[Union[Literal["N/A"], str]]               = None
+        self.country_code:   Optional[Union[Literal["N/A"], str]]               = None
+        self.region:         Optional[Union[Literal["N/A"], str]]               = None
+        self.region_code:    Optional[Union[Literal["N/A"], str]]               = None
+        self.city:           Optional[Union[Literal["N/A"], str]]               = None
+        self.district:       Optional[Union[Literal["N/A"], str]]               = None
+        self.zip_code:       Optional[Union[Literal["N/A"], str]]               = None
+        self.lat:            Optional[Union[Literal["N/A"], Union[float, int]]] = None
+        self.lon:            Optional[Union[Literal["N/A"], Union[float, int]]] = None
+        self.time_zone:      Optional[Union[Literal["N/A"], str]]               = None
+        self.offset:         Optional[Union[Literal["N/A"], int]]               = None
+        self.currency:       Optional[Union[Literal["N/A"], str]]               = None
+        self.org:            Optional[Union[Literal["N/A"], str]]               = None
+        self.isp:            Optional[Union[Literal["N/A"], str]]               = None
+        self._as:            Optional[Union[Literal["N/A"], str]]               = None
+        self.as_name:        Optional[Union[Literal["N/A"], str]]               = None
+        self.mobile:         Optional[Union[Literal["N/A"], bool]]              = None
+        self.proxy:          Optional[Union[Literal["N/A"], bool]]              = None
+        self.hosting:        Optional[Union[Literal["N/A"], bool]]              = None
 
     def compile(self):
         """
         Populate the `compiled` subclass with processed values where `None` is replaced with "..."
         and all other values are converted to their string representation.
         """
-        self.compiled.continent = "..." if self.continent is None else str(self.continent)
+        self.compiled.continent      = "..." if self.continent      is None else str(self.continent)
         self.compiled.continent_code = "..." if self.continent_code is None else str(self.continent_code)
-        self.compiled.country = "..." if self.country is None else str(self.country)
-        self.compiled.country_code = "..." if self.country_code is None else str(self.country_code)
-        self.compiled.region = "..." if self.region is None else str(self.region)
-        self.compiled.region_short = "..." if self.region is None else truncate_with_ellipsis(str(self.region), Settings.STDOUT_FIELD_REGION_MAX_LEN)
-        self.compiled.region_code = "..." if self.region_code is None else str(self.region_code)
-        self.compiled.city = "..." if self.city is None else str(self.city)
-        self.compiled.district = "..." if self.district is None else str(self.district)
-        self.compiled.zip_code = "..." if self.zip_code is None else str(self.zip_code)
-        self.compiled.lat = "..." if self.lat is None else str(self.lat)
-        self.compiled.lon = "..." if self.lon is None else str(self.lon)
-        self.compiled.time_zone = "..." if self.time_zone is None else str(self.time_zone)
-        self.compiled.offset = "..." if self.offset is None else str(self.offset)
-        self.compiled.currency = "..." if self.currency is None else str(self.currency)
-        self.compiled.org = "..." if self.org is None else str(self.org)
-        self.compiled.org_short = "..." if self.org is None else truncate_with_ellipsis(str(self.org), Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN)
-        self.compiled.isp = "..." if self.isp is None else str(self.isp)
-        self.compiled.isp_short = "..." if self.isp is None else truncate_with_ellipsis(str(self.isp), Settings.STDOUT_FIELD_ISP_MAX_LEN)
-        self.compiled._as = "..." if self._as is None else str(self._as)
-        self.compiled.as_short = "..." if self._as is None else truncate_with_ellipsis(str(self._as), Settings.STDOUT_FIELD_AS_MAX_LEN)
-        self.compiled.as_name = "..." if self.as_name is None else str(self.as_name)
-        self.compiled.as_name_short = "..." if self.as_name is None else truncate_with_ellipsis(str(self.as_name), Settings.STDOUT_FIELD_AS_NAME_MAX_LEN)
-        self.compiled.mobile = "..." if self.mobile is None else str(self.mobile)
-        self.compiled.proxy = "..." if self.proxy is None else str(self.proxy)
-        self.compiled.hosting = "..." if self.hosting is None else str(self.hosting)
+        self.compiled.country        = "..." if self.country        is None else str(self.country)
+        self.compiled.country_code   = "..." if self.country_code   is None else str(self.country_code)
+        self.compiled.region         = "..." if self.region         is None else str(self.region)
+        self.compiled.region_short   = "..." if self.region         is None else truncate_with_ellipsis(str(self.region), Settings.STDOUT_FIELD_REGION_MAX_LEN)
+        self.compiled.region_code    = "..." if self.region_code    is None else str(self.region_code)
+        self.compiled.city           = "..." if self.city           is None else str(self.city)
+        self.compiled.district       = "..." if self.district       is None else str(self.district)
+        self.compiled.zip_code       = "..." if self.zip_code       is None else str(self.zip_code)
+        self.compiled.lat            = "..." if self.lat            is None else str(self.lat)
+        self.compiled.lon            = "..." if self.lon            is None else str(self.lon)
+        self.compiled.time_zone      = "..." if self.time_zone      is None else str(self.time_zone)
+        self.compiled.offset         = "..." if self.offset         is None else str(self.offset)
+        self.compiled.currency       = "..." if self.currency       is None else str(self.currency)
+        self.compiled.org            = "..." if self.org            is None else str(self.org)
+        self.compiled.org_short      = "..." if self.org            is None else truncate_with_ellipsis(str(self.org), Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN)
+        self.compiled.isp            = "..." if self.isp            is None else str(self.isp)
+        self.compiled.isp_short      = "..." if self.isp            is None else truncate_with_ellipsis(str(self.isp), Settings.STDOUT_FIELD_ISP_MAX_LEN)
+        self.compiled._as            = "..." if self._as            is None else str(self._as)
+        self.compiled.as_short       = "..." if self._as            is None else truncate_with_ellipsis(str(self._as), Settings.STDOUT_FIELD_AS_MAX_LEN)
+        self.compiled.as_name        = "..." if self.as_name        is None else str(self.as_name)
+        self.compiled.as_name_short  = "..." if self.as_name        is None else truncate_with_ellipsis(str(self.as_name), Settings.STDOUT_FIELD_AS_NAME_MAX_LEN)
+        self.compiled.mobile         = "..." if self.mobile         is None else str(self.mobile)
+        self.compiled.proxy          = "..." if self.proxy          is None else str(self.proxy)
+        self.compiled.hosting        = "..." if self.hosting        is None else str(self.hosting)
 
 class Player_IPLookup:
     def __init__(self):
@@ -3356,6 +3356,18 @@ def stdout_render_core():
             else:
                 return ""
 
+        def format_network_interface_message():
+            """Generates a formatted message for the network interface being scanned."""
+            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+            padding_width = calculate_padding_width(
+                109, 44,
+                len(str(Settings.CAPTURE_INTERFACE_NAME)),
+                len(displayed_capture_ip_address),
+                len(str(is_arp_enabled))
+            )
+            return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+
         def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
             updated_field_names = [
                 field + " \u2193" if field == target_field else field
@@ -3369,13 +3381,7 @@ def stdout_render_core():
         SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
         FIELDS_TO_HIDE_IN_STDOUT = set(Settings.STDOUT_FIELDS_TO_HIDE)
-
-        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        displayed__capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-        padding_width = calculate_padding_width(109, 44, len(str(Settings.CAPTURE_INTERFACE_NAME)), len(displayed__capture_ip_address), len(str(is_arp_enabled)))
-        STDOUT__SCANNING_ON_NETWORK_INTERFACE = f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed__capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
-        is_arp_enabled = displayed__capture_ip_address = padding_width = None
-
+        STDOUT__SCANNING_ON_NETWORK_INTERFACE = format_network_interface_message()
         STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
             for field_name in [
