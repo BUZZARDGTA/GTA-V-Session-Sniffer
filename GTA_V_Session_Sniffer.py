@@ -2733,7 +2733,7 @@ def iplookup_core():
                 if not isinstance(iplookup, dict):
                     raise TypeError(f'Expected "dict" object, got "{type(iplookup)}"')
 
-                player_ip_looked_up: str = iplookup.get("query", None)
+                player_ip_looked_up = iplookup.get("query", None)
                 if not isinstance(player_ip_looked_up, str):
                     raise TypeError(f'Expected "str" object, got "{type(player_ip_looked_up)}"')
 
@@ -2741,108 +2741,108 @@ def iplookup_core():
                 ip_api_instance.is_initialized = True
 
                 continent = iplookup.get("continent", "N/A")
-                if not isinstance(continent, str):
-                    raise TypeError(f'Expected "str" object, got "{type(continent)}"')
+                if continent != "N/A" and not isinstance(continent, str):
+                    raise TypeError(f'Expected "str" object, got "{type(continent)}" ({player_ip_looked_up})')
                 ip_api_instance.continent = continent
 
                 continent_code = iplookup.get("continentCode", "N/A")
-                if not isinstance(continent_code, str):
-                    raise TypeError(f'Expected "str" object, got "{type(continent_code)}"')
+                if continent_code != "N/A" and not isinstance(continent_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(continent_code)}" ({player_ip_looked_up})')
                 ip_api_instance.continent_code = continent_code
 
                 country = iplookup.get("country", "N/A")
-                if not isinstance(country, str):
-                    raise TypeError(f'Expected "str" object, got "{type(country)}"')
+                if country != "N/A" and not isinstance(country, str):
+                    raise TypeError(f'Expected "str" object, got "{type(country)}" ({player_ip_looked_up})')
                 ip_api_instance.country = country
 
                 country_code = iplookup.get("countryCode", "N/A")
-                if not isinstance(country_code, str):
-                    raise TypeError(f'Expected "str" object, got "{type(country_code)}"')
+                if country_code != "N/A" and not isinstance(country_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(country_code)}" ({player_ip_looked_up})')
                 ip_api_instance.country_code = country_code
 
                 region = iplookup.get("regionName", "N/A")
-                if not isinstance(region, str):
-                    raise TypeError(f'Expected "str" object, got "{type(region)}"')
+                if region != "N/A" and not isinstance(region, str):
+                    raise TypeError(f'Expected "str" object, got "{type(region)}" ({player_ip_looked_up})')
                 ip_api_instance.region = region
 
                 region_code = iplookup.get("region", "N/A")
-                if not isinstance(region_code, str):
-                    raise TypeError(f'Expected "str" object, got "{type(region_code)}"')
+                if region_code != "N/A" and not isinstance(region_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(region_code)}" ({player_ip_looked_up})')
                 ip_api_instance.region_code = region_code
 
                 city = iplookup.get("city", "N/A")
-                if not isinstance(city, str):
-                    raise TypeError(f'Expected "str" object, got "{type(city)}"')
+                if city != "N/A" and not isinstance(city, str):
+                    raise TypeError(f'Expected "str" object, got "{type(city)}" ({player_ip_looked_up})')
                 ip_api_instance.city = city
 
                 district = iplookup.get("district", "N/A")
-                if not isinstance(district, str):
-                    raise TypeError(f'Expected "str" object, got "{type(district)}"')
+                if district != "N/A" and not isinstance(district, str):
+                    raise TypeError(f'Expected "str" object, got "{type(district)}" ({player_ip_looked_up})')
                 ip_api_instance.district = district
 
                 zip_code = iplookup.get("zip", "N/A")
-                if not isinstance(zip_code, str):
-                    raise TypeError(f'Expected "str" object, got "{type(zip_code)}"')
+                if zip_code != "N/A" and not isinstance(zip_code, str):
+                    raise TypeError(f'Expected "str" object, got "{type(zip_code)}" ({player_ip_looked_up})')
                 ip_api_instance.zip_code = zip_code
 
                 lat = iplookup.get("lat", "N/A")
-                if not isinstance(lat, (float, int)):
-                    raise TypeError(f'Expected "float | int" object, got "{type(lat)}"')
+                if lat != "N/A" and not isinstance(lat, (float, int)):
+                    raise TypeError(f'Expected "float | int" object, got "{type(lat)}" ({player_ip_looked_up})')
                 ip_api_instance.lat = lat
 
                 lon = iplookup.get("lon", "N/A")
-                if not isinstance(lon, (float, int)):
-                    raise TypeError(f'Expected "float | int" object, got "{type(lon)}"')
+                if lon != "N/A" and not isinstance(lon, (float, int)):
+                    raise TypeError(f'Expected "float | int" object, got "{type(lon)}" ({player_ip_looked_up})')
                 ip_api_instance.lon = lon
 
                 time_zone = iplookup.get("timezone", "N/A")
-                if not isinstance(time_zone, str):
-                    raise TypeError(f'Expected "str" object, got "{type(time_zone)}"')
+                if time_zone != "N/A" and not isinstance(time_zone, str):
+                    raise TypeError(f'Expected "str" object, got "{type(time_zone)}" ({player_ip_looked_up})')
                 ip_api_instance.time_zone = time_zone
 
                 offset = iplookup.get("offset", "N/A")
-                if not isinstance(offset, int):
-                    raise TypeError(f'Expected "int" object, got "{type(offset)}"')
+                if offset != "N/A" and not isinstance(offset, int):
+                    raise TypeError(f'Expected "int" object, got "{type(offset)}" ({player_ip_looked_up})')
                 ip_api_instance.offset = offset
 
                 currency = iplookup.get("currency", "N/A")
-                if not isinstance(currency, str):
-                    raise TypeError(f'Expected "str" object, got "{type(currency)}"')
+                if currency != "N/A" and not isinstance(currency, str):
+                    raise TypeError(f'Expected "str" object, got "{type(currency)}" ({player_ip_looked_up})')
                 ip_api_instance.currency = currency
 
                 isp = iplookup.get("isp", "N/A")
-                if not isinstance(isp, str):
-                    raise TypeError(f'Expected "str" object, got "{type(isp)}"')
+                if isp != "N/A" and not isinstance(isp, str):
+                    raise TypeError(f'Expected "str" object, got "{type(isp)}" ({player_ip_looked_up})')
                 ip_api_instance.isp = isp
 
                 org = iplookup.get("org", "N/A")
-                if not isinstance(org, str):
-                    raise TypeError(f'Expected "str" object, got "{type(org)}"')
+                if org != "N/A" and not isinstance(org, str):
+                    raise TypeError(f'Expected "str" object, got "{type(org)}" ({player_ip_looked_up})')
                 ip_api_instance.org = org
 
                 _as = iplookup.get("as", "N/A")
-                if not isinstance(_as, str):
-                    raise TypeError(f'Expected "str" object, got "{type(_as)}"')
+                if _as != "N/A" and not isinstance(_as, str):
+                    raise TypeError(f'Expected "str" object, got "{type(_as)}" ({player_ip_looked_up})')
                 ip_api_instance._as = _as
 
                 as_name = iplookup.get("asname", "N/A")
-                if not isinstance(as_name, str):
-                    raise TypeError(f'Expected "str" object, got "{type(as_name)}"')
+                if as_name != "N/A" and not isinstance(as_name, str):
+                    raise TypeError(f'Expected "str" object, got "{type(as_name)}" ({player_ip_looked_up})')
                 ip_api_instance.as_name = as_name
 
                 mobile = iplookup.get("mobile", "N/A")
-                if not isinstance(mobile, bool):
-                    raise TypeError(f'Expected "bool" object, got "{type(mobile)}"')
+                if mobile != "N/A" and not isinstance(mobile, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(mobile)}" ({player_ip_looked_up})')
                 ip_api_instance.mobile = mobile
 
                 proxy = iplookup.get("proxy", "N/A")
-                if not isinstance(proxy, bool):
-                    raise TypeError(f'Expected "bool" object, got "{type(proxy)}"')
+                if proxy != "N/A" and not isinstance(proxy, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(proxy)}" ({player_ip_looked_up})')
                 ip_api_instance.proxy = proxy
 
                 hosting = iplookup.get("hosting", "N/A")
-                if not isinstance(hosting, bool):
-                    raise TypeError(f'Expected "bool" object, got "{type(hosting)}"')
+                if hosting != "N/A" and not isinstance(hosting, bool):
+                    raise TypeError(f'Expected "bool" object, got "{type(hosting)}" ({player_ip_looked_up})')
                 ip_api_instance.hosting = hosting
 
                 ip_api_instance.compile()
