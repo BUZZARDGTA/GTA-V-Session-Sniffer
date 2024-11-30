@@ -1976,7 +1976,7 @@ RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), s
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
-WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download.html"
+WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 
 cls()
 title(f"Searching for a new update - {TITLE}")
