@@ -1322,16 +1322,24 @@ def tail(n: int, iterable: list):
     """Return last n items of the iterable as a list."""
     return iterable[-n:]
 
-def concat_lists_no_duplicates(list1: list, list2: list):
-    combined_list = list1 + list2
+def concat_lists_no_duplicates(*lists: list):
+    """
+    Concatenates multiple lists while removing duplicates and preserving order.
 
-    # Remove duplicates while preserving order
+    Args:
+        *lists: One or more lists to concatenate.
+
+    Returns:
+        A single list with duplicates removed, preserving the original order.
+    """
     unique_list = []
     seen = set()
-    for item in combined_list:
-        if item not in seen:
-            unique_list.append(item)
-            seen.add(item)
+
+    for lst in lists:
+        for item in lst:
+            if item not in seen:
+                unique_list.append(item)
+                seen.add(item)
 
     return unique_list
 
@@ -1414,15 +1422,6 @@ def is_valid_non_special_ipv4(ip_address: str):
         return False
 
     return True
-
-def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
-    current_padding = len(str(var))
-
-    if current_padding <= padding:
-        if current_padding > max_padding:
-            max_padding = current_padding
-
-    return max_padding
 
 def get_pid_by_path(filepath: Path):
     for process in psutil.process_iter(["pid", "exe"]):
@@ -2855,6 +2854,25 @@ tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
+        def format_network_interface_message():
+            """Generates a formatted message for the network interface being scanned."""
+            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+            padding_width = calculate_padding_width(
+                109, 44,
+                len(str(Settings.CAPTURE_INTERFACE_NAME)),
+                len(displayed_capture_ip_address),
+                len(str(is_arp_enabled))
+            )
+            return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+
+        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
+            updated_field_names = [
+                field + " \u2193" if field == target_field else field
+                for field in field_names
+            ]
+            return updated_field_names
+
         def parse_userip_ini_file(ini_path: Path, unresolved_ip_invalid: set[str]):
             def process_ini_line_output(line: str):
                 return line.strip()
@@ -3142,7 +3160,6 @@ def stdout_render_core():
                 settings["PROTECTION_SUSPEND_PROCESS_MODE"]
             ), userip
 
-
         def update_userip_databases(last_userip_parse_time: Optional[float]):
             DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
                 ;;-----------------------------------------------------------------------------
@@ -3350,24 +3367,14 @@ def stdout_render_core():
             else:
                 return ""
 
-        def format_network_interface_message():
-            """Generates a formatted message for the network interface being scanned."""
-            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-            padding_width = calculate_padding_width(
-                109, 44,
-                len(str(Settings.CAPTURE_INTERFACE_NAME)),
-                len(displayed_capture_ip_address),
-                len(str(is_arp_enabled))
-            )
-            return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+        def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
+            current_padding = len(str(var))
 
-        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
-            updated_field_names = [
-                field + " \u2193" if field == target_field else field
-                for field in field_names
-            ]
-            return updated_field_names
+            if current_padding <= padding:
+                if current_padding > max_padding:
+                    max_padding = current_padding
+
+            return max_padding
 
 
         global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
