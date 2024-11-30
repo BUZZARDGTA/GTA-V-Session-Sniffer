@@ -1574,47 +1574,6 @@ def truncate_with_ellipsis(string: str, max_length: int):
         return f"{string[:max_length]}..."
     return string
 
-def get_country_info(ip_address: str):
-    country_name = "N/A"
-    country_code = "N/A"
-
-    if geoip2_enabled:
-        try:
-            response = geolite2_country_reader.country(ip_address)
-        except geoip2.errors.AddressNotFoundError:
-            pass
-        else:
-            country_name = str(response.country.name)
-            country_code = str(response.country.iso_code)
-
-    return country_name, country_code
-
-def get_city_info(ip_address: str):
-    city = "N/A"
-
-    if geoip2_enabled:
-        try:
-            response = geolite2_city_reader.city(ip_address)
-        except geoip2.errors.AddressNotFoundError:
-            pass
-        else:
-            city = str(response.city.name)
-
-    return city
-
-def get_asn_info(ip_address: str):
-    asn = "N/A"
-
-    if geoip2_enabled:
-        try:
-            response = geolite2_asn_reader.asn(ip_address)
-        except geoip2.errors.AddressNotFoundError:
-            pass
-        else:
-            asn = str(response.autonomous_system_organization)
-
-    return asn
-
 def show_message_box(title: str, message: str, style: Msgbox.Style) -> int:
     # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
@@ -2858,6 +2817,25 @@ tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
+        def calculate_padding_width(total_width: int, *lengths: int):
+            """
+            Calculate the padding width based on the total width and the lengths of provided strings.
+
+            Args:
+            - total_width (int): Total width available for padding
+            - *args (int): Integrers for which lengths are used to calculate padding width
+
+            Returns:
+            - padding_width (int): Calculated padding width
+            """
+            # Calculate the total length of all strings
+            total_length = sum(length for length in lengths)
+
+            # Calculate the padding width
+            padding_width = max(0, (total_width - total_length) // 2)
+
+            return padding_width
+
         def format_network_interface_message():
             """Generates a formatted message for the network interface being scanned."""
             is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
@@ -3278,24 +3256,55 @@ def stdout_render_core():
             last_userip_parse_time = time.perf_counter()
             return last_userip_parse_time
 
-        def calculate_padding_width(total_width: int, *lengths: int):
-            """
-            Calculate the padding width based on the total width and the lengths of provided strings.
+        def get_country_info(ip_address: str):
+            country_name = "N/A"
+            country_code = "N/A"
 
-            Args:
-            - total_width (int): Total width available for padding
-            - *args (int): Integrers for which lengths are used to calculate padding width
+            if geoip2_enabled:
+                try:
+                    response = geolite2_country_reader.country(ip_address)
+                except geoip2.errors.AddressNotFoundError:
+                    pass
+                else:
+                    country_name = str(response.country.name)
+                    country_code = str(response.country.iso_code)
 
-            Returns:
-            - padding_width (int): Calculated padding width
-            """
-            # Calculate the total length of all strings
-            total_length = sum(length for length in lengths)
+            return country_name, country_code
 
-            # Calculate the padding width
-            padding_width = max(0, (total_width - total_length) // 2)
+        def get_city_info(ip_address: str):
+            city = "N/A"
 
-            return padding_width
+            if geoip2_enabled:
+                try:
+                    response = geolite2_city_reader.city(ip_address)
+                except geoip2.errors.AddressNotFoundError:
+                    pass
+                else:
+                    city = str(response.city.name)
+
+            return city
+
+        def get_asn_info(ip_address: str):
+            asn = "N/A"
+
+            if geoip2_enabled:
+                try:
+                    response = geolite2_asn_reader.asn(ip_address)
+                except geoip2.errors.AddressNotFoundError:
+                    pass
+                else:
+                    asn = str(response.autonomous_system_organization)
+
+            return asn
+
+        def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
+            current_padding = len(str(var))
+
+            if current_padding <= padding:
+                if current_padding > max_padding:
+                    max_padding = current_padding
+
+            return max_padding
 
         def format_player_stdout_datetime(datetime_object: datetime) -> str:
             formatted_elapsed = None
@@ -3370,15 +3379,6 @@ def stdout_render_core():
                 return ", ".join(map(str, player_ports.intermediate))
             else:
                 return ""
-
-        def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
-            current_padding = len(str(var))
-
-            if current_padding <= padding:
-                if current_padding > max_padding:
-                    max_padding = current_padding
-
-            return max_padding
 
 
         global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
