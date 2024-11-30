@@ -2663,15 +2663,9 @@ def iplookup_core():
         MAX_BATCH_IP_API_IPS = 100
         FIELDS_TO_LOOKUP = "continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,mobile,proxy,hosting,query"
 
-        first_exec = True
         while True:
             if ScriptControl.has_crashed():
                 return
-
-            if not first_exec:
-                time.sleep(1)
-            else:
-                first_exec = False
 
             players_connected_to_lookup: list[str] = []
             players_disconnected_to_lookup: list[str] = []
