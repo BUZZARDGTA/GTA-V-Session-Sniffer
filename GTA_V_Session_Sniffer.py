@@ -57,7 +57,6 @@ from Modules.https_utils.unsafe_https import s
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 12:
     print("To use this script, your Python version must be 3.12 or higher.")
-    print("Please note that Python 3.12 is not compatible with Windows versions 7 or lower.")
     sys.exit(0)
 
 logging.basicConfig(
@@ -2582,14 +2581,11 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                 elif player.userip.settings.PROTECTION == "Restart_PC":
                     subprocess.Popen(["shutdown", "/r"])
 
-        voice_notification_setting = player.userip.settings.VOICE_NOTIFICATIONS
-        if voice_notification_setting:
-            if voice_notification_setting == "Male":
+        if player.userip.settings.VOICE_NOTIFICATIONS:
+            if player.userip.settings.VOICE_NOTIFICATIONS == "Male":
                 voice_name = "Liam"
-            elif voice_notification_setting == "Female":
+            elif player.userip.settings.VOICE_NOTIFICATIONS == "Female":
                 voice_name = "Jane"
-            else:
-                raise RuntimeError(f"Unknown value: ${voice_notification_setting = }")
             file_path = Path(f"{TTS_PATH}/{voice_name} ({connection_type}).wav")
 
             if not file_path.exists():
@@ -3976,8 +3972,6 @@ def packet_callback(packet: Packet):
         tshark_restarted_times += 1
         raise PacketCaptureOverflow("Packet capture time exceeded 3 seconds.")
 
-    target_port = -1
-    target_ip = -1
     if Settings.CAPTURE_IP_ADDRESS:
         if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
             target_ip = packet.ip.dst
@@ -4025,10 +4019,7 @@ def packet_callback(packet: Packet):
             """.removeprefix("\n").removesuffix("\n"))
             terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
-    # This ensures that the port and IP have been reassigned since
-    # declaration, or that the script has been terminated.
-    assert target_port != -1 and target_ip != -1
-    if not target_port:
+    if target_port is None:
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                 Developer didn't expect this scenario to be possible.
