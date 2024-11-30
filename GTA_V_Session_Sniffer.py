@@ -1,27 +1,3 @@
-# -----------------------------------------------------
-# 📚 Local Python Libraries (Included with Project) 📚
-# -----------------------------------------------------
-from Modules.oui_lookup.oui_lookup import MacLookup
-from Modules.capture.capture import PacketCapture, Packet
-from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
-from Modules.https_utils.unsafe_https import s
-
-# --------------------------------------------
-# 📦 External/Third-party Python Libraries 📦
-# --------------------------------------------
-import wmi
-import psutil
-import colorama
-import requests
-import geoip2.errors
-import geoip2.database
-from rich.text import Text
-from rich.console import Console
-from rich.traceback import Traceback
-from wmi import _wmi_namespace, _wmi_object
-from prettytable import PrettyTable, TableStyle
-from colorama import Fore, Back, Style
-
 # ------------------------------------------------------
 # 🐍 Standard Python Libraries (Included by Default) 🐍
 # ------------------------------------------------------
@@ -53,9 +29,34 @@ from ipaddress import IPv4Address, AddressValueError
 from dataclasses import dataclass
 
 
-if sys.version_info.major <= 3 and sys.version_info.minor < 9:
-    print("To use this script, your Python version must be 3.9 or higher.")
-    print("Please note that Python 3.9 is not compatible with Windows versions 7 or lower.")
+# --------------------------------------------
+# 📦 External/Third-party Python Libraries 📦
+# --------------------------------------------
+import wmi
+import psutil
+import colorama
+import requests
+import geoip2.errors
+import geoip2.database
+from rich.text import Text
+from rich.console import Console
+from rich.traceback import Traceback
+from wmi import _wmi_namespace, _wmi_object
+from prettytable import PrettyTable, TableStyle
+from colorama import Fore, Back, Style
+
+
+# -----------------------------------------------------
+# 📚 Local Python Libraries (Included with Project) 📚
+# -----------------------------------------------------
+from Modules.oui_lookup.oui_lookup import MacLookup
+from Modules.capture.capture import PacketCapture, Packet
+from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
+from Modules.https_utils.unsafe_https import s
+
+
+if sys.version_info.major <= 3 and sys.version_info.minor < 12:
+    print("To use this script, your Python version must be 3.12 or higher.")
     sys.exit(0)
 
 logging.basicConfig(
@@ -419,6 +420,7 @@ class Settings(DefaultSettings):
     def has_setting(cls, setting_name):
         return hasattr(cls, setting_name)
 
+    @staticmethod
     def reconstruct_settings():
         print("\nCorrect reconstruction of \"Settings.ini\" ...")
         text = textwrap.dedent(f"""
@@ -435,6 +437,7 @@ class Settings(DefaultSettings):
             text += f"{setting_name}={setting_value}\n"
         SETTINGS_PATH.write_text(text, encoding="utf-8")
 
+    @staticmethod
     def load_from_settings_file(settings_path: Path):
         matched_settings_count = 0
 
@@ -1122,6 +1125,7 @@ class SessionHost:
     search_player = False
     players_pending_for_disconnection = []
 
+    @staticmethod
     def get_host_player(session_connected: list[Player]):
         connected_players: list[Player] = take(2, sorted(session_connected, key=attrgetter("datetime.last_rejoin")))
 
@@ -1616,7 +1620,7 @@ def show_message_box(title: str, message: str, style: Msgbox.Style) -> int:
     return ctypes.windll.user32.MessageBoxW(0, message, title, style)
 
 def show_error__tshark_not_detected():
-    webbrowser.open(WIRESHARK_REQUIERED_DL)
+    webbrowser.open(WIRESHARK_REQUIRED_DL)
 
     msgbox_title = TITLE
     msgbox_message = textwrap.dedent(f"""
@@ -1970,8 +1974,8 @@ RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>
 RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-WIRESHARK_REQUIERED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
-WIRESHARK_REQUIERED_DL = "https://www.wireshark.org/download.html"
+WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.8 (v4.2.8-0-g91fdcf8e29f8)."
+WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 
 cls()
 title(f"Searching for a new update - {TITLE}")
@@ -2162,10 +2166,10 @@ while True:
     else:
         TSHARK_VERSION = get_tshark_version(TSHARK_PATH)
 
-        if TSHARK_VERSION == WIRESHARK_REQUIERED_VERSION:
+        if TSHARK_VERSION == WIRESHARK_REQUIRED_VERSION:
             break
 
-        webbrowser.open(WIRESHARK_REQUIERED_DL)
+        webbrowser.open(WIRESHARK_REQUIRED_DL)
         msgbox_title = TITLE
 
         if TSHARK_VERSION is None:
@@ -2177,7 +2181,7 @@ while True:
                 ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
 
                 Installed version: {TSHARK_VERSION}
-                Requiered version: {WIRESHARK_REQUIERED_VERSION}
+                Required version: {WIRESHARK_REQUIRED_VERSION}
 
                 Opening the \"Wireshark\" project download page for you.
                 You can then download and install it from there and press \"Retry\".
@@ -3249,7 +3253,7 @@ def stdout_render_core():
 
             # Remove deleted files from notified settings conflicts
             # TODO:
-            # I should also warn again on another error, but it'd probably requiere a DICT then.
+            # I should also warn again on another error, but it'd probably require a DICT then.
             # I have things more important to code atm.
             for path in set(UserIP_Databases.notified_settings_corrupted):
                 if not path.exists() or not path.is_file():
@@ -4015,7 +4019,7 @@ def packet_callback(packet: Packet):
             """.removeprefix("\n").removesuffix("\n"))
             terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
-    if not target_port:
+    if target_port is None:
         stdout_crash_text = textwrap.dedent(f"""
             ERROR:
                 Developer didn't expect this scenario to be possible.
