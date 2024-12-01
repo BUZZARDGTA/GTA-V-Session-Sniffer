@@ -28,7 +28,6 @@ from typing import Optional, Literal, Union, Type
 from ipaddress import IPv4Address, AddressValueError
 from dataclasses import dataclass
 
-
 # --------------------------------------------
 # 📦 External/Third-party Python Libraries 📦
 # --------------------------------------------
@@ -44,7 +43,6 @@ from rich.traceback import Traceback
 from wmi import _wmi_namespace, _wmi_object
 from prettytable import PrettyTable, TableStyle
 from colorama import Fore, Back, Style
-
 
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
@@ -1978,10 +1976,11 @@ if error_updating__flag:
         webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
         terminate_script("EXIT")
 
-cls()
+
 if not is_pyinstaller_compiled():
     import importlib.metadata
 
+    cls()
     title(f"Checking that your Python packages versions matches with file \"requirements.txt\" - {TITLE}")
     print(f"\nChecking that your Python packages versions matches with file \"requirements.txt\" ...\n")
 
