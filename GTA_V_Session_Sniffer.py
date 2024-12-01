@@ -9,7 +9,6 @@ import json
 import time
 import enum
 import errno
-import ctypes
 import signal
 import winreg
 import logging
@@ -51,6 +50,7 @@ from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet
 from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
 from Modules.https_utils.unsafe_https import s
+from Modules.msgbox import Msgbox
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 12:
@@ -124,9 +124,9 @@ def terminate_script(
     if msgbox_crash_text is not None:
         msgbox_title = TITLE
         msgbox_message = msgbox_crash_text
-        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Critical | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
+        msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Critical | MsgBox.Style.SystemModal | MsgBox.Style.MsgBoxSetForeground
 
-        show_message_box(msgbox_title, msgbox_message, msgbox_style)
+        MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
         time.sleep(1)
 
     time.sleep(3)
@@ -230,43 +230,6 @@ class Updater:
             if latest_version._date_time > self.current_version._date_time:
                 return True
         return False
-
-class Msgbox:
-    # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw#return-value
-    class ReturnValues(enum.IntEnum):
-        IDABORT = 3 # The Abort button was selected.
-        IDCANCEL = 2 # The Cancel button was selected.
-        IDCONTINUE = 11 # The Continue button was selected.
-        IDIGNORE = 5 # The Ignore button was selected.
-        IDNO = 7 # The No button was selected.
-        IDOK = 1 # The OK button was selected.
-        IDRETRY = 4 # The Retry button was selected.
-        IDTRYAGAIN = 10 # The Try Again button was selected.
-        IDYES = 6 # The Yes button was selected.
-
-    class Style(enum.IntFlag):
-        # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw
-        # https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/msgbox-function
-        OKOnly = 0  # Display OK button only.
-        OKCancel = 1  # Display OK and Cancel buttons.
-        AbortRetryIgnore = 2  # Display Abort, Retry, and Ignore buttons.
-        YesNoCancel = 3  # Display Yes, No, and Cancel buttons.
-        YesNo = 4  # Display Yes and No buttons.
-        RetryCancel = 5  # Display Retry and Cancel buttons.
-        Critical = 16  # Display Critical Message icon.
-        Question = 32  # Display Warning Query icon.
-        Exclamation = 48  # Display Warning Message icon.
-        Information = 64  # Display Information Message icon.
-        DefaultButton1 = 0  # First button is default.
-        DefaultButton2 = 256  # Second button is default.
-        DefaultButton3 = 512  # Third button is default.
-        DefaultButton4 = 768  # Fourth button is default.
-        ApplicationModal = 0  # Application modal; the user must respond to the message box before continuing work in the current application.
-        SystemModal = 4096  # System modal; all applications are suspended until the user responds to the message box.
-        MsgBoxHelpButton = 16384  # Adds Help button to the message box.
-        MsgBoxSetForeground = 65536  # Specifies the message box window as the foreground window.
-        MsgBoxRight = 524288  # Text is right-aligned.
-        MsgBoxRtlReading = 1048576  # Specifies text should appear as right-to-left reading on Hebrew and Arabic systems.
 
 class Threads_ExceptionHandler:
     """In Python, threads cannot be raised within the main source code. When raised, they operate independently,
@@ -1218,8 +1181,8 @@ class UserIP_Databases:
                 \"{USERIP_DATABASES_PATH}\\{conflicting_database_name}.ini\":
                 {conflicting_username}={conflicting_ip}
         """.removeprefix("\n").removesuffix("\n")), "    ")
-        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-        threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+        msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.SystemModal | MsgBox.Style.MsgBoxSetForeground
+        threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
     @classmethod
     def add(cls, database_name: str, settings: UserIP_Settings, user_ips: dict[str, list[str]]):
@@ -1572,10 +1535,6 @@ def truncate_with_ellipsis(string: str, max_length: int):
         return f"{string[:max_length]}..."
     return string
 
-def show_message_box(title: str, message: str, style: Msgbox.Style) -> int:
-    # https://stackoverflow.com/questions/50086178/python-how-to-keep-messageboxw-on-top-of-all-other-windows
-    return ctypes.windll.user32.MessageBoxW(0, message, title, style)
-
 def show_error__tshark_not_detected():
     webbrowser.open(WIRESHARK_REQUIRED_DL)
 
@@ -1586,9 +1545,9 @@ def show_error__tshark_not_detected():
         Opening the \"Wireshark\" project download page for you.
         You can then download and install it from there and press \"Retry\".
     """.removeprefix("\n").removesuffix("\n"))
-    msgbox_style = Msgbox.Style.RetryCancel | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+    msgbox_style = MsgBox.Style.RetryCancel | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
 
-    return show_message_box(msgbox_title, msgbox_message, msgbox_style)
+    return MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
 
 def safe_print(*args, **kwargs):
     """
@@ -1742,8 +1701,8 @@ def update_and_initialize_geolite2_readers():
     if show_error:
         msgbox_title = TITLE
         msgbox_message = msgbox_message.rstrip("\n")
-        msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-        show_message_box(msgbox_title, msgbox_message, msgbox_style)
+        msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+        MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
 
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
@@ -1954,9 +1913,9 @@ else:
                 Current version: {current_version}
                 Latest version: {latest_version}
             """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Question | Msgbox.Style.MsgBoxSetForeground
-            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-            if errorlevel == Msgbox.ReturnValues.IDYES:
+            msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Question | MsgBox.Style.MsgBoxSetForeground
+            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+            if errorlevel == MsgBox.ReturnValues.IDYES:
                 webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
                 terminate_script("EXIT")
     else:
@@ -1970,9 +1929,9 @@ if error_updating__flag:
         Do you want to open the \"{TITLE}\" project download page ?
         You can then download and run the latest version from there.
     """.removeprefix("\n").removesuffix("\n"))
-    msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == Msgbox.ReturnValues.IDYES:
+    msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+    errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+    if errorlevel == MsgBox.ReturnValues.IDYES:
         webbrowser.open("https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer")
         terminate_script("EXIT")
 
@@ -2018,10 +1977,10 @@ if not is_pyinstaller_compiled():
         msgbox_message += "\n\nDo you want to ignore this warning and continue with script execution?"
 
         # Show message box
-        msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
+        msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
         msgbox_title = TITLE
-        errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-        if errorlevel != Msgbox.ReturnValues.IDYES:
+        errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+        if errorlevel != MsgBox.ReturnValues.IDYES:
             terminate_script("EXIT")
 
 cls()
@@ -2046,9 +2005,9 @@ while not is_npcap_or_winpcap_installed():
         Opening the \"Npcap\" project download page for you.
         You can then download and install it from there and press \"Retry\".
     """.removeprefix("\n").removesuffix("\n"))
-    msgbox_style = Msgbox.Style.RetryCancel | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-    if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+    msgbox_style = MsgBox.Style.RetryCancel | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+    errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+    if errorlevel == MsgBox.ReturnValues.IDCANCEL:
         terminate_script("EXIT")
 
 cls()
@@ -2076,10 +2035,10 @@ for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
                 with its default value:
                 {sort_field_name}={default_sort_value}
             """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+            msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
 
-            if errorlevel != Msgbox.ReturnValues.IDYES:
+            if errorlevel != MsgBox.ReturnValues.IDYES:
                 terminate_script("EXIT")
 
             setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name)) # Replace the incorrect field with its default value
@@ -2098,10 +2057,10 @@ if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELD
 
         Would you like to apply their default values and continue?
     """.removeprefix("\n").removesuffix("\n"))
-    msgbox_style = Msgbox.Style.YesNo | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-    errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
+    msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+    errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
 
-    if errorlevel != Msgbox.ReturnValues.IDYES:
+    if errorlevel != MsgBox.ReturnValues.IDYES:
         terminate_script("EXIT")
 
     for setting_name in ["STDOUT_DATE_FIELDS_SHOW_DATE", "STDOUT_DATE_FIELDS_SHOW_TIME", "STDOUT_DATE_FIELDS_SHOW_ELAPSED"]:
@@ -2119,7 +2078,7 @@ while True:
         TSHARK_PATH = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
     except TSharkNotFoundException:
         errorlevel = show_error__tshark_not_detected()
-        if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+        if errorlevel == MsgBox.ReturnValues.IDCANCEL:
             terminate_script("EXIT")
     else:
         TSHARK_VERSION = get_tshark_version(TSHARK_PATH)
@@ -2132,7 +2091,7 @@ while True:
 
         if TSHARK_VERSION is None:
             errorlevel = show_error__tshark_not_detected()
-            if errorlevel == Msgbox.ReturnValues.IDCANCEL:
+            if errorlevel == MsgBox.ReturnValues.IDCANCEL:
                 terminate_script("EXIT")
         else:
             msgbox_message = textwrap.dedent(f"""
@@ -2144,11 +2103,11 @@ while True:
                 Opening the \"Wireshark\" project download page for you.
                 You can then download and install it from there and press \"Retry\".
             """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = Msgbox.Style.AbortRetryIgnore | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-            errorlevel = show_message_box(msgbox_title, msgbox_message, msgbox_style)
-            if errorlevel == Msgbox.ReturnValues.IDABORT:
+            msgbox_style = MsgBox.Style.AbortRetryIgnore | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+            if errorlevel == MsgBox.ReturnValues.IDABORT:
                 terminate_script("EXIT")
-            elif errorlevel == Msgbox.ReturnValues.IDIGNORE:
+            elif errorlevel == MsgBox.ReturnValues.IDIGNORE:
                 break
 
 cls()
@@ -2603,8 +2562,8 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                     Proxy, VPN or Tor exit address: {player.iplookup.ipapi.compiled.proxy}
                     Hosting, colocated or data center: {player.iplookup.ipapi.compiled.hosting}
                 """.removeprefix("\n").removesuffix("\n")), "    ")
-                msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-                threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.SystemModal | MsgBox.Style.MsgBoxSetForeground
+                threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
 def iplookup_core():
     with Threads_ExceptionHandler():
@@ -3036,8 +2995,8 @@ def stdout_render_core():
                                         documentation:
                                         https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
                                 """.removeprefix("\n").removesuffix("\n")), "    ")
-                                msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-                                threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                                msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+                                threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
                             return None, None
 
                         if need_rewrite_current_setting:
@@ -3080,8 +3039,8 @@ def stdout_render_core():
                                     \"{ini_path}\":
                                     {username}={ip}
                             """.removeprefix("\n").removesuffix("\n")), "    ")
-                            msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.SystemModal | Msgbox.Style.MsgBoxSetForeground
-                            threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                            msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.SystemModal | MsgBox.Style.MsgBoxSetForeground
+                            threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
                             UserIP_Databases.notified_ip_invalid.add(f"{ini_path.name}={username}={ip}")
                         continue
 
@@ -3112,8 +3071,8 @@ def stdout_render_core():
                             documentation:
                             https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer?tab=readme-ov-file#userip_ini_databases_tutorial
                     """.removeprefix("\n").removesuffix("\n")), "    ")
-                    msgbox_style = Msgbox.Style.OKOnly | Msgbox.Style.Exclamation | Msgbox.Style.MsgBoxSetForeground
-                    threading.Thread(target=show_message_box, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                    msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+                    threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
                 return None, None
             else:
                 if ini_path in UserIP_Databases.notified_settings_corrupted:
