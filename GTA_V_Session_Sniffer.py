@@ -50,7 +50,7 @@ from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet
 from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
 from Modules.https_utils.unsafe_https import s
-from Modules.msgbox import Msgbox
+from Modules.msgbox import MsgBox
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 12:
