@@ -27,6 +27,9 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/sniffer) specif
 | Grand Theft Auto 5                  | PC, Xbox One, PS5 |
 | Minecraft Bedrock Edition (Friends) |      PC, PS3      |
 
+Technically, the script works for literally every P2P (Peer-To-Peer) video games.<br>
+However, please note that additional servers (e.g., game servers) will not be filtered from the script's output unless they are listed above.
+
 ## About Usernames Decryption/Resolving
 
 To clarify, the script does not explicitly decrypt or resolve in-game usernames associated with IPs\*.<br>
@@ -37,9 +40,6 @@ You can, however, manually assign a username to each IP using UserIP database fi
 - ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br>
 - _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)<br />_
 - _[GTA_V_Session_Sniffer-plugin-Cherax-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)<br />_
-
-\*\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br>
-But please note that additional servers (e.g., game servers) won't be filtered from the script's output if they are not indexed within the list above_
 
 ## Configuration
 
