@@ -20,6 +20,10 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/sniffer) specif
 - Works without requiring a modded video game or cracked program.
 - Includes a configuration file for advanced customization.
 - Includes a setting to scan for game server(s).
+- Includes a setting to fully save sessions into a log file.
+- Warns you about specific user IPs upon detection.
+- Protects you from specific user IPs upon detection.
+- Logs specific user IPs to a file upon detection.
 
 ## Officially Supported Video Games
 
