@@ -2,7 +2,7 @@
 
 # GTA V Session Sniffer
 
-![WindowsTerminal_2024-12-02_18-25](https://github.com/user-attachments/assets/423794c8-9c36-496d-a7f6-e150f628c0a8)
+![WindowsTerminal_2024-12-02_18-25](https://github.com/user-attachments/assets/ff855c9b-cbad-4381-b826-4ef2fe7560ba)
 
 </div>
 
