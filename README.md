@@ -2,6 +2,8 @@
 
 ## Description
 
+![WindowsTerminal_2024-12-02_17-24](https://github.com/user-attachments/assets/d320ae4a-a39e-4fbc-a7fc-8f001bccb7df)
+
 Compatible with both PC and all consoles (PlayStation and Xbox).<br>
 Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
 
@@ -39,7 +41,12 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 |                                                         Console Output                                               | Settings                                                                                        |
 | :------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: |
-| ![WindowsTerminal_2024-11-07_01-25](https://github.com/user-attachments/assets/5df228a1-1465-44a1-928b-9cc894e14f7f) | ![Settings](https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa)    |
+| ![WindowsTerminal_2024-12-02_17-24](https://github.com/user-attachments/assets/d320ae4a-a39e-4fbc-a7fc-8f001bccb7df) | ![Settings](https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa)    |
+---
+|                                                         Session Logger                                               |
+| :------------------------------------------------------------------------------------------------------------------: |
+| ![Code_2024-12-02_17-28](https://github.com/user-attachments/assets/208dbfab-baa5-499c-ba6f-99dbe1775450)            |
+
 
 ## Configuration
 
