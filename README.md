@@ -34,7 +34,7 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
 You can, however, manually assign a username to each IP using UserIP database files.
 
 \*_Since v1.1.4, you can now view usernames on GTA V in real-time on PC using either ~~2Take1 /~~ Stand or Cherax mod menus:_
-- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br>
+- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br>
 - _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)<br />_
 - _[GTA_V_Session_Sniffer-plugin-Cherax-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)<br />_
 
@@ -391,8 +391,8 @@ username3=255.255.255.255
 
 If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
 
-- [GitHub Issues](https://github.com/Illegal-Services/GTA-V-Session-Sniffer/issues)
-- [GitHub Discussions](https://github.com/Illegal-Services/GTA-V-Session-Sniffer/discussions)
+- [GitHub Issues](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues)
+- [GitHub Discussions](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/discussions)
 
 You can also contact me privately via:
 
