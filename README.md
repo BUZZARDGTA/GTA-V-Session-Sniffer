@@ -62,7 +62,7 @@ To edit the script settings, open the `Settings.ini` file.<br>
 This file is created upon the first script launch and automatically updates thereafter.
 
 Please note that any changes made to the file will take effect only after restarting the script.<br>
-If you're unsure about a specific setting, set its value to None. The script will analyze the file and regenerate it if errors are found.
+If unsure about a setting, remove its line. The script will analyze the file and reset missing settings to defaults upon restart.
 
 For detailed explanations of each setting, **click to expand below:**
 
