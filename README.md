@@ -8,24 +8,30 @@
 
 ## Description
 
-Compatible with both PC and all consoles (PlayStation and Xbox).<br>
-Thoroughly tested on PC, Xbox One, PlayStation 5, and PlayStation 3 ensuring 100% compatibility.
+Session Sniffer is a packet sniffer (also known as an IP grabber/sniffer) specifically designed for peer-to-peer (P2P) video games on PC and consoles (PlayStation and Xbox). It can identify players who:
+- Are trying to connect.
+- Are currently connected.
+- Have left your session.
+- Have rejoined your session.
 
-To be clear, the script does not explicitly indicate which IP corresponds to which in-game username\*.<br>
-This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.
+## Advantages
 
-- Scan players who:
-  - Are trying to connect.
-  - Are currently connected.
-  - Have left your session.
-  - Have rejoined your session.
+- The script has a configuration file that allows for more advanced customization of its behavior.
+- You can use the script without a modded video game or cracked program.
+- The script is entirely **FREE TO USE** and **OPEN SOURCE**.
 
-**Officially Tested and Supported Video Games\*\*:**
+## Officially Supported Video Games
 
-| Supported Video Games               | Officially Tested Platforms |
-| :---------------------------------- | :-------------------------: |
-| Grand Theft Auto 5                  |      PC, Xbox One, PS5      |
-| Minecraft Bedrock Edition (Friends) |           PC, PS3           |
+| Supported Video Games               | Tested Platforms  |
+| :---------------------------------- | :---------------: |
+| Grand Theft Auto 5                  | PC, Xbox One, PS5 |
+| Minecraft Bedrock Edition (Friends) |      PC, PS3      |
+
+## About Usernames Decryption/Resolving
+
+To clarify, the script does not explicitly decrypt or resolve in-game usernames associated with IPs\*.<br>
+This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.<br>
+You can, however, manually assign a username to each IP using UserIP database files.
 
 \*_Since v1.1.4, you can now view usernames on GTA V in real-time on PC using either ~~2Take1 /~~ Stand or Cherax mod menus~~s~~:_
 - ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/Illegal-Services/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br>
@@ -34,12 +40,6 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
 
 \*\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br>
 But please note that additional servers (e.g., game servers) won't be filtered from the script's output if they are not indexed within the list above_
-
-## Advantages
-
-- The script has a configuration file that allows for more advanced customization of its behavior.
-- You can use the script without a modded video game or cracked program.
-- The script is entirely **FREE TO USE** and **OPEN SOURCE**.
 
 ## Showcase
 
@@ -367,7 +367,7 @@ username3=255.255.255.255
 
 ### General Tips and Tricks
 
-- You can handily zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [mouse scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
+- You can handily zoom in or out on your terminal's output by using the keyboard shortcut `[CTRL] + [Mouse_Scroll]` or `[CTRL] + [+]`, and `[CTRL] + [-]`.
 - You can pause your terminal's output by using the keyboard shortcut `[CTRL] + [S]` and resume it with `[CTRL] + [Q]`.
 
 ### GTA V Tips and Tricks
