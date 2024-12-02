@@ -41,17 +41,6 @@ You can, however, manually assign a username to each IP using UserIP database fi
 \*\*_Technically the script works for literally every P2P (Peer-To-Peer) video games.<br>
 But please note that additional servers (e.g., game servers) won't be filtered from the script's output if they are not indexed within the list above_
 
-## Showcase
-
-|                                                         Console Output                                               | Settings                                                                                        |
-| :------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: |
-| ![WindowsTerminal_2024-12-02_17-24](https://github.com/user-attachments/assets/d320ae4a-a39e-4fbc-a7fc-8f001bccb7df) | ![Settings](https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa)    |
----
-|                                                         Session Logger                                               |
-| :------------------------------------------------------------------------------------------------------------------: |
-| ![Code_2024-12-02_17-28](https://github.com/user-attachments/assets/208dbfab-baa5-499c-ba6f-99dbe1775450)            |
-
-
 ## Configuration
 
 ### Prerequisites / Dependencies
@@ -64,6 +53,10 @@ Furthermore, for packet sniffing functionality, you'll require either [Npcap](ht
 It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npcap/) is already included by default within the [Wireshark](https://www.wireshark.org/) installation.
 
 ### Editing Settings
+
+| Settings File                                                                                |
+| :------------------------------------------------------------------------------------------: |
+| <img src="https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa" alt="Settings" width="50%" /> |
 
 To edit the script settings, open the `Settings.ini` file.<br>
 This file is created upon the first script launch and automatically updates thereafter.
