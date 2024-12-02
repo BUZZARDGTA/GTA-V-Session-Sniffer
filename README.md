@@ -16,9 +16,9 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/sniffer) specif
 
 ## Advantages
 
-- Includes a configuration file for advanced customization.
+- Unlike other similar software, Session Sniffer is completely **FREE TO USE** and **OPEN SOURCE**.
 - Works without requiring a modded video game or cracked program.
-- Completely **FREE TO USE** and **OPEN SOURCE**.
+- Includes a configuration file for advanced customization.
 
 ## Officially Supported Video Games
 
