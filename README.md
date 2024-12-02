@@ -321,10 +321,9 @@ Please note that UWP apps are not supported.
 
 * `<PROTECTION_SUSPEND_PROCESS_MODE>`<br>
 Specifies the duration (in seconds) for which the `<PROTECTION_PROCESS_PATH>` process will be suspended when `<PROTECTION>` is set to `Suspend_Process`.<br>
-
-- Floating-point number: Specify a duration in seconds (e.g., 2.5 for 2.5 seconds).<br>
-- `Auto`: Keep the process suspended as long as the IP is detected in the session.<br>
-- `Manual`: Suspend the process indefinitely until the user manually resumes it.
+    * Floating-point number: Specify a duration in seconds (e.g., 2.5 for 2.5 seconds).<br>
+    * `Auto`: Keep the process suspended as long as the IP is detected in the session.<br>
+    * `Manual`: Suspend the process indefinitely until the user manually resumes it.
 
 </details>
 
