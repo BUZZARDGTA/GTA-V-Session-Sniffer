@@ -295,7 +295,7 @@ class DefaultSettings:
     STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
-    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "AS Name"]
+    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "ASN"]
     STDOUT_DATE_FIELDS_SHOW_DATE = False
     STDOUT_DATE_FIELDS_SHOW_TIME = False
     STDOUT_DATE_FIELDS_SHOW_ELAPSED = True
@@ -318,7 +318,7 @@ class DefaultSettings:
     USERIP_ENABLED = True
 
 class Settings(DefaultSettings):
-    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "AS Name", "Mobile", "VPN", "Hosting"]
+    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
 
     stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
@@ -349,7 +349,7 @@ class Settings(DefaultSettings):
         "ISP": "iplookup.ipapi.compiled.isp",
         "ASN / ISP": "iplookup.maxmind.compiled.asn",
         "AS": "iplookup.ipapi.compiled._as",
-        "AS Name": "iplookup.ipapi.compiled.as_name",
+        "ASN": "iplookup.ipapi.compiled.as_name",
         "Mobile": "iplookup.ipapi.compiled.mobile",
         "VPN": "iplookup.ipapi.compiled.proxy",
         "Hosting": "iplookup.ipapi.compiled.hosting"
@@ -2557,7 +2557,7 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                     Organization: {player.iplookup.ipapi.compiled.org}
                     ISP: {player.iplookup.ipapi.compiled.isp}
                     ASN / ISP: {player.iplookup.maxmind.compiled.asn}
-                    AS Name: {player.iplookup.ipapi.compiled.as_name}
+                    ASN: {player.iplookup.ipapi.compiled.as_name}
                     Mobile (cellular) connection: {player.iplookup.ipapi.compiled.mobile}
                     Proxy, VPN or Tor exit address: {player.iplookup.ipapi.compiled.proxy}
                     Hosting, colocated or data center: {player.iplookup.ipapi.compiled.hosting}
@@ -3679,7 +3679,7 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
                 if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "AS Name" not in FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
                 if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
@@ -3759,7 +3759,7 @@ def stdout_render_core():
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
                 if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "AS Name" not in FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
                 if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
