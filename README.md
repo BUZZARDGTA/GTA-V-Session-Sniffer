@@ -68,7 +68,7 @@ For detailed explanations of each setting, **click to expand below:**
 The full path to your "tshark.exe" executable.<br>
 If not set, it will attempt to detect tshark from your Wireshark installation.
 
-#### \<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT\>
+#### <CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>
 Allows you to skip the network interface selection by automatically<br>
 using the `<CAPTURE_INTERFACE_NAME>`, `<CAPTURE_IP_ADDRESS>` and `<CAPTURE_MAC_ADDRESS>` settings.
 
