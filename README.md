@@ -64,7 +64,7 @@ For detailed explanations of each setting, **click to expand below:**
 <details>
 <summary>📖 Settings Details (Click to Expand/Collapse)</summary>
 
-#### \<CAPTURE_TSHARK_PATH\>
+<h4>&lt;CAPTURE_TSHARK_PATH&gt;</h4>
 The full path to your "tshark.exe" executable.<br>
 If not set, it will attempt to detect tshark from your Wireshark installation.
 
