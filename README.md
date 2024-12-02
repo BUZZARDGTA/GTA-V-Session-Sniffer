@@ -36,9 +36,9 @@ But please note that additional servers (e.g., game servers) won't be filtered f
 
 ## Showcase
 
-|                                                         Console Output                                                         |
-| :----------------------------------------------------------------------------------------------------------------------------: |
-| ![WindowsTerminal_2024-11-07_01-25](https://github.com/user-attachments/assets/5df228a1-1465-44a1-928b-9cc894e14f7f)           |
+|                                                         Console Output                                               | Settings                                                                                        |
+| :------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: |
+| ![WindowsTerminal_2024-11-07_01-25](https://github.com/user-attachments/assets/5df228a1-1465-44a1-928b-9cc894e14f7f) | ![Settings](https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa)    |
 
 ## Configuration
 
