@@ -1,6 +1,10 @@
+<div align="center">
+
 # GTA V Session Sniffer
 
 ![WindowsTerminal_2024-12-02_17-50](https://github.com/user-attachments/assets/03e1f3bb-2d68-41b9-aade-7814fed3aacd)
+
+</div>
 
 ## Description
 
