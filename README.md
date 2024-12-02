@@ -12,6 +12,7 @@ This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) bu
   - Are trying to connect.
   - Are currently connected.
   - Have left your session.
+  - Have rejoined your session.
 
 **Officially Tested and Supported Video Games\*\*:**
 
