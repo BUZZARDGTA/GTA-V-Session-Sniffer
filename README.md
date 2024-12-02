@@ -16,9 +16,9 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/sniffer) specif
 
 ## Advantages
 
-- The script has a configuration file that allows for more advanced customization of its behavior.
-- You can use the script without a modded video game or cracked program.
-- The script is entirely **FREE TO USE** and **OPEN SOURCE**.
+- Includes a configuration file for advanced customization.
+- Works without requiring a modded video game or cracked program.
+- Completely **FREE TO USE** and **OPEN SOURCE**.
 
 ## Officially Supported Video Games
 
