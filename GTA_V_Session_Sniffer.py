@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from traceback import TracebackException
 from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import Optional, Literal, Union, Type
+from typing import Optional, Literal, Union, Type, Any
 from ipaddress import IPv4Address, AddressValueError
 from dataclasses import dataclass
 
@@ -48,7 +48,7 @@ from colorama import Fore, Back, Style
 # -----------------------------------------------------
 from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet
-from Modules.capture.utils import TSharkNotFoundException, get_tshark_path, get_tshark_version, is_npcap_or_winpcap_installed
+from Modules.capture.utils import TSharkNotFoundException, InvalidTSharkVersionException, get_tshark_path, is_npcap_or_winpcap_installed
 from Modules.https_utils.unsafe_https import s
 from Modules.msgbox import MsgBox
 
@@ -113,7 +113,13 @@ def terminate_script(
         console.print(traceback_message)
 
         error_message = Text.from_markup(
-            "\n\n\nAn unexpected (uncaught) error occurred. [bold]Please kindly report it to: [link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link][/bold].",
+            (
+                "\n\n\nAn unexpected (uncaught) error occurred. [bold]Please kindly report it to:[/bold]\n"
+                "[link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]"
+                "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link].\n\n"
+                "DEBUG:\n"
+                f"VERSION={globals().get("VERSION", "Unknown Version")}" # Define a default value for VERSION if it's not defined
+            ),
             style="white"
         )
         console.print(error_message)
@@ -146,7 +152,7 @@ def handle_exception(exc_type: Type[BaseException], exc_value: BaseException, ex
         return
 
     exception_info = ExceptionInfo(exc_type, exc_value, exc_traceback)
-    terminate_script("EXIT", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to: https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
+    terminate_script("EXIT", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to:\nhttps://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
 
 def signal_handler(sig: int, frame: FrameType):
     if sig == 2: # means CTRL+C pressed
@@ -254,12 +260,13 @@ class Threads_ExceptionHandler:
         pass
 
     def __exit__(self, exc_type: type, exc_value: Exception, exc_traceback: TracebackType):
-        """Exit method called upon exiting the 'with' block.
+        """
+        Exit method called upon exiting the 'with' block.
 
         Args:
-            exc_type (type): The type of the exception raised.
-            exc_value (Exception): The value of the exception raised.
-            exc_traceback (TracebackType): The traceback information of the exception raised.
+            exc_type: The type of the exception raised.
+            exc_value: The value of the exception raised.
+            exc_traceback: The traceback information of the exception raised.
 
         Returns:
             bool: True to suppress the exception from propagating further.
@@ -276,7 +283,7 @@ class Threads_ExceptionHandler:
             Threads_ExceptionHandler.raising_function = tb.tb_frame.f_code.co_name
 
             exception_info = ExceptionInfo(exc_type, exc_value, exc_traceback)
-            terminate_script("THREAD_RAISED", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to: https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
+            terminate_script("THREAD_RAISED", "An unexpected (uncaught) error occurred.\n\nPlease kindly report it to:\nhttps://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues", exception_info = exception_info)
 
             return True  # Prevent exceptions from propagating
 
@@ -292,6 +299,8 @@ class DefaultSettings:
     CAPTURE_PROGRAM_PRESET = None
     CAPTURE_VPN_MODE = False
     CAPTURE_OVERFLOW_TIMER = 3.0
+    CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER = None
+    CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = None
     STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
@@ -316,6 +325,7 @@ class DefaultSettings:
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
     STDOUT_REFRESHING_TIMER = 3
     USERIP_ENABLED = True
+    DISCORD_PRESENCE = True
 
 class Settings(DefaultSettings):
     stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
@@ -430,27 +440,29 @@ class Settings(DefaultSettings):
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "CAPTURE_INTERFACE_NAME":
-                    if setting_value == "None":
-                        Settings.CAPTURE_INTERFACE_NAME = None
-                    else:
+                    try:
+                        Settings.CAPTURE_INTERFACE_NAME, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
                         Settings.CAPTURE_INTERFACE_NAME = setting_value
                 elif setting_name == "CAPTURE_IP_ADDRESS":
-                    if setting_value == "None":
-                        Settings.CAPTURE_IP_ADDRESS = None
-                    elif is_ipv4_address(setting_value):
-                        Settings.CAPTURE_IP_ADDRESS = setting_value
-                    else:
-                        need_rewrite_settings = True
-                elif setting_name == "CAPTURE_MAC_ADDRESS":
-                    if setting_value == "None":
-                        Settings.CAPTURE_MAC_ADDRESS = None
-                    elif is_mac_address(setting_value):
-                        formatted_mac_address = format_mac_address(setting_value)
-                        if not formatted_mac_address == setting_value:
+                    try:
+                        Settings.CAPTURE_IP_ADDRESS, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        if is_ipv4_address(setting_value):
+                            Settings.CAPTURE_IP_ADDRESS = setting_value
+                        else:
                             need_rewrite_settings = True
-                        Settings.CAPTURE_MAC_ADDRESS = formatted_mac_address
-                    else:
-                        need_rewrite_settings = True
+                elif setting_name == "CAPTURE_MAC_ADDRESS":
+                    try:
+                        Settings.CAPTURE_MAC_ADDRESS, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        if is_mac_address(setting_value):
+                            formatted_mac_address = format_mac_address(setting_value)
+                            if not formatted_mac_address == setting_value:
+                                need_rewrite_settings = True
+                            Settings.CAPTURE_MAC_ADDRESS = formatted_mac_address
+                        else:
+                            need_rewrite_settings = True
                 elif setting_name == "CAPTURE_ARP":
                     try:
                         Settings.CAPTURE_ARP, need_rewrite_current_setting = custom_str_to_bool(setting_value)
@@ -485,6 +497,22 @@ class Settings(DefaultSettings):
                     else:
                         if CAPTURE_OVERFLOW_TIMER >= 1:
                             Settings.CAPTURE_OVERFLOW_TIMER = CAPTURE_OVERFLOW_TIMER
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER":
+                    try:
+                        Settings.CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        if updated_setting_value := setting_value.strip().strip("\"'").strip("()"):
+                            Settings.CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER = f"({updated_setting_value})"
+                        else:
+                            need_rewrite_settings = True
+                elif setting_name == "CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER":
+                    try:
+                        Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER, need_rewrite_current_setting = custom_str_to_nonetype(setting_value)
+                    except InvalidNoneTypeValueError:
+                        if updated_setting_value := setting_value.strip().strip("\"'").strip("()"):
+                            Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = f"({updated_setting_value})"
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "STDOUT_SHOW_ADVERTISING_HEADER":
@@ -690,6 +718,11 @@ class Settings(DefaultSettings):
                 elif setting_name == "USERIP_ENABLED":
                     try:
                         Settings.USERIP_ENABLED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                    except InvalidBooleanValueError:
+                        need_rewrite_settings = True
+                elif setting_name == "DISCORD_PRESENCE":
+                    try:
+                        Settings.DISCORD_PRESENCE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
 
@@ -1163,6 +1196,8 @@ class UserIP_Databases:
 
     @staticmethod
     def _notify_conflict(initial_userip_entry: UserIP, conflicting_database_name: str, conflicting_username: str, conflicting_ip: str):
+        from Modules.consts import USERIP_DATABASES_PATH
+
         msgbox_title = TITLE
         msgbox_message = textwrap.indent(textwrap.dedent(f"""
             ERROR:
@@ -1189,9 +1224,10 @@ class UserIP_Databases:
         """
         Add a settings dictionary and user_ips dictionary pair to the databases.
 
-        :param database_name: The name of the database.
-        :param settings: The settings class for the database.
-        :param user_ips: A dictionary mapping usernames to lists of IPs.
+        Args:
+            database_name: The name of the database.
+            settings: The settings class for the database.
+            user_ips: A dictionary mapping usernames to lists of IPs.
         """
         if settings.ENABLED == True:
             cls.userip_databases.append((database_name, settings, user_ips))
@@ -1244,9 +1280,7 @@ class UserIP_Databases:
 
     @classmethod
     def get_userip_info(cls, ip: str):
-        """
-        Returns an UserIP object for the specified IP, containing its associated name, settings and usernames.
-        """
+        """Returns an UserIP object for the specified IP, containing its associated name, settings and usernames."""
         return cls.userip_infos_by_ip.get(ip)
 
     @classmethod
@@ -1254,7 +1288,8 @@ class UserIP_Databases:
         """
         Updates the player's UserIP data using the information from UserIP_Databases.
 
-        :param player: The player object with 'ip' and 'userip' attributes.
+        Args:
+            player: The player object with 'ip' and 'userip' attributes.
         """
         if userip_data := cls.get_userip_info(player.ip):
             player.userip.database_name = userip_data.database_name
@@ -1266,38 +1301,28 @@ class UserIP_Databases:
 def is_pyinstaller_compiled():
     return getattr(sys, "frozen", False) # Check if the running Python script is compiled using PyInstaller, cx_Freeze or similar
 
-def resource_path(relative_path: Path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    base_path = getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
-    if not isinstance(base_path, Path):
-        base_path = Path(base_path)
-    return base_path / relative_path
-
 def title(title: str):
     print(f"\033]0;{title}\007", end="")
 
 def cls():
     print("\033c", end="")
 
-def take(n: int, iterable: list):
+def take(n: int, iterable: list[Any]):
     """Return first n items of the iterable as a list."""
     return iterable[:n]
 
-def tail(n: int, iterable: list):
+def tail(n: int, iterable: list[Any]):
     """Return last n items of the iterable as a list."""
     return iterable[-n:]
 
-def concat_lists_no_duplicates(*lists: list):
+def concat_lists_no_duplicates(*lists: list[Any]):
     """
     Concatenates multiple lists while removing duplicates and preserving order.
 
     Args:
         *lists: One or more lists to concatenate.
-
-    Returns:
-        A single list with duplicates removed, preserving the original order.
     """
-    unique_list = []
+    unique_list: list[Any] = []
     seen = set()
 
     for lst in lists:
@@ -1321,41 +1346,6 @@ def is_hex(string: str):
     except (ValueError, TypeError):
         return False
 
-def get_documents_folder():
-    """
-    Retrieves the path to the current user's 'Documents' folder by querying the Windows registry.
-
-    Returns:
-        str: The Path object to the 'Documents' folder.
-    """
-
-    """ NOTE: Alternative code:
-    import os
-    import sys
-    from pathlib import Path
-
-    # Windows - Use SHGetKnownFolderPath for Documents
-    from win32com.shell import shell, shellcon
-
-    # Get the Documents folder path
-    documents_path = Path(shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents, 0))
-
-    # Append the desired file path
-    log_path = documents_path / "Cherax" / "Lua" / "GTA_V_Session_Sniffer-plugin" / "log.txt"
-
-    print(log_path)
-    """
-
-    reg_key = R"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
-
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key) as key:
-        documents_path, _ = winreg.QueryValueEx(key, "Personal")
-
-    if not isinstance(documents_path, str):
-        raise TypeError(f'Expected "str", got "{type(documents_path)}"')
-
-    return Path(documents_path)
-
 def is_ipv4_address(ip_address: str):
     try:
         return IPv4Address(ip_address).version == 4
@@ -1363,6 +1353,7 @@ def is_ipv4_address(ip_address: str):
         return False
 
 def is_mac_address(mac_address: str):
+    from Modules.consts import RE_MAC_ADDRESS_PATTERN
     return bool(RE_MAC_ADDRESS_PATTERN.match(mac_address))
 
 def is_private_device_ipv4(ip_address: str):
@@ -1414,7 +1405,7 @@ def get_tshark_interfaces():
         return stdout.strip().split(" ", maxsplit=2)
 
     stdout = subprocess.check_output([
-        R"C:\Program Files\Wireshark\tshark.exe", "-D"
+        Settings.CAPTURE_TSHARK_PATH, "-D"
     ], text=True, encoding="utf-8")
 
     interfaces: list[tuple[str, str, str]] = []
@@ -1520,16 +1511,15 @@ def format_mac_address(mac_address: str):
 
 def truncate_with_ellipsis(string: str, max_length: int):
     """
-    Format a string by truncating it to a specified maximum length,
-    and appending "..." if truncated.
+    Format a string by truncating it to a specified maximum length, and appending "..." if truncated.
 
     Args:
-        string (str): The string to format.
-        max_length (int): The maximum length of the formatted string.
+        string: The string to format.
+        max_length: The maximum length of the formatted string.
 
     Returns:
-        str: The formatted string, truncated with "..." if it exceeds
-            the specified `max_length`. Otherwise, returns the original `string`.
+        str: The formatted string, truncated with "..." if it exceeds the specified `max_length`.
+             Otherwise, returns the original `string`.
     """
     if len(string) > max_length:
         return f"{string[:max_length]}..."
@@ -1553,8 +1543,9 @@ def safe_print(*args, **kwargs):
     """
     Print the provided arguments if the script has not crashed.
 
-    :param args: The values to be printed.
-    :param kwargs: Additional keyword arguments to pass to the built-in print function.
+    Args:
+        *args: The values to be printed.
+        **kwargs: Additional keyword arguments to pass to the built-in print function.
     """
     if ScriptControl.has_crashed():
         return
@@ -1707,6 +1698,8 @@ def update_and_initialize_geolite2_readers():
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
 def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "last", "all"]):
+    from Modules.consts import RE_SETTINGS_INI_PARSER_PATTERN
+
     def process_ini_line_output(line: str):
         return line.rstrip("\n")
 
@@ -1818,8 +1811,8 @@ def custom_str_to_bool(string: str, only_match_against: Optional[bool] = None):
     otherwise, it raises an \"InvalidBooleanValueError\".
 
     Args:
-        string (str): The boolean string to be checked.
-        (optional) only_match_against (bool | None): If provided, the only boolean value to match against.
+        string: The boolean string to be checked.
+        only_match_against (optional): If provided, the only boolean value to match against.
     """
     need_rewrite_current_setting = False
     resolved_value = None
@@ -1847,23 +1840,16 @@ def custom_str_to_bool(string: str, only_match_against: Optional[bool] = None):
 
 def custom_str_to_nonetype(string: str):
     """
-    This function returns the NoneType value represented by the string for lowercase or any case variation;\n
-    otherwise, it raises an \"InvalidNoneTypeValueError\".
+    This function returns the NoneType value represented by the string for lowercase or any case variation; otherwise, it raises an \"InvalidNoneTypeValueError\".
 
     Args:
-        string (str): The NoneType string to be checked.
+        string: The NoneType string to be checked.
     """
-    string_lower = string.lower()
-    need_rewrite_current_setting = False
-
-    if string_lower == "none":
-        if not string == "None":
-            need_rewrite_current_setting = True
-        value = None
-    else:
+    if not string.lower() == "none":
         raise InvalidNoneTypeValueError("Input is not a valid NoneType value")
 
-    return value, need_rewrite_current_setting
+    is_string_literal_none = string == "None"
+    return None, is_string_literal_none
 
 colorama.init(autoreset=True)
 
@@ -1874,24 +1860,8 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.6 - 01/12/2024 (00:40)"
-TITLE_VERSION = f"{TITLE} {VERSION}"
+VERSION = "v1.2.7 - 05/12/2024 (14:15)"
 SETTINGS_PATH = Path("Settings.ini")
-USERIP_DATABASES_PATH = Path("UserIP Databases")
-SESSIONS_LOGGING_PATH = Path("Sessions Logging") / datetime.now().strftime("%Y/%m/%d") / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
-USERIP_LOGGING_PATH = Path("UserIP_Logging.log")
-TWO_TAKE_ONE__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/PopstarDevs/2Take1Menu/scripts/GTA_V_Session_Sniffer-plugin/log.txt"
-STAND__PLUGIN__LOG_PATH = Path.home() / "AppData/Roaming/Stand/Lua Scripts/GTA_V_Session_Sniffer-plugin/log.txt"
-CHERAX__PLUGIN__LOG_PATH = get_documents_folder() / "Cherax/Lua/GTA_V_Session_Sniffer-plugin/log.txt"
-TTS_PATH = resource_path(Path("TTS/"))
-RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
-RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
-RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>[^;#]+)")
-RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
-USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
-ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaabc9099c)."
-WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 
 cls()
 title(f"Searching for a new update - {TITLE}")
@@ -1959,6 +1929,7 @@ if not is_pyinstaller_compiled():
         "prettytable": "3.12.0",
         "psutil": "6.1.0",
         "requests": "2.32.3",
+        "rich": "13.9.4",
         "urllib3": "2.2.3",
         "WMI": "1.5.1"
     }
@@ -2073,42 +2044,35 @@ if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELD
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
 print("\nChecking that \"Tshark (Wireshark) v4.2.9\" is installed on your system ...\n")
+from Modules.consts import WIRESHARK_REQUIRED_VERSION, WIRESHARK_REQUIRED_DL
+
 while True:
     try:
         TSHARK_PATH = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
+        break
     except TSharkNotFoundException:
         errorlevel = show_error__tshark_not_detected()
         if errorlevel == MsgBox.ReturnValues.IDCANCEL:
             terminate_script("EXIT")
-    else:
-        TSHARK_VERSION = get_tshark_version(TSHARK_PATH)
-
-        if TSHARK_VERSION == WIRESHARK_REQUIRED_VERSION:
-            break
-
+    except InvalidTSharkVersionException as invalid_tshark_version:
         webbrowser.open(WIRESHARK_REQUIRED_DL)
         msgbox_title = TITLE
+        msgbox_message = textwrap.dedent(f"""
+            ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
 
-        if TSHARK_VERSION is None:
-            errorlevel = show_error__tshark_not_detected()
-            if errorlevel == MsgBox.ReturnValues.IDCANCEL:
-                terminate_script("EXIT")
-        else:
-            msgbox_message = textwrap.dedent(f"""
-                ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
+            Installed version: {invalid_tshark_version.version}
+            Required version: {WIRESHARK_REQUIRED_VERSION}
 
-                Installed version: {TSHARK_VERSION}
-                Required version: {WIRESHARK_REQUIRED_VERSION}
-
-                Opening the \"Wireshark\" project download page for you.
-                You can then download and install it from there and press \"Retry\".
-            """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = MsgBox.Style.AbortRetryIgnore | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
-            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
-            if errorlevel == MsgBox.ReturnValues.IDABORT:
-                terminate_script("EXIT")
-            elif errorlevel == MsgBox.ReturnValues.IDIGNORE:
-                break
+            Opening the \"Wireshark\" project download page for you.
+            You can then download and install it from there and press \"Retry\".
+        """.removeprefix("\n").removesuffix("\n"))
+        msgbox_style = MsgBox.Style.AbortRetryIgnore | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+        errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+        if errorlevel == MsgBox.ReturnValues.IDABORT:
+            terminate_script("EXIT")
+        elif errorlevel == MsgBox.ReturnValues.IDIGNORE:
+            TSHARK_PATH = invalid_tshark_version.path
+            break
 
 cls()
 title(f"Initializing and updating MaxMind's GeoLite2 Country, City and ASN databases - {TITLE}")
@@ -2426,6 +2390,12 @@ if excluded_protocols:
         f"not ({' or '.join(excluded_protocols)})"
     )
 
+if Settings.CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER:
+    capture_filter.insert(0, Settings.CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER)
+
+if Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER:
+    display_filter.insert(0, Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER)
+
 CAPTURE_FILTER = " and ".join(capture_filter) if capture_filter else None
 DISPLAY_FILTER = " and ".join(display_filter) if display_filter else None
 
@@ -2479,6 +2449,7 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                 process.resume()
                 return
 
+        from Modules.consts import USERIP_LOGGING_PATH, TTS_PATH
 
         # We wants to run this as fast as possible so it's on top of the function.
         if connection_type == "connected":
@@ -2780,11 +2751,11 @@ def stdout_render_core():
             Calculate the padding width based on the total width and the lengths of provided strings.
 
             Args:
-            - total_width (int): Total width available for padding
-            - *args (int): Integrers for which lengths are used to calculate padding width
+                total_width: Total width available for padding
+                *lengths: Integrers for which lengths are used to calculate padding width
 
             Returns:
-            - padding_width (int): Calculated padding width
+                padding_width: Calculated padding width
             """
             # Calculate the total length of all strings
             total_length = sum(length for length in lengths)
@@ -2816,6 +2787,8 @@ def stdout_render_core():
         def parse_userip_ini_file(ini_path: Path, unresolved_ip_invalid: set[str]):
             def process_ini_line_output(line: str):
                 return line.strip()
+
+            from Modules.consts import RE_SETTINGS_INI_PARSER_PATTERN, USERIP_INI_SETTINGS_LIST, RE_USERIP_INI_PARSER_PATTERN
 
             if not ini_path.exists():
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
@@ -3101,6 +3074,8 @@ def stdout_render_core():
             ), userip
 
         def update_userip_databases(last_userip_parse_time: Optional[float]):
+            from Modules.consts import USERIP_DATABASES_PATH
+
             DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
                 ;;-----------------------------------------------------------------------------
                 ;; GTA V Session Sniffer User IP default database file
@@ -3338,6 +3313,7 @@ def stdout_render_core():
             else:
                 return ""
 
+        from Modules.consts import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
 
         global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
 
@@ -3387,6 +3363,31 @@ def stdout_render_core():
         global_pps_rate = 0
         last_userip_parse_time = None
         last_mod_menus_logs_parse_time = None
+
+        if Settings.STDOUT_SESSIONS_LOGGING:
+            from Modules.consts import ANSI_ESCAPE
+
+        if Settings.DISCORD_PRESENCE:
+            from pypresence import Presence
+
+            DISCORD_PRESENCE_CLIENT_ID = 1313304495958261781
+
+            discord_rpc = Presence(DISCORD_PRESENCE_CLIENT_ID)
+            discord_rpc_last_update_time = None
+            discord_rpc_start_time = int(time.time())
+
+
+            discord_rpc.connect()
+            discord_rpc.update(
+                details = "Sniffin' my babies IPs.",
+                start = discord_rpc_start_time,
+                buttons = [
+                    {
+                        "label": "GitHub Repo",
+                        "url": "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer"
+                    }
+                ]
+            )
 
         modmenu__plugins__ip_to_usernames: dict[str, list[str]] = {}
         # NOTE: The log file content is read only once because the plugin is no longer supported.
@@ -3589,7 +3590,7 @@ def stdout_render_core():
                 printer.cache_print("")
 
             printer.cache_print(f"-" * 109)
-            printer.cache_print(f"                         Welcome in {TITLE_VERSION}")
+            printer.cache_print(f"                         Welcome in {TITLE} {VERSION}")
             printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
             printer.cache_print(f"-   " * 28)
             printer.cache_print(STDOUT__SCANNING_ON_NETWORK_INTERFACE)
@@ -3775,6 +3776,8 @@ def stdout_render_core():
             printer.cache_print("")
 
             if Settings.STDOUT_SESSIONS_LOGGING:
+                from Modules.consts import SESSIONS_LOGGING_PATH
+
                 logging_connected_players_table = PrettyTable()
                 logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
                 logging_connected_players_table.title = f"Player{plural(len(session_connected))} connected in your session ({len(session_connected)}):"
@@ -3869,6 +3872,26 @@ def stdout_render_core():
 
             cls()
             printer.flush_cache()
+
+            if Settings.DISCORD_PRESENCE:
+                if discord_rpc_last_update_time is None or time.perf_counter() - discord_rpc_last_update_time >= 3.0:
+                    discord_rpc_last_update_time = time.perf_counter()
+
+                    discord_rpc.update(
+                        state = f"{len(session_connected)} player{plural(len(session_connected))} connected in the session.",
+                        details = "Sniffin' my babies IPs.",
+                        start = discord_rpc_start_time,
+                        #large_image="image_name",  # Name of the uploaded image in Discord app assets
+                        #large_text="Hover text for large image",  # Tooltip for the large image
+                        #small_image="image_name_small",  # Optional small image
+                        #small_text="Hover text for small image",  # Tooltip for the small image
+                        buttons = [
+                            {
+                                "label": "GitHub Repo",
+                                "url": "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer"
+                            }
+                        ]
+                    )
 
             og_process_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
 

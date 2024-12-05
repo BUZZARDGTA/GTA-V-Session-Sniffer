@@ -117,6 +117,14 @@ This timer represents the duration between the timestamp of a captured packet an
 When this timer is reached, the tshark process will be restarted.<br>
 Valid values include any number greater than or equal to 3.
 
+* `<CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER>`<br>
+**For advanced users**; Allows you to specify a custom Tshark capture filter, which will be prepended to the filter used in the script.<br>
+Learn more: [Wireshark Capture Filters](https://wiki.wireshark.org/CaptureFilters) / [Tshark Capture Filters](https://tshark.dev/capture/capture_filters/)
+
+* `<CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER>`<br>
+**For advanced users**; Allows you to specify a custom Tshark display filter, which will be prepended to the filter used in the script.<br>
+Learn more: [Wireshark Display Filters](https://wiki.wireshark.org/DisplayFilters) / [Tshark Display Filters](https://tshark.dev/analyze/packet_hunting/packet_hunting/)
+
 * `<STDOUT_SHOW_ADVERTISING_HEADER>`<br>
 Determine if you want or not to show the developer's advertisements in the script's display.
 

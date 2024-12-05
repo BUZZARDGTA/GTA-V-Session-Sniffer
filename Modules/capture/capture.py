@@ -106,13 +106,17 @@ class PacketCapture:
         with subprocess.Popen(
             self._tshark_command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True
         ) as process:
             self._tshark__process = process
 
             yield from (Packet(fields) for fields in map(process_tshark_stdout, process.stdout))
 
+            # Check exit code after processing all stdout lines
+            if process.wait() != 0:
+                stderr_output = process.stderr.read()
+                raise TSharkCrashException(f"TShark exited with error code {process.returncode}:\n{stderr_output.strip()}")
 
 def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
     return datetime.fromtimestamp(timestamp=float(packet_frame_time_epoch))
