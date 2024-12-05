@@ -1526,6 +1526,8 @@ def truncate_with_ellipsis(string: str, max_length: int):
     return string
 
 def show_error__tshark_not_detected():
+    from Modules.consts import WIRESHARK_REQUIRED_DL
+
     webbrowser.open(WIRESHARK_REQUIRED_DL)
 
     msgbox_title = TITLE
@@ -1860,7 +1862,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.7 - 05/12/2024 (14:15)"
+VERSION = "v1.2.8 - 05/12/2024 (15:56)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
@@ -2044,11 +2046,14 @@ if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELD
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
 print("\nChecking that \"Tshark (Wireshark) v4.2.9\" is installed on your system ...\n")
-from Modules.consts import WIRESHARK_REQUIRED_VERSION, WIRESHARK_REQUIRED_DL
+from Modules.consts import WIRESHARK_REQUIRED_DL, WIRESHARK_REQUIRED_VERSION
 
 while True:
     try:
-        TSHARK_PATH = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
+        tshark_path = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
+        if Settings.CAPTURE_TSHARK_PATH is None:
+            Settings.CAPTURE_TSHARK_PATH = tshark_path
+            Settings.reconstruct_settings()
         break
     except TSharkNotFoundException:
         errorlevel = show_error__tshark_not_detected()
@@ -2071,7 +2076,9 @@ while True:
         if errorlevel == MsgBox.ReturnValues.IDABORT:
             terminate_script("EXIT")
         elif errorlevel == MsgBox.ReturnValues.IDIGNORE:
-            TSHARK_PATH = invalid_tshark_version.path
+            if Settings.CAPTURE_TSHARK_PATH is None:
+                Settings.CAPTURE_TSHARK_PATH = invalid_tshark_version.path
+                Settings.reconstruct_settings()
             break
 
 cls()
@@ -2405,7 +2412,7 @@ while True:
             interface = Settings.CAPTURE_INTERFACE_NAME,
             capture_filter = CAPTURE_FILTER,
             display_filter = DISPLAY_FILTER,
-            tshark_path = TSHARK_PATH
+            tshark_path = Settings.CAPTURE_TSHARK_PATH
         )
     except TSharkNotFoundException:
         errorlevel = show_error__tshark_not_detected()

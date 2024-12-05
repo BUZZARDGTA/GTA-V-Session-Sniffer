@@ -39,7 +39,8 @@ def get_tshark_path(tshark_path: Path = None):
                 user_tshark_path = tshark_path / "tshark.exe"
 
             if user_tshark_path:
-                possible_tshark_paths.insert(0, user_tshark_path)
+                if user_tshark_path not in possible_tshark_paths:
+                    possible_tshark_paths.insert(0, user_tshark_path)
 
         return possible_tshark_paths
 
@@ -62,7 +63,9 @@ def get_tshark_path(tshark_path: Path = None):
                 continue
 
             program_files = Path(env_path)
-            possible_tshark_paths.append(program_files / "Wireshark" / "tshark.exe")
+            possible_tshark_path = program_files / "Wireshark" / "tshark.exe"
+            if possible_tshark_path not in possible_tshark_paths:
+                possible_tshark_paths.append(possible_tshark_path)
 
         return possible_tshark_paths
 
@@ -91,7 +94,9 @@ def get_tshark_path(tshark_path: Path = None):
                                 if not display_name.startswith("Wireshark"):
                                     continue
 
-                                possible_tshark_paths.append(Path(install_location) / "tshark.exe")
+                                possible_tshark_path = Path(install_location) / "tshark.exe"
+                                if possible_tshark_path not in possible_tshark_paths:
+                                    possible_tshark_paths.append(possible_tshark_path)
                             except FileNotFoundError:
                                 # Skip keys without the required values
                                 continue
