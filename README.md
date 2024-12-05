@@ -59,9 +59,46 @@ It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npca
 
 ### Editing Settings
 
-| Settings File                                                                                |
-| :------------------------------------------------------------------------------------------: |
-| <img src="https://github.com/user-attachments/assets/7bc64c80-39ab-4f30-adf5-1256f8f737fa" alt="Settings" width="50%" /> |
+#### Example Settings file:
+```
+CAPTURE_TSHARK_PATH=C:\Program Files\Wireshark\tshark.exe
+CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT=False
+CAPTURE_INTERFACE_NAME=Ethernet 2
+CAPTURE_IP_ADDRESS=192.168.1.101
+CAPTURE_MAC_ADDRESS=D8:BB:C1:8F:1B:E6
+CAPTURE_ARP=True
+CAPTURE_BLOCK_THIRD_PARTY_SERVERS=True
+CAPTURE_PROGRAM_PRESET=GTA5
+CAPTURE_VPN_MODE=False
+CAPTURE_OVERFLOW_TIMER=3.0
+CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER=None
+CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER=None
+STDOUT_SHOW_ADVERTISING_HEADER=False
+STDOUT_SESSIONS_LOGGING=True
+STDOUT_RESET_PORTS_ON_REJOINS=True
+STDOUT_FIELDS_TO_HIDE=['Intermediate Ports', 'First Port', 'Continent', 'R. Code', 'City', 'District', 'ZIP Code', 'Lat', 'Lon', 'Time Zone', 'Offset', 'Currency', 'Organization', 'AS', 'ASN / ISP']
+STDOUT_DATE_FIELDS_SHOW_DATE=False
+STDOUT_DATE_FIELDS_SHOW_TIME=False
+STDOUT_DATE_FIELDS_SHOW_ELAPSED=True
+STDOUT_FIELD_SHOW_COUNTRY_CODE=True
+STDOUT_FIELD_SHOW_CONTINENT_CODE=True
+STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY=Last Rejoin
+STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY=Last Seen
+STDOUT_FIELD_COUNTRY_MAX_LEN=20
+STDOUT_FIELD_CITY_MAX_LEN=20
+STDOUT_FIELD_CONTINENT_MAX_LEN=20
+STDOUT_FIELD_REGION_MAX_LEN=20
+STDOUT_FIELD_ORGANIZATION_MAX_LEN=20
+STDOUT_FIELD_ISP_MAX_LEN=20
+STDOUT_FIELD_ASN_ISP_MAX_LEN=20
+STDOUT_FIELD_AS_MAX_LEN=20
+STDOUT_FIELD_AS_NAME_MAX_LEN=20
+STDOUT_DISCONNECTED_PLAYERS_TIMER=10.0
+STDOUT_DISCONNECTED_PLAYERS_COUNTER=6
+STDOUT_REFRESHING_TIMER=0.1
+USERIP_ENABLED=True
+DISCORD_PRESENCE=True
+```
 
 To edit the script settings, open the `Settings.ini` file.<br>
 This file is created upon the first script launch and automatically updates thereafter.
@@ -355,9 +392,9 @@ You need to list the entries under the `[UserIP]` section of the INI file in thi
 [Settings]
 ENABLED=True
 COLOR=RED
+LOG=True
 NOTIFICATIONS=True
 VOICE_NOTIFICATIONS=Male
-LOG=True
 PROTECTION=False
 PROTECTION_PROCESS_PATH=E:\Games\GTAV\GTA5.exe
 PROTECTION_RESTART_PROCESS_PATH=D:\Desktop\Grand Theft Auto V.url
