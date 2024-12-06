@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from traceback import TracebackException
 from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import Optional, Literal, Union, Type, Any
+from typing import TypedDict, Optional, Literal, Union, Type, Any
 from ipaddress import IPv4Address, AddressValueError
 from dataclasses import dataclass
 
@@ -537,7 +537,7 @@ class Settings(DefaultSettings):
                         need_rewrite_settings = True
                     else:
                         if isinstance(stdout_fields_to_hide, list) and all(isinstance(item, str) for item in stdout_fields_to_hide):
-                            filtered_stdout_fields_to_hide: list[Optional[str]] = []
+                            filtered_stdout_fields_to_hide: list[str] = []
 
                             for value in stdout_fields_to_hide:
                                 case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, Settings.stdout_hideable_fields)
@@ -749,12 +749,12 @@ class Interface:
     def __init__(self, name: str):
         self.name = name
 
-        self.ip_addresses     : list[Optional[str]]                       = []
-        self.mac_address      : Union[Literal["N/A"], str]                = "N/A"
-        self.organization_name: Union[Literal["N/A"], str]                = "N/A"
-        self.packets_sent     : Union[Literal["N/A"], int]                = "N/A"
-        self.packets_recv     : Union[Literal["N/A"], int]                = "N/A"
-        self.arp_infos        : dict[str, Optional[list[dict[str, str]]]] = {}
+        self.ip_addresses     : list[str]                       = []
+        self.mac_address      : Union[Literal["N/A"], str]      = "N/A"
+        self.organization_name: Union[Literal["N/A"], str]      = "N/A"
+        self.packets_sent     : Union[Literal["N/A"], int]      = "N/A"
+        self.packets_recv     : Union[Literal["N/A"], int]      = "N/A"
+        self.arp_infos        : dict[str, list[dict[str, str]]] = {}
 
         self.adapter_properties = Adapter_Properties()
 
@@ -790,6 +790,12 @@ class Interface:
             if interface.adapter_properties.InterfaceIndex == interface_index:
                 return interface
         return None
+
+class InterfaceOptionData(TypedDict):
+    is_arp: bool
+    interface: str
+    ip_address: Optional[str]
+    mac_address: Optional[str]
 
 class ThirdPartyServers(enum.Enum):
     PC_DISCORD = ["66.22.196.0/22", "66.22.200.0/21", "66.22.208.0/20", "66.22.224.0/20", "66.22.240.0/21", "66.22.248.0/24"]
@@ -838,7 +844,7 @@ class Player_Ports:
     def _initialize(self, port: int):
         self.list = [port]
         self.first = port
-        self.intermediate: list[Optional[int]] = []
+        self.intermediate: list[int] = []
         self.last = port
 
     def reset(self, port: int):
@@ -998,7 +1004,7 @@ class Player_UserIp:
     def _initialize(self):
         self.database_name: Optional[str] = None
         self.settings: Optional[UserIP_Settings] = None
-        self.usernames: list[Optional[str]] = []
+        self.usernames: list[str] = []
         self.detection = Player_Detection()
 
     def reset(self):
@@ -1006,7 +1012,7 @@ class Player_UserIp:
 
 class Player_ModMenus:
     def __init__(self):
-        self.usernames: list[Optional[str]] = []
+        self.usernames: list[str] = []
 
 class Player:
     def __init__(self, ip: str, port: int, packet_datetime: datetime):
@@ -1862,7 +1868,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.9 - 06/12/2024 (13:36)"
+VERSION = "v1.3.0 - 06/12/2024 (17:22)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
@@ -2213,7 +2219,7 @@ if Settings.CAPTURE_ARP:
         ):
             continue
 
-        arp_infos: list[Optional[dict[str, str]]] = [
+        arp_infos: list[dict[str, str]] = [
             {
                 "ip_address": entry["ip_address"],
                 "mac_address": format_mac_address(entry["mac_address"]),
@@ -2239,7 +2245,7 @@ table.align["IP Address"] = "l"
 table.align["MAC Address"] = "c"
 table.align["Manufacturer"] = "c"
 
-interfaces_options: dict[int, dict[str, Optional[str]]] = {}
+interfaces_options: dict[int, InterfaceOptionData] = {}
 counter = 0
 
 for i in Interface.all_interfaces:
@@ -2261,9 +2267,9 @@ for i in Interface.all_interfaces:
             counter += 1
             interfaces_options[counter] = {
                 "is_arp": False,
-                "Interface": i.name,
-                "IP Address": ip_address,
-                "MAC Address": i.mac_address
+                "interface": i.name,
+                "ip_address": ip_address,
+                "mac_address": i.mac_address
             }
 
             table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", i.name, i.packets_sent, i.packets_recv, ip_address, i.mac_address, manufacturer_or_organization_name])
@@ -2271,9 +2277,9 @@ for i in Interface.all_interfaces:
         counter += 1
         interfaces_options[counter] = {
             "is_arp": False,
-            "Interface": i.name,
-            "IP Address": "N/A",
-            "MAC Address": i.mac_address
+            "interface": i.name,
+            "ip_address": "N/A",
+            "mac_address": i.mac_address
         }
 
         table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", i.name, i.packets_sent, i.packets_recv, "N/A", i.mac_address, manufacturer_or_organization_name])
@@ -2288,9 +2294,9 @@ for i in Interface.all_interfaces:
                 counter += 1
                 interfaces_options[counter] = {
                     "is_arp": True,
-                    "Interface": i.name,
-                    "IP Address": arp_info["ip_address"],
-                    "MAC Address": arp_info["mac_address"]
+                    "interface": i.name,
+                    "ip_address": arp_info["ip_address"],
+                    "mac_address": arp_info["mac_address"]
                 }
 
                 table.add_row([f"{Fore.YELLOW}{counter}{Fore.RESET}", f"{i.name} (ARP)", "N/A", "N/A", arp_info["ip_address"], arp_info["mac_address"], arp_info["organization_name"]])
@@ -2306,11 +2312,12 @@ if (
     for interface_counter, interface_options in interfaces_options.items():
         priority = 0
 
-        if Settings.CAPTURE_INTERFACE_NAME == interface_options["Interface"]:
+        if Settings.CAPTURE_INTERFACE_NAME is not None:
+            if Settings.CAPTURE_INTERFACE_NAME == interface_options["interface"]:
+                priority += 1
+        if Settings.CAPTURE_MAC_ADDRESS == interface_options["mac_address"]:
             priority += 1
-        if Settings.CAPTURE_MAC_ADDRESS == interface_options["MAC Address"]:
-            priority += 1
-        if Settings.CAPTURE_IP_ADDRESS == interface_options["IP Address"]:
+        if Settings.CAPTURE_IP_ADDRESS == interface_options["ip_address"]:
             priority += 1
 
         if priority == max_priority: # If multiple matches on the same priority are found we search for the next bigger priority else we prompt the user.
@@ -2340,11 +2347,14 @@ cls()
 title(f"Initializing addresses and establishing connection to your PC / Console - {TITLE}")
 print(f"\nInitializing addresses and establishing connection to your PC / Console ...\n")
 need_rewrite_settings = False
-fixed__capture_mac_address = interfaces_options[user_interface_selection]["MAC Address"] if interfaces_options[user_interface_selection]["MAC Address"] != "N/A" else None
-fixed__capture_ip_address = interfaces_options[user_interface_selection]["IP Address"] if interfaces_options[user_interface_selection]["IP Address"] != "N/A" else None
+fixed__capture_mac_address = interfaces_options[user_interface_selection]["mac_address"] if interfaces_options[user_interface_selection]["mac_address"] != "N/A" else None
+fixed__capture_ip_address = interfaces_options[user_interface_selection]["ip_address"] if interfaces_options[user_interface_selection]["ip_address"] != "N/A" else None
 
-if not Settings.CAPTURE_INTERFACE_NAME == interfaces_options[user_interface_selection]["Interface"]:
-    Settings.CAPTURE_INTERFACE_NAME = interfaces_options[user_interface_selection]["Interface"]
+if Settings.CAPTURE_INTERFACE_NAME is None:
+    Settings.CAPTURE_INTERFACE_NAME = interfaces_options[user_interface_selection]["interface"]
+    need_rewrite_settings = True
+elif not Settings.CAPTURE_INTERFACE_NAME == interfaces_options[user_interface_selection]["interface"]:
+    Settings.CAPTURE_INTERFACE_NAME = interfaces_options[user_interface_selection]["interface"]
     need_rewrite_settings = True
 
 if not Settings.CAPTURE_MAC_ADDRESS == fixed__capture_mac_address:
@@ -2772,17 +2782,37 @@ def stdout_render_core():
 
             return padding_width
 
-        def format_network_interface_message():
-            """Generates a formatted message for the network interface being scanned."""
-            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-            padding_width = calculate_padding_width(
-                109, 44,
-                len(str(Settings.CAPTURE_INTERFACE_NAME)),
-                len(displayed_capture_ip_address),
-                len(str(is_arp_enabled))
-            )
-            return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+        def compile_header_text():
+            def format_network_interface_message():
+                """Generates a formatted message for the network interface being scanned."""
+                # NOTE: Fixes VSCode type hinting being lost
+                if not isinstance(Settings.CAPTURE_INTERFACE_NAME, str):
+                    raise TypeError(f'Expected "str" object, got "{type(Settings.CAPTURE_INTERFACE_NAME)}"')
+
+                is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+                displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+                padding_width = calculate_padding_width(109, 44,
+                    len(Settings.CAPTURE_INTERFACE_NAME),
+                    len(displayed_capture_ip_address),
+                    len(is_arp_enabled)
+                )
+                return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+
+            header = [""]
+            if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
+                header.append("-" * 109)
+                header.append(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
+                header.append("  * https://github.com/BUZZARDGTA")
+                header.append("")
+                header.append(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
+                header.append("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
+                header.append("")
+            header.append(f"-" * 109)
+            header.append(f"                         Welcome in {TITLE} {VERSION}")
+            header.append(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
+            header.append(f"-   " * 28)
+            header.append(format_network_interface_message())
+            return "\n".join(header)
 
         def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
             updated_field_names = [
@@ -3327,7 +3357,7 @@ def stdout_render_core():
         SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
         FIELDS_TO_HIDE_IN_STDOUT = set(Settings.STDOUT_FIELDS_TO_HIDE)
-        STDOUT__SCANNING_ON_NETWORK_INTERFACE = format_network_interface_message()
+        HEADER_TEXT = compile_header_text()
         STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
             for field_name in [
@@ -3568,27 +3598,17 @@ def stdout_render_core():
             else:
                 pps_color = Fore.GREEN
 
-            printer.cache_print("")
-
-            if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
-                printer.cache_print("-" * 109)
-                printer.cache_print(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-                printer.cache_print("  * https://github.com/BUZZARDGTA")
-                printer.cache_print("")
-                printer.cache_print(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-                printer.cache_print("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
-                printer.cache_print("")
-
-            printer.cache_print(f"-" * 109)
-            printer.cache_print(f"                         Welcome in {TITLE} {VERSION}")
-            printer.cache_print(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-            printer.cache_print(f"-   " * 28)
-            printer.cache_print(STDOUT__SCANNING_ON_NETWORK_INTERFACE)
+            printer.cache_print(HEADER_TEXT)
 
             color_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
             num_of_userip_files = len(UserIP_Databases.userip_databases)
-            padding_width = calculate_padding_width(109, 75, len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)))
-            printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}")
+            if Settings.DISCORD_PRESENCE:
+                rpc_message = f" RPC: {Fore.GREEN}Connected{Fore.RESET}" if discord_rpc_manager.is_connected else f" RPC: {Fore.YELLOW}Waiting for Discord{Fore.RESET}"
+            else:
+                rpc_message = ""
+
+            padding_width = calculate_padding_width(109, 75, len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)), len(ANSI_ESCAPE.sub("", (rpc_message))))
+            printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}")
             if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
                 padding_width = calculate_padding_width(109, 35, len(str(plural(number_of_ip_invalid_in_userip_files))), len(str(plural(num_of_userip_files))), len(str(number_of_ip_invalid_in_userip_files)))
                 printer.cache_print(f"{' ' * padding_width}Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}")
