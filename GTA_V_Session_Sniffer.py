@@ -1862,7 +1862,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "GTA V Session Sniffer"
-VERSION = "v1.2.8 - 05/12/2024 (15:56)"
+VERSION = "v1.2.9 - 06/12/2024 (13:36)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
@@ -3375,26 +3375,9 @@ def stdout_render_core():
             from Modules.consts import ANSI_ESCAPE
 
         if Settings.DISCORD_PRESENCE:
-            from pypresence import Presence
+            from Modules.discord.rpc import DiscordRPCManager
 
-            DISCORD_PRESENCE_CLIENT_ID = 1313304495958261781
-
-            discord_rpc = Presence(DISCORD_PRESENCE_CLIENT_ID)
-            discord_rpc_last_update_time = None
-            discord_rpc_start_time = int(time.time())
-
-
-            discord_rpc.connect()
-            discord_rpc.update(
-                details = "Sniffin' my babies IPs.",
-                start = discord_rpc_start_time,
-                buttons = [
-                    {
-                        "label": "GitHub Repo",
-                        "url": "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer"
-                    }
-                ]
-            )
+            discord_rpc_manager = DiscordRPCManager()
 
         modmenu__plugins__ip_to_usernames: dict[str, list[str]] = {}
         # NOTE: The log file content is read only once because the plugin is no longer supported.
@@ -3881,24 +3864,8 @@ def stdout_render_core():
             printer.flush_cache()
 
             if Settings.DISCORD_PRESENCE:
-                if discord_rpc_last_update_time is None or time.perf_counter() - discord_rpc_last_update_time >= 3.0:
-                    discord_rpc_last_update_time = time.perf_counter()
-
-                    discord_rpc.update(
-                        state = f"{len(session_connected)} player{plural(len(session_connected))} connected in the session.",
-                        details = "Sniffin' my babies IPs.",
-                        start = discord_rpc_start_time,
-                        #large_image="image_name",  # Name of the uploaded image in Discord app assets
-                        #large_text="Hover text for large image",  # Tooltip for the large image
-                        #small_image="image_name_small",  # Optional small image
-                        #small_text="Hover text for small image",  # Tooltip for the small image
-                        buttons = [
-                            {
-                                "label": "GitHub Repo",
-                                "url": "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer"
-                            }
-                        ]
-                    )
+                if discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0:
+                    discord_rpc_manager.update(f"{len(session_connected)} player{plural(len(session_connected))} connected in the session.")
 
             og_process_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
 
