@@ -19,3 +19,6 @@ RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>
 RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
 WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaabc9099c)."
 WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
+HEADER_TEXT_MAX_LENGTH = 99
+HEADER_TEXT_SEPARATOR = "-" * HEADER_TEXT_MAX_LENGTH
+HEADER_TEXT_MIDDLE_SEPARATOR = "-   " * 25

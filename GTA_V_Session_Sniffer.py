@@ -396,7 +396,7 @@ class Settings(DefaultSettings):
         print("\nCorrect reconstruction of \"Settings.ini\" ...")
         text = textwrap.dedent(f"""
             ;;-----------------------------------------------------------------------------
-            ;; GTA V Session Sniffer Configuration Settings
+            ;; Session Sniffer Configuration Settings
             ;;-----------------------------------------------------------------------------
             ;; Lines starting with \";\" or \"#\" symbols are commented lines.
             ;;
@@ -1867,7 +1867,7 @@ else:
     SCRIPT_DIR = Path(__file__).resolve().parent
 os.chdir(SCRIPT_DIR)
 
-TITLE = "GTA V Session Sniffer"
+TITLE = "Session Sniffer"
 VERSION = "v1.3.0 - 06/12/2024 (17:22)"
 SETTINGS_PATH = Path("Settings.ini")
 
@@ -2763,54 +2763,61 @@ tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 def stdout_render_core():
     with Threads_ExceptionHandler():
-        def calculate_padding_width(total_width: int, *lengths: int):
-            """
-            Calculate the padding width based on the total width and the lengths of provided strings.
+        from Modules.consts import ANSI_ESCAPE, HEADER_TEXT_SEPARATOR
 
-            Args:
-                total_width: Total width available for padding
-                *lengths: Integrers for which lengths are used to calculate padding width
+        def print_in_header(text: str):
+            from Modules.consts import HEADER_TEXT_MAX_LENGTH
 
-            Returns:
-                padding_width: Calculated padding width
-            """
-            # Calculate the total length of all strings
-            total_length = sum(length for length in lengths)
+            def calculate_padding_width(total_width: int, *lengths: int):
+                """
+                Calculate the padding width based on the total width and the lengths of provided strings.
 
-            # Calculate the padding width
-            padding_width = max(0, (total_width - total_length) // 2)
+                Args:
+                    total_width: Total width available for padding
+                    *lengths: Integrers for which lengths are used to calculate padding width
 
-            return padding_width
+                Returns:
+                    padding_width: Calculated padding width
+                """
+                # Calculate the total length of all strings
+                total_length = sum(length for length in lengths)
+
+                # Calculate the padding width
+                padding_width = max(0, (total_width - total_length) // 2)
+
+                return padding_width
+
+            padding_width = calculate_padding_width(HEADER_TEXT_MAX_LENGTH, len(ANSI_ESCAPE.sub("", text)))
+            return f"{' ' * padding_width}{text}"
 
         def compile_header_text():
             def format_network_interface_message():
                 """Generates a formatted message for the network interface being scanned."""
+
                 # NOTE: Fixes VSCode type hinting being lost
                 if not isinstance(Settings.CAPTURE_INTERFACE_NAME, str):
                     raise TypeError(f'Expected "str" object, got "{type(Settings.CAPTURE_INTERFACE_NAME)}"')
 
                 is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
                 displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-                padding_width = calculate_padding_width(109, 44,
-                    len(Settings.CAPTURE_INTERFACE_NAME),
-                    len(displayed_capture_ip_address),
-                    len(is_arp_enabled)
-                )
-                return f"{' ' * padding_width}Scanning on network interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})"
+
+                return print_in_header(f"Scanning on interface:{Fore.YELLOW}{Settings.CAPTURE_INTERFACE_NAME}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
+
+            from Modules.consts import HEADER_TEXT_MIDDLE_SEPARATOR
 
             header = [""]
             if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
-                header.append("-" * 109)
+                header.append(HEADER_TEXT_SEPARATOR)
                 header.append(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
                 header.append("  * https://github.com/BUZZARDGTA")
                 header.append("")
                 header.append(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
                 header.append("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
                 header.append("")
-            header.append(f"-" * 109)
-            header.append(f"                         Welcome in {TITLE} {VERSION}")
-            header.append(f"                   This script aims in getting people's address IP from GTA V, WITHOUT MODS.")
-            header.append(f"-   " * 28)
+            header.append(HEADER_TEXT_SEPARATOR)
+            header.append(print_in_header(f"Welcome in {TITLE} {VERSION}"))
+            header.append(print_in_header("The best FREE and Open-Source packet sniffer aka IP grabber, works WITHOUT MODS."))
+            header.append(HEADER_TEXT_MIDDLE_SEPARATOR)
             header.append(format_network_interface_message())
             return "\n".join(header)
 
@@ -3115,7 +3122,7 @@ def stdout_render_core():
 
             DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
                 ;;-----------------------------------------------------------------------------
-                ;; GTA V Session Sniffer User IP default database file
+                ;; Session Sniffer User IP default database file
                 ;;-----------------------------------------------------------------------------
                 ;; Lines starting with \";\" or \"#\" symbols are commented lines.
                 ;;
@@ -3401,9 +3408,6 @@ def stdout_render_core():
         last_userip_parse_time = None
         last_mod_menus_logs_parse_time = None
 
-        if Settings.STDOUT_SESSIONS_LOGGING:
-            from Modules.consts import ANSI_ESCAPE
-
         if Settings.DISCORD_PRESENCE:
             from Modules.discord.rpc import DiscordRPCManager
 
@@ -3607,18 +3611,14 @@ def stdout_render_core():
             else:
                 rpc_message = ""
 
-            padding_width = calculate_padding_width(109, 75, len(str(avg_latency_rounded)), len(str(Settings.CAPTURE_OVERFLOW_TIMER)), len(str(plural(tshark_restarted_times))), len(str(tshark_restarted_times)), len(str(global_pps_rate)), len(ANSI_ESCAPE.sub("", (rpc_message))))
-            printer.cache_print(f"{' ' * padding_width}Captured packets average latency per second:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restarted time{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}")
+            printer.cache_print(print_in_header(f"Packets latency per sec:{latency_color}{avg_latency_rounded}{Fore.RESET}/{latency_color}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restart{plural(tshark_restarted_times)}:{color_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}"))
             if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
-                padding_width = calculate_padding_width(109, 35, len(str(plural(number_of_ip_invalid_in_userip_files))), len(str(plural(num_of_userip_files))), len(str(number_of_ip_invalid_in_userip_files)))
-                printer.cache_print(f"{' ' * padding_width}Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}")
+                printer.cache_print(print_in_header(f"Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}"))
             if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_ip_conflicts):
-                padding_width = calculate_padding_width(109, 39, len(str(plural(number_of_conflicting_ip_in_userip_files))), len(str(plural(num_of_userip_files))), len(str(number_of_conflicting_ip_in_userip_files)))
-                printer.cache_print(f"{' ' * padding_width}Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}")
+                printer.cache_print(print_in_header(f"Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}"))
             if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_corrupted):
-                padding_width = calculate_padding_width(109, 47, len(str(plural(number_of_corrupted_userip_settings_files))), len(str(plural(num_of_userip_files))), len(str(number_of_corrupted_userip_settings_files)))
-                printer.cache_print(f"{' ' * padding_width}Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}")
-            printer.cache_print(f"-" * 109)
+                printer.cache_print(print_in_header(f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}"))
+            printer.cache_print(HEADER_TEXT_SEPARATOR)
 
             stdout_connected_players_table = PrettyTable()
             stdout_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
