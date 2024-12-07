@@ -328,8 +328,6 @@ class DefaultSettings:
     DISCORD_PRESENCE = True
 
 class Settings(DefaultSettings):
-    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
-
     stdout_fields_mapping = {
         "First Seen": "datetime.first_seen",
         "Last Rejoin": "datetime.last_rejoin",
@@ -364,6 +362,10 @@ class Settings(DefaultSettings):
         "VPN": "iplookup.ipapi.compiled.proxy",
         "Hosting": "iplookup.ipapi.compiled.hosting"
     }
+    stdout_forced_fields = ["First Seen", "Last Rejoin", "Last Seen", "Usernames", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address"]
+    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
+    stdout_all_connected_fields = [field for field in stdout_forced_fields if field != "Last Seen"] + stdout_hideable_fields
+    stdout_all_disconnected_fields = [field for field in stdout_forced_fields if field != "PPS"] + stdout_hideable_fields
 
     @classmethod
     def iterate_over_settings(cls):
@@ -373,7 +375,7 @@ class Settings(DefaultSettings):
             if (
                 callable(attr_value)
                 or attr_name.startswith("_")
-                or attr_name in ["stdout_hideable_fields", "stdout_fields_mapping"]
+                or attr_name in ["stdout_fields_mapping", "stdout_forced_fields", "stdout_hideable_fields", "stdout_all_connected_fields", "stdout_all_disconnected_fields"]
                 or not attr_name.isupper()
                 or not isinstance(attr_value, _allowed_settings_types)
             ):
@@ -532,8 +534,8 @@ class Settings(DefaultSettings):
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELDS_TO_HIDE":
                     try:
-                        stdout_fields_to_hide = ast.literal_eval(setting_value)
-                    except ValueError:
+                        stdout_fields_to_hide: list[str] = ast.literal_eval(setting_value)
+                    except (ValueError, SyntaxError):
                         need_rewrite_settings = True
                     else:
                         if isinstance(stdout_fields_to_hide, list) and all(isinstance(item, str) for item in stdout_fields_to_hide):
@@ -577,7 +579,7 @@ class Settings(DefaultSettings):
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY":
-                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_fields_mapping.keys())
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_all_connected_fields)
                     if case_insensitive_match:
                         Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = normalized_match
                         if not case_sensitive_match:
@@ -585,7 +587,7 @@ class Settings(DefaultSettings):
                     else:
                         need_rewrite_settings = True
                 elif setting_name == "STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY":
-                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_fields_mapping.keys())
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_all_disconnected_fields)
                     if case_insensitive_match:
                         Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = normalized_match
                         if not case_sensitive_match:
@@ -1313,13 +1315,13 @@ def title(title: str):
 def cls():
     print("\033c", end="")
 
-def take(n: int, iterable: list[Any]):
-    """Return first n items of the iterable as a list."""
-    return iterable[:n]
+def take(n: int, input_list: list[Any]):
+    """Return first n items from the given input list."""
+    return input_list[:n]
 
-def tail(n: int, iterable: list[Any]):
-    """Return last n items of the iterable as a list."""
-    return iterable[-n:]
+def tail(n: int, input_list: list[Any]):
+    """Return last n items from the given input list."""
+    return input_list[-n:]
 
 def concat_lists_no_duplicates(*lists: list[Any]):
     """
@@ -1787,11 +1789,9 @@ def terminate_process_tree(pid: int = None):
 
 def check_case_insensitive_and_exact_match(input_value: str, custom_values_list: list[str]):
     """
-    Checks if the input value matches any string in the list case-insensitively,
-    and whether it also matches exactly (case-sensitive).
+    Checks if the input value matches any string in the list case-insensitively, and whether it also matches exactly (case-sensitive).
 
-    It also returns the correctly capitalized version of the matched value from the list
-    if a case-insensitive match is found.
+    It also returns the correctly capitalized version of the matched value from the list if a case-insensitive match is found.
 
     Returns a tuple of three values:
     - The first boolean is True if a case-insensitive match is found.
@@ -1868,7 +1868,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "Session Sniffer"
-VERSION = "v1.3.0 - 06/12/2024 (17:22)"
+VERSION = "v1.3.0 - 07/12/2024 (13:39)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
@@ -3367,40 +3367,24 @@ def stdout_render_core():
         HEADER_TEXT = compile_header_text()
         STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
-            for field_name in [
-                field_name
-                for field_name in Settings.stdout_fields_mapping.keys()
-                if not field_name == "Last Seen"
-            ]
-            if field_name not in FIELDS_TO_HIDE_IN_STDOUT and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ], Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
-        STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES  = add_down_arrow_char_to_sorted_table_field([
+            for field_name in Settings.stdout_all_connected_fields
+            if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_STDOUT
+        ], SESSION_CONNECTED_SORTED_KEY)
+        STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
-            for field_name in [
-                field_name
-                for field_name in Settings.stdout_fields_mapping.keys()
-                if not field_name == "PPS"
-            ]
-            if field_name not in FIELDS_TO_HIDE_IN_STDOUT and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ], Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
-        LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES    = add_down_arrow_char_to_sorted_table_field([
+            for field_name in Settings.stdout_all_disconnected_fields
+            if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_STDOUT
+        ], SESSION_DISCONNECTED_SORTED_KEY)
+        LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
-            for field_name in [
-                field_name
-                for field_name in Settings.stdout_fields_mapping.keys()
-                if not field_name == "Last Seen"
-            ]
-            if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ], Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+            for field_name in Settings.stdout_all_connected_fields
+            if (Settings.USERIP_ENABLED or field_name != "Usernames")
+        ], SESSION_CONNECTED_SORTED_KEY)
         LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES = add_down_arrow_char_to_sorted_table_field([
             field_name
-            for field_name in [
-                field_name
-                for field_name in Settings.stdout_fields_mapping.keys()
-                if not field_name == "PPS"
-            ]
-            if field_name and (Settings.USERIP_ENABLED or field_name != "Usernames")
-        ], Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+            for field_name in Settings.stdout_all_disconnected_fields
+            if (Settings.USERIP_ENABLED or field_name != "Usernames")
+        ], SESSION_DISCONNECTED_SORTED_KEY)
 
         printer = PrintCacher()
         global_pps_t1 = time.perf_counter()
