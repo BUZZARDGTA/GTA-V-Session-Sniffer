@@ -22,3 +22,4 @@ WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 HEADER_TEXT_MAX_LENGTH = 99
 HEADER_TEXT_SEPARATOR = "-" * HEADER_TEXT_MAX_LENGTH
 HEADER_TEXT_MIDDLE_SEPARATOR = "-   " * 25
+GITHUB_RELEASE_API__GEOLITE2 = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"

@@ -737,6 +737,57 @@ class Settings(DefaultSettings):
         if need_rewrite_settings:
             Settings.reconstruct_settings()
 
+        for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
+            for sort_field_name, sort_field_value, default_sort_value in [
+                ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+                ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+            ]:
+                if field_name in sort_field_value:
+                    need_rewrite_settings = True
+
+                    msgbox_title = TITLE
+                    msgbox_message = textwrap.dedent(f"""
+                        ERROR in your custom \"Settings.ini\" file:
+
+                        You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
+
+                        Would you like to replace:
+                        {sort_field_name}={sort_field_value}
+                        with its default value:
+                        {sort_field_name}={default_sort_value}
+                    """.removeprefix("\n").removesuffix("\n"))
+                    msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+                    errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+
+                    if errorlevel != MsgBox.ReturnValues.IDYES:
+                        terminate_script("EXIT")
+
+                    setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name)) # Replace the incorrect field with its default value
+                    Settings.reconstruct_settings()
+
+        if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED is False:
+            msgbox_title = TITLE
+            msgbox_message = textwrap.dedent(f"""
+                ERROR in your custom \"Settings.ini\" file:
+
+                At least one of these settings must be set to \"True\" value:
+                <STDOUT_DATE_FIELDS_SHOW_DATE>
+                <STDOUT_DATE_FIELDS_SHOW_TIME>
+                <STDOUT_DATE_FIELDS_SHOW_ELAPSED>
+
+                Would you like to apply their default values and continue?
+            """.removeprefix("\n").removesuffix("\n"))
+            msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
+
+            if errorlevel != MsgBox.ReturnValues.IDYES:
+                terminate_script("EXIT")
+
+            for setting_name in ["STDOUT_DATE_FIELDS_SHOW_DATE", "STDOUT_DATE_FIELDS_SHOW_TIME", "STDOUT_DATE_FIELDS_SHOW_ELAPSED"]:
+                setattr(Settings, setting_name, getattr(DefaultSettings, setting_name))
+
+            Settings.reconstruct_settings()
+
 class Adapter_Properties:
     def __init__(self,
         interface_index = "N/A",
@@ -1549,21 +1600,10 @@ def show_error__tshark_not_detected():
 
     return MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
 
-def safe_print(*args, **kwargs):
-    """
-    Print the provided arguments if the script has not crashed.
-
-    Args:
-        *args: The values to be printed.
-        **kwargs: Additional keyword arguments to pass to the built-in print function.
-    """
-    if ScriptControl.has_crashed():
-        return
-
-    print(*args, **kwargs)
-
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
+        from Modules.consts import GITHUB_RELEASE_API__GEOLITE2
+
         geolite2_version_file_path = geolite2_databases_folder_path / "version.json"
         geolite2_databases: dict[str, dict[str, None | str]] = {
             f"GeoLite2-{db}.mmdb": {
@@ -1588,19 +1628,18 @@ def update_and_initialize_geolite2_readers():
                     if database_name in geolite2_databases:
                         geolite2_databases[database_name]["current_version"] = database_info.get("version", None)
 
-        github_release_api__geolite2 = "https://api.github.com/repos/PrxyHunter/GeoLite2/releases/latest"
         try:
-            response = s.get(github_release_api__geolite2)
+            response = s.get(GITHUB_RELEASE_API__GEOLITE2)
         except Exception as e:
             return {
                 "exception": e,
-                "url": github_release_api__geolite2,
+                "url": GITHUB_RELEASE_API__GEOLITE2,
                 "http_code": None
             }
         if response.status_code != 200:
             return {
                 "exception": None,
-                "url": github_release_api__geolite2,
+                "url": GITHUB_RELEASE_API__GEOLITE2,
                 "http_code": response.status_code
             }
 
@@ -1608,12 +1647,10 @@ def update_and_initialize_geolite2_readers():
         for asset in release_data["assets"]:
             asset_name = asset["name"]
             if asset_name in geolite2_databases:
-                geolite2_databases[asset_name].update(
-                    {
-                        "last_version": asset["updated_at"],
-                        "download_url": asset["browser_download_url"]
-                    }
-                )
+                geolite2_databases[asset_name].update({
+                    "last_version": asset["updated_at"],
+                    "download_url": asset["browser_download_url"]
+                })
 
         for database_name, database_info in geolite2_databases.items():
             if not database_info["current_version"] == database_info["last_version"]:
@@ -1639,12 +1676,10 @@ def update_and_initialize_geolite2_readers():
                 geolite2_databases[database_name]["current_version"] = database_info["last_version"]
 
         with geolite2_version_file_path.open("w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    name: {"version": info["current_version"]}
-                    for name, info in geolite2_databases.items()
-                }, f, indent=4
-            )
+            json.dump({
+                name: {"version": info["current_version"]}
+                for name, info in geolite2_databases.items()
+            }, f, indent=4)
 
         return {
             "exception": None,
@@ -1993,61 +2028,6 @@ cls()
 title(f"Applying your custom settings from \"Settings.ini\" - {TITLE}")
 print("\nApplying your custom settings from \"Settings.ini\" ...\n")
 Settings.load_from_settings_file(SETTINGS_PATH)
-
-cls()
-title(f"Checking your custom settings from \"Settings.ini\" - {TITLE}")
-print("\nChecking your custom settings from \"Settings.ini\" ...\n")
-for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
-    for sort_field_name, sort_field_value, default_sort_value in [
-        ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-        ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
-    ]:
-        if field_name in sort_field_value:
-            msgbox_title = TITLE
-            msgbox_message = textwrap.dedent(f"""
-                ERROR in your custom \"Settings.ini\" file:
-
-                You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
-
-                Would you like to replace:
-                {sort_field_name}={sort_field_value}
-                with its default value:
-                {sort_field_name}={default_sort_value}
-            """.removeprefix("\n").removesuffix("\n"))
-            msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
-            errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
-
-            if errorlevel != MsgBox.ReturnValues.IDYES:
-                terminate_script("EXIT")
-
-            setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name)) # Replace the incorrect field with its default value
-
-            Settings.reconstruct_settings()
-
-if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED is False:
-    msgbox_title = TITLE
-    msgbox_message = textwrap.dedent(f"""
-        ERROR in your custom \"Settings.ini\" file:
-
-        At least one of these settings must be set to \"True\" value:
-        <STDOUT_DATE_FIELDS_SHOW_DATE>
-        <STDOUT_DATE_FIELDS_SHOW_TIME>
-        <STDOUT_DATE_FIELDS_SHOW_ELAPSED>
-
-        Would you like to apply their default values and continue?
-    """.removeprefix("\n").removesuffix("\n"))
-    msgbox_style = MsgBox.Style.YesNo | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
-    errorlevel = MsgBox.show(msgbox_title, msgbox_message, msgbox_style)
-
-    if errorlevel != MsgBox.ReturnValues.IDYES:
-        terminate_script("EXIT")
-
-    for setting_name in ["STDOUT_DATE_FIELDS_SHOW_DATE", "STDOUT_DATE_FIELDS_SHOW_TIME", "STDOUT_DATE_FIELDS_SHOW_ELAPSED"]:
-        # Replace the incorrect field with its default value
-        setattr(Settings, setting_name, getattr(DefaultSettings, setting_name))
-
-        # Reconstruct the settings after applying changes
-        Settings.reconstruct_settings()
 
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
@@ -3356,6 +3336,19 @@ def stdout_render_core():
                 return ", ".join(map(str, player_ports.intermediate))
             else:
                 return ""
+
+        def safe_print(*args, **kwargs):
+            """
+            Print the provided arguments if the script has not crashed.
+
+            Args:
+                *args: The values to be printed.
+                **kwargs: Additional keyword arguments to pass to the built-in print function.
+            """
+            if ScriptControl.has_crashed():
+                return
+
+            print(*args, **kwargs)
 
         from Modules.consts import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
 
