@@ -1903,7 +1903,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "Session Sniffer"
-VERSION = "v1.3.0 - 07/12/2024 (13:39)"
+VERSION = "v1.3.0 - 09/12/2024 (16:33)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
@@ -2361,9 +2361,9 @@ capture_filter.append("not (portrange 0-1023 or port 5353)")
 
 if Settings.CAPTURE_PROGRAM_PRESET:
     if Settings.CAPTURE_PROGRAM_PRESET == "GTA5":
-        display_filter.append("(frame.len>=71 and frame.len<=1032)")
+        capture_filter.append("(len >= 71 and len <= 1032)")
     elif Settings.CAPTURE_PROGRAM_PRESET == "Minecraft":
-        display_filter.append("(frame.len>=49 and frame.len<=1498)")
+        capture_filter.append("(len >= 49 and len <= 1498)")
 
     # If the <CAPTURE_PROGRAM_PRESET> setting is set, automatically blocks RTCP connections.
     # In case RTCP can be useful to get someone IP, I decided not to block them without using a <CAPTURE_PROGRAM_PRESET>.
