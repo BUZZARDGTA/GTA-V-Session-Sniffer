@@ -424,19 +424,6 @@ username3=255.255.255.255
   To do so, visit this address: https://socialclub.rockstargames.com/member/Player_Username/ and replace 'Player_Username' with their actual username.
 - If you're playing on PC and want to obtain someone's IP address, if they are indexed on this website, you can try using [gtaresolver.com](https://gtaresolver.com/) website to resolve someone's IP address from their in-game username.
 
-## Contact Support
-
-If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
-
-- [GitHub Issues](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues)
-- [GitHub Discussions](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/discussions)
-
-You can also contact me privately via:
-
-- Email: BUZZARDGTA@protonmail.com
-- Discord: waitingforharukatoaddme
-- Telegram: [@waitingforharukatoaddme](https://t.me/waitingforharukatoaddme)
-
 ## Requirements
 
 - [Windows](https://www.microsoft.com/windows) 10 or 11 (x86/x64)
@@ -455,3 +442,15 @@ You can also contact me privately via:
   - The ability to hide the date or time, allowing users to display only the elapsed time, date, time, or any combination of these fields, depending on their preference.
   - Support for displaying any IP lookup fields in the console output and logs.
 
+## Contact Support
+
+If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
+
+- [GitHub Issues](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues)
+- [GitHub Discussions](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/discussions)
+
+You can also contact me privately via:
+
+- Email: BUZZARDGTA@protonmail.com
+- Discord: waitingforharukatoaddme
+- Telegram: [@waitingforharukatoaddme](https://t.me/waitingforharukatoaddme)
