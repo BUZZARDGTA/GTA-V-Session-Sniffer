@@ -447,8 +447,8 @@ You can also contact me privately via:
 
 - [Windows](https://www.microsoft.com/windows) 10 or 11 (x86/x64)
 - [Wireshark](https://www.wireshark.org/) v4.2.9
-- _optional:_ [MaxMind GeoLite2](https://www.maxmind.com/)
 - [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
+- _optional:_ [MaxMind GeoLite2](https://www.maxmind.com/)
 
 ## Credits
 
