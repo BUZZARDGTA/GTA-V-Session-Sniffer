@@ -2,7 +2,7 @@
 
 ## Scanner is stuck
 
-When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ..."`, it typically indicates one of the following situations:
+When the scanner is stuck at `"Scanning IPs, refreshing display in x second ..."`, it typically indicates one of the following situations:
 
 - You are not currently in an online session with at least one other player.
 - The configuration for the script may not be set up correctly.  
