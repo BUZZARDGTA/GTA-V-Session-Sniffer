@@ -6,7 +6,7 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ...
 
 - You are not currently in an online session with a minimum of 2 players.<br>
 - The configuration for the script may not be set up correctly.<br>
-  Please refer to [Editing Settings](SCRIPT_CONFIGURATION.md) for detailed instructions.
+  Please refer to [Script Settings Configuration](SCRIPT_CONFIGURATION.md#script-settings-configuration) for detailed instructions.
 
 ## Some players are undetected
 
