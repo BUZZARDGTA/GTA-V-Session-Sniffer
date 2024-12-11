@@ -10,7 +10,6 @@ import time
 import enum
 import errno
 import signal
-import winreg
 import logging
 import textwrap
 import winsound
