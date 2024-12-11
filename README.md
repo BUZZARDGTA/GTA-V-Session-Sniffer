@@ -57,6 +57,9 @@ You can, however, manually assign a username to each IP using UserIP database fi
 
 For more details, check out the [Credits and Contributors](docs/CREDITS_and_CONTRIBUTORS.md).
 
+## Script Configuration
+For more details, check out the [Credits and Contributors](docs/CONFIGURATION.md).
+
 ## Contact Support
 
 If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
