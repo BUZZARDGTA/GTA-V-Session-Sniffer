@@ -9,7 +9,7 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ...
   Please refer to [Script Settings Configuration](SCRIPT_CONFIGURATION.md#script-settings-configuration) for detailed instructions.
 - As mentioned just below in [Some players are undetected](#some-players-are-undetected), any of the following may be causing the issue:
   - You may be using the "Force Relay Connection" feature in your mod menu (generally within the "Protections" menu).
-  - P2P networking might be blocked by your firewall, VPN, or even ISP.
+  - P2P traffic might be blocked by your firewall, VPN, or even ISP.
 
 ## Some players are undetected
 
