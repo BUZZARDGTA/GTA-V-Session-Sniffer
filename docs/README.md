@@ -28,12 +28,4 @@ Encountered a problem? We've got you covered:
 
 ---
 
-## 👥 Credits & Contributors
-
-Meet the amazing people behind this project:  
-- **[Credits & Contributors](CREDITS_and_CONTRIBUTORS.md)**  
-  Acknowledgments, thanks, and contributions from the community.
-
----
-
 If you're looking for anything else or need support, don't hesitate to reach out! Head back to the [main README](../README.md) for contact details and more.
