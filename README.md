@@ -53,6 +53,10 @@ You can, however, manually assign a username to each IP using UserIP database fi
 - [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
 - _optional:_ [MaxMind GeoLite2](https://www.maxmind.com/)
 
+## Credits and Contributors
+
+For more details, check out the [Credits and Contributors](docs/CREDITS_and_CONTRIBUTORS.md).
+
 ## Contact Support
 
 If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
