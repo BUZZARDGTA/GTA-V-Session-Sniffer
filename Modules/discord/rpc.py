@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 from pypresence import Presence
-from pypresence.exceptions import DiscordNotFound, PipeClosed
+from pypresence.exceptions import DiscordNotFound, PipeClosed, ResponseTimeout
 
 DISCORD_PRESENCE_CLIENT_ID = 1313304495958261781
 DISCORD_RPC_TITLE = "Sniffin' my babies IPs."
@@ -25,11 +25,13 @@ class DiscordRPCManager:
         """Attempts to connect to Discord RPC."""
         if self.is_connected:
             return True
+
         try:
             self.discord_rpc.connect()
             self.is_connected = True
         except DiscordNotFound:
             self.is_connected = False
+
         return self.is_connected
 
     def update(self, state_message: Optional[str] = None):
@@ -56,7 +58,7 @@ class DiscordRPCManager:
                 #small_text = "Hover text for small image",  # Tooltip for the small image
                 buttons = DISCORD_RPC_BUTTONS
             )
-        except PipeClosed:
+        except (PipeClosed, ResponseTimeout):
             self.is_connected = False
             self.start_time = None
 
