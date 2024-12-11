@@ -1,5 +1,12 @@
 ## Configuration
 
+Before proceeding, ensure you are using Windows 10 or above.
+
+Additionally, make sure you have [Wireshark](https://www.wireshark.org/) (v4.2.9) installed on your system.
+
+Furthermore, for packet sniffing functionality, you'll require either [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/).<br>
+It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npcap/) is already included by default within the [Wireshark](https://www.wireshark.org/) installation.
+
 #### Editing Settings
 
 #### Example Settings file:
