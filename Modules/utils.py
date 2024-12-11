@@ -19,7 +19,7 @@ def get_documents_folder(use_alternative_method = False):
 
     if use_alternative_method:
         # Alternative method using SHGetKnownFolderPath from WinAPI
-        from win32com.shell import shell, shellcon
+        from win32com.shell import shell, shellcon # type:ignore # Seems like we can also use `win32comext.shell`
 
         # Get the Documents folder path
         documents_path = shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents, 0)
