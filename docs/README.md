@@ -7,7 +7,7 @@ Welcome to the complete documentation for **Session Sniffer**. This guide is des
 ## ⚙️ Configuration Guide
 
 Customize the script to suit your needs:  
-- **[Script Configuration](docs/SCRIPT_CONFIGURATION.md)**  
+- **[Script Configuration](SCRIPT_CONFIGURATION.md)**  
   Learn about available settings, configuration files, and how to enable advanced features.
 
 ---
@@ -15,7 +15,7 @@ Customize the script to suit your needs:
 ## 💡 Tips and Tricks
 
 Unlock the full potential of **Session Sniffer** with our expert tips:  
-- **[Tips and Tricks](docs/TIPS_and_TRICKS.md)**  
+- **[Tips and Tricks](TIPS_and_TRICKS.md)**  
   Learn about optimization strategies, hidden features, and best practices.
 
 ---
@@ -23,7 +23,7 @@ Unlock the full potential of **Session Sniffer** with our expert tips:
 ## 🚑 Troubleshooting
 
 Encountered a problem? We've got you covered:  
-- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**  
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)**  
   Detailed solutions for common issues and errors.
 
 ---
@@ -31,7 +31,7 @@ Encountered a problem? We've got you covered:
 ## 👥 Credits & Contributors
 
 Meet the amazing people behind this project:  
-- **[Credits & Contributors](docs/CREDITS_and_CONTRIBUTORS.md)**  
+- **[Credits & Contributors](CREDITS_and_CONTRIBUTORS.md)**  
   Acknowledgments, thanks, and contributions from the community.
 
 ---
