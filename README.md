@@ -17,16 +17,14 @@
 
 ---
 
-## Advantages
+### Key Features
 
-- Unlike other similar software, it is completely **FREE TO USE** and **OPEN SOURCE**.
-- Works without requiring a modded video game or cracked program.
-- Includes a configuration file for advanced customization.
-- Includes a setting to scan for game server(s).
-- Includes a setting to fully save sessions into a log file.
-- Warns you about specific user IPs upon detection.
-- Protects you from specific user IPs upon detection.
-- Logs specific user IPs to a file upon detection.
+- **Free & Open Source**: Completely free to use and modify, unlike other similar software.
+- **No Mods Required**: Works without mods, no risk of banning.
+- **Advanced Options**: Configuration files for deep customization.
+- **Game Server Scanning**: Includes a setting to scan for game servers.
+- **Session Logging**: Save session data and logs for future analysis.
+- **IP Protection**: Warns and protects against specific user IPs.
 
 ---
 
