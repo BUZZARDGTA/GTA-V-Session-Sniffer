@@ -1,36 +1,40 @@
 from pathlib import Path
 
 
-def get_documents_folder():
-    """Retrieves the Path object to the current user's \"Documents\" folder by querying the Windows registry."""
-    import winreg
+def get_documents_folder(use_alternative_method = False):
+    """
+    Retrieves the Path object to the current user's \"Documents\" folder by querying the Windows registry.
 
-    reg_key = R"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+    Args:
+        use_alternative_method: If set to `True`, the alternative method will be used to retrieve the "Documents" folder.\n
+        If set to `False` (default), the registry-based method will be used.
 
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key) as key:
-        documents_path, _ = winreg.QueryValueEx(key, "Personal")
+    Returns:
+        Path: A `Path` object pointing to the user's "Documents" folder.
+
+    Raises:
+        TypeError: If the retrieved path is not a string.
+    """
+    from pathlib import Path
+
+    if use_alternative_method:
+        # Alternative method using SHGetKnownFolderPath from WinAPI
+        from win32com.shell import shell, shellcon
+
+        # Get the Documents folder path
+        documents_path = shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents, 0)
+    else:
+        # Default method using Windows registry
+        import winreg
+        from Modules.consts import USER_SHELL_FOLDERS_REG_KEY
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, USER_SHELL_FOLDERS_REG_KEY) as key:
+            documents_path, _ = winreg.QueryValueEx(key, "Personal")
 
     if not isinstance(documents_path, str):
         raise TypeError(f'Expected "str", got "{type(documents_path)}"')
 
     return Path(documents_path)
-
-    """ NOTE: Alternative code:
-    import os
-    import sys
-    from pathlib import Path
-
-    # Windows - Use SHGetKnownFolderPath for Documents
-    from win32com.shell import shell, shellcon
-
-    # Get the Documents folder path
-    documents_path = Path(shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents, 0))
-
-    # Append the desired file path
-    log_path = documents_path / "Cherax" / "Lua" / "GTA_V_Session_Sniffer-plugin" / "log.txt"
-
-    print(log_path)
-    """
 
 def resource_path(relative_path: Path):
     """Get absolute path to resource, works for dev and for PyInstaller."""

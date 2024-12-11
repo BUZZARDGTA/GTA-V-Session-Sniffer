@@ -95,6 +95,11 @@ class PacketCapture:
 
             time.sleep(0.1)
 
+            # Ensure that the stdout_thread completes before exiting the method
+            if not stdout_thread.is_alive():
+                stdout_thread.join()
+                break
+
     def apply_on_packets(self, callback: Callable[[Packet], None]):
         for packet in self._capture_packets():
             callback(packet)
@@ -111,11 +116,13 @@ class PacketCapture:
         ) as process:
             self._tshark__process = process
 
-            yield from (Packet(fields) for fields in map(process_tshark_stdout, process.stdout))
+            # Iterate over stdout line by line as it is being produced
+            for line in process.stdout:
+                yield Packet(process_tshark_stdout(line))
 
-            # Check exit code after processing all stdout lines
-            if process.wait() != 0:
-                stderr_output = process.stderr.read()
+            # After stdout is done, check if there were any errors
+            stderr_output = process.stderr.read()
+            if process.returncode != 0:
                 raise TSharkCrashException(f"TShark exited with error code {process.returncode}:\n{stderr_output.strip()}")
 
 def converts_tshark_packet_timestamp_to_datetime_object(packet_frame_time_epoch: str):
