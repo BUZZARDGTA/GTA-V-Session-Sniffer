@@ -78,13 +78,13 @@ You can, however, manually assign a username to each IP using UserIP database fi
 
 ## Contact Support
 
-If you need assistance or have any inquiries, feel free to reach me out. I'm here to help!
-
+Need help? You can reach out via:
 - [GitHub Issues](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues)
 - [GitHub Discussions](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/discussions)
 
-You can also contact me privately via:
+Or privately:
+- **Email**: BUZZARDGTA@protonmail.com  
+- **Discord**: waitingforharukatoaddme  
+- **Telegram**: [@waitingforharukatoaddme](https://t.me/waitingforharukatoaddme)  
 
-- Email: BUZZARDGTA@protonmail.com
-- Discord: waitingforharukatoaddme
-- Telegram: [@waitingforharukatoaddme](https://t.me/waitingforharukatoaddme)
+---
