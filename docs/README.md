@@ -4,12 +4,6 @@ Welcome to the complete documentation for **Session Sniffer**. This guide is des
 
 ---
 
-Learn how to install, use, and maximize the potential of **Session Sniffer**:  
-- **[Overview & Setup Guide](docs/README.md)**  
-  Step-by-step instructions for installing and running the script.
-
----
-
 ## ⚙️ Configuration Guide
 
 Customize the script to suit your needs:  
