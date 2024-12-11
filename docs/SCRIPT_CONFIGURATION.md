@@ -1,4 +1,4 @@
-# Script Configuration
+# Configuration Guide
 
 ## Script Settings Configuration
 
