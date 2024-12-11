@@ -45,7 +45,7 @@ However, please note that additional servers (e.g., game servers) will not be fi
 
 ## About Usernames Decryption/Resolving
 
-The script **does not decrypt or resolve usernames**\* associated with IPs but allows manual assignment using UserIP database files.  
+The script **does not decrypt or resolve usernames**\* but allows manual assignment via UserIP database files.  
 This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.  
 
 \*_As of v1.1.4, username detection for GTA V (PC) is supported via these **mod menu** plugins:_
