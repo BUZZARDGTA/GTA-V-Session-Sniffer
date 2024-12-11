@@ -6,6 +6,8 @@
 
 </div>
 
+---
+
 ## Description
 
 Session Sniffer is a packet sniffer (also known as an IP grabber/puller/sniffer) specifically designed for peer-to-peer (P2P) video games on PC and consoles (PlayStation and Xbox). It can identify players who:
@@ -13,6 +15,8 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/puller/sniffer)
 - Are currently connected.
 - Have left your session.
 - Have rejoined your session.
+
+---
 
 ## Advantages
 
@@ -25,6 +29,8 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/puller/sniffer)
 - Protects you from specific user IPs upon detection.
 - Logs specific user IPs to a file upon detection.
 
+---
+
 ## Officially Tested and Supported Video Games
 
 | Supported Video Games               | Tested Platforms  |
@@ -32,39 +38,43 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/puller/sniffer)
 | Grand Theft Auto 5                  | PC, Xbox One, PS5 |
 | Minecraft Bedrock Edition (Friends) |      PC, PS3      |
 
-Technically, the script works for literally every P2P (Peer-To-Peer) video games.<br>
+Technically, the script works for literally every P2P (Peer-To-Peer) video games.  
 However, please note that additional servers (e.g., game servers) will not be filtered from the script's output unless they are listed above.
+
+---
 
 ## About Usernames Decryption/Resolving
 
-To clarify, the script does not explicitly decrypt or resolve in-game usernames associated with IPs\*.<br>
-This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.<br>
+To clarify, the script does not explicitly decrypt or resolve in-game usernames associated with IPs\*.  
+This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.  
 You can, however, manually assign a username to each IP using UserIP database files.
 
 \*_Since v1.1.4, you can now view usernames on GTA V in real-time on PC using either ~~2Take1 /~~ Stand or Cherax mod menus:_
-- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]<br>
-- _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)<br />_
-- _[GTA_V_Session_Sniffer-plugin-Cherax-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)<br />_
+- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]  
+- _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)_  
+- _[GTA_V_Session_Sniffer-plugin-Cherax-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)_  
+
+---
 
 ## Requirements
 
-- [Windows](https://www.microsoft.com/windows) 10 or 11 (x86/x64)
-- [Wireshark](https://www.wireshark.org/) v4.2.9
-- [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
-- _optional:_ [MaxMind GeoLite2](https://www.maxmind.com/)
+- **OS**: [Windows](https://www.microsoft.com/windows) 10 or 11 (x86/x64)
+- **Network Tools**:
+  - [Wireshark](https://www.wireshark.org/) v4.2.9
+  - [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/)
+  - **Optional**: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data/)
 
-## Credits and Contributors
+---
 
-For more details, check out the [Credits and Contributors](docs/CREDITS_and_CONTRIBUTORS.md).
+## Essential Guides / Project Resources
 
-## Tips and Tricks
-For more details, check out the [Tips and Tricks](docs/TIPS_and_TRICKS.md).
+📖 **[Documentation](docs/README.md)**  
+⚙️ **[Configuration Guide](docs/SCRIPT_CONFIGURATION.md)**  
+💡 **[Tips and Tricks](docs/TIPS_and_TRICKS.md)**  
+🚑 **[Troubleshooting](docs/TROUBLESHOOTING.md)**  
+👥 **[Credits & Contributors](docs/CREDITS_and_CONTRIBUTORS.md)**  
 
-## Script Configuration
-For more details, check out the [Script Configuration](docs/SCRIPT_CONFIGURATION.md).
-
-## Troubleshooting
-For more details, check out the [Troubleshooting](docs/TROUBLESHOOTING.md).
+---
 
 ## Contact Support
 
