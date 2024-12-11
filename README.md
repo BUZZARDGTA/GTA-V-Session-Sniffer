@@ -25,7 +25,7 @@ Session Sniffer is a packet sniffer (also known as an IP grabber/puller/sniffer)
 - Protects you from specific user IPs upon detection.
 - Logs specific user IPs to a file upon detection.
 
-## Officially Supported Video Games
+## Officially Tested and Supported Video Games
 
 | Supported Video Games               | Tested Platforms  |
 | :---------------------------------- | :---------------: |
