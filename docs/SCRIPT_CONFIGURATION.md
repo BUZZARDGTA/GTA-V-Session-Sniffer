@@ -1,4 +1,6 @@
-## Script Configuration
+# Script Configuration
+
+## Script Settings Configuration
 
 Before proceeding, ensure you are using Windows 10 or above.
 
@@ -7,9 +9,9 @@ Additionally, make sure you have [Wireshark](https://www.wireshark.org/) (v4.2.9
 Furthermore, for packet sniffing functionality, you'll require either [Npcap](https://nmap.org/npcap/) or [Winpcap](https://www.winpcap.org/).<br>
 It's worth noting that this step can be omitted as [Npcap](https://nmap.org/npcap/) is already included by default within the [Wireshark](https://www.wireshark.org/) installation.
 
-#### Editing Settings
+### Editing Settings
 
-#### Example Settings file:
+### Example Settings file:
 ```
 CAPTURE_TSHARK_PATH=C:\Program Files\Wireshark\tshark.exe
 CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT=False
@@ -192,12 +194,12 @@ Determine if you want or not to enable detections from the UserIP databases.
 
 </details>
 
-#### Scan trough a VPN
+### Scan trough a VPN
 
 When using a VPN, make sure that you scan from your actual VPN interface.<br>
 Additionally, ensure that in the `Settings.ini` file, the setting `<CAPTURE_NETWORK_INTERFACE_CONNECTION_PROMPT>` is set to `True` value.
 
-#### Scan for a console
+### Scan for a console
 
 In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X), you'll need to follow these steps:
 
@@ -208,7 +210,7 @@ In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X)
 5. Start the script and wait for it to enter the "Capture network interface selection" screen.
 6. Then, you'll need to identify the console's IP and MAC Address and select it accordingly.
 
-#### Resolving Country, City and ASN fields.
+### Resolving Country, City and ASN fields.
 
 The script relies on [MaxMind’s GeoIP2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) to resolve player information.<br>
 Upon startup, it automatically attempts to check for updates and downloads the latest version from the [PrxyHunter/GeoLite2](https://github.com/PrxyHunter/GeoLite2) repository.
@@ -220,14 +222,14 @@ Then you will need to create a new folder named `GeoLite2 Databases` within the 
 Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).<br>
 You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 
-#### Resolving Mobile, Proxy and Hosting fields.
+### Resolving Mobile, Proxy and Hosting fields.
 
 The script relies on the free [ip-api](https://ip-api.com/) API website to resolve player's "Mobile", "VPN" and "Hosting" fields.<br>
 This free and limited usage allows for a maximum resolution of (100 \* 15) = 1500 IPs per minute.
 
 ## UserIP INI databases Configuration
 
-#### What's an UserIP database ?
+### What's an UserIP database ?
 
 In earlier versions, there was only one database `Blacklist.ini` for blacklisting users.<br>
 Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to suit your needs.
@@ -244,7 +246,7 @@ Throughout the INI file, any text following a `;` or `##` symbol is treated as a
 Simply create a folder named `UserIP Databases` and add any *.ini files for the script to read.<br>
 To create these files, follow these guidelines:
 
-#### UserIP Settings
+### UserIP Settings
 
 These are settings specific for each UserIP database files configuration.
 
@@ -298,12 +300,12 @@ Specifies the duration (in seconds) for which the `<PROTECTION_PROCESS_PATH>` pr
 
 </details>
 
-#### UserIP Entries
+### UserIP Entries
 
 You need to list the entries under the `[UserIP]` section of the INI file in this format:<br>
 `<USERNAME>=<IP>`
 
-#### Example UserIP file:
+### Example UserIP file:
 ```
 [Settings]
 ENABLED=True
