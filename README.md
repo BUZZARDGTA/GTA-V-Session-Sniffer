@@ -45,14 +45,13 @@ However, please note that additional servers (e.g., game servers) will not be fi
 
 ## About Usernames Decryption/Resolving
 
-To clarify, the script does not explicitly decrypt or resolve in-game usernames associated with IPs\*.  
+The script **does not decrypt or resolve usernames**\* associated with IPs but allows manual assignment using UserIP database files.  
 This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.  
-You can, however, manually assign a username to each IP using UserIP database files.
 
-\*_Since v1.1.4, you can now view usernames on GTA V in real-time on PC using either ~~2Take1 /~~ Stand or Cherax mod menus:_
-- ~~_[GTA_V_Session_Sniffer-plugin-2Take1-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]  
-- _[GTA_V_Session_Sniffer-plugin-Stand-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)_  
-- _[GTA_V_Session_Sniffer-plugin-Cherax-Lua](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)_  
+\*_As of v1.1.4, username detection for GTA V (PC) is supported via these **mod menu** plugins:_
+- ~~_[2Take1 Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]  
+- _[Stand Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)_  
+- _[Cherax Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)_  
 
 ---
 
