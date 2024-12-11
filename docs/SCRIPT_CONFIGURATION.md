@@ -1,4 +1,4 @@
-## Configuration
+## Script Configuration
 
 Before proceeding, ensure you are using Windows 10 or above.
 
