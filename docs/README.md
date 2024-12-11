@@ -7,7 +7,7 @@ Welcome to the complete documentation for **Session Sniffer**. This guide is des
 ## ⚙️ Configuration Guide
 
 Customize the script to suit your needs:  
-- **[Script Configuration](SCRIPT_CONFIGURATION.md)**  
+- **[Configuration Guide](SCRIPT_CONFIGURATION.md)**  
   Learn about available settings, configuration files, and how to enable advanced features.
 
 ---
