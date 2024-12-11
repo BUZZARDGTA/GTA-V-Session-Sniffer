@@ -35,7 +35,7 @@
 | Grand Theft Auto 5                  | PC, Xbox One, PS5 |
 | Minecraft Bedrock Edition (Friends) |      PC, PS3      |
 
-> _Note_: The script works for all P2P (Peer-To-Peer) games, but only the games listed above have server filtering in the output.
+> _Note_: The script works for all P2P (Peer-To-Peer) games, but only the games listed above have servers filtering.
 
 ---
 
