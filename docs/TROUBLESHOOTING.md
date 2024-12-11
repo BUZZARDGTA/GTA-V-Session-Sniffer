@@ -13,7 +13,7 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x seconds ...
 - **In GTA V**, some players may occasionally go undetected, but it's important to note that this issue is not specific to the script as the same players may also be undetected by mod menus username IP resolving.  
   This happens because players may be connected through the dedicated game servers (details are not fully known), or they might be connected via someone else's connection as a "relay" (specifics remain unclear).  
   Additionally, on PC, some players may use features like "Force Relay Connections", which are only available through mod menus, to mask their presence by forcing their connection through the dedicated game server.
-- Certain firewalls, VPNs, or even some Internet Service Providers (ISPs) can also block Peer-To-Peer (P2P) traffic, resulting in very few or no packets being sniffed from these players.  
+- Certain firewalls, VPNs, or even some Internet Service Providers (ISPs) can also block Peer-To-Peer (P2P) traffic, resulting in very few or no packets being sniffed from these players.
 
 ## Unrelated / False Positive IPs detected
 
