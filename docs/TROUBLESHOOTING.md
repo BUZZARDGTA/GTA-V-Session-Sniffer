@@ -18,15 +18,15 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x second ..."
   Additionally, on PC, some players may use features like "Force Relay Connections", which are only available through mod menus, to mask their presence by forcing their connection through the dedicated game server.
 - Certain firewalls, VPNs, or even some rare Internet Service Providers (ISPs) can also block Peer-To-Peer (P2P) traffic, resulting in very few or no packets being sniffed from these players.
 
-## Unrelated / False Positive IPs detected
+## Unrelated / False Positive IPs Detected
 
-The display of unrelated IPs is possible in certain scenarios.  
-I have made efforts to minimize this occurrence by optimizing the `CAPTURE_FILTER` and `DISPLAY_FILTER` from the source code.  
-If you have other Peer-To-Peer applications running, such as a BitTorrent client, it may contribute to this issue.  
-To mitigate this, I recommend closing all other Peer-To-Peer applications while using the script.
+The display of unrelated IPs can occur in certain scenarios.  
+Efforts have been made to to minimize this occurrence by optimizing the `CAPTURE_FILTER` and `DISPLAY_FILTER` in the source code.  
+If you have other Peer-To-Peer (P2P) applications running, such as a BitTorrent client, they may contribute to this issue.  
+To mitigate this, it is recommended closing to close all other P2P applications while using the script.
 
-Furthermore, you can enhance the filtering process by setting `<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>` to the `True` value in your `Settings.ini` file.  
-You can also, adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.  
+Additionally, you can enhance the filtering process by setting `<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>` to `True` in your `Settings.ini` file.  
+You can also adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.  
 These configurations help minimize the display of unrelated IPs.
 
 ## About Screen Refreshing
