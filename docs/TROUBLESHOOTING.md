@@ -33,4 +33,4 @@ These configurations help minimize the display of unrelated IPs.
 
 Refreshing the display of the script positions your terminal's cursor at the very bottom of the script.  
 However, if you are using Windows Terminal, this issue is somewhat resolved because the view sticks to the top of the page by scrolling there initially.  
-I would recommend using [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/) for an optimal experience.
+I recommend using [Windows Terminal](https://learn.microsoft.com/en-us/windows/terminal/) for an optimal experience.
