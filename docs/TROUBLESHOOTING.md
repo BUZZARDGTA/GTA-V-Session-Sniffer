@@ -23,7 +23,7 @@ When the scanner is stuck at `"Scanning IPs, refreshing display in x second ..."
 The display of unrelated IPs can occur in certain scenarios.  
 Efforts have been made to to minimize this occurrence by optimizing the `CAPTURE_FILTER` and `DISPLAY_FILTER` in the source code.  
 If you have other Peer-To-Peer (P2P) applications running, such as a BitTorrent client, they may contribute to this issue.  
-To mitigate this, it is recommended closing to close all other P2P applications while using the script.
+To mitigate this, it is recommended to close all other P2P applications while using the script.
 
 Additionally, you can enhance the filtering process by setting `<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>` to `True` in your `Settings.ini` file.  
 You can also adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.  
