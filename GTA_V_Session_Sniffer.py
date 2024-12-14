@@ -1601,7 +1601,7 @@ def show_error__tshark_not_detected():
 
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
-        from Modules.consts import GITHUB_RELEASE_API__GEOLITE2
+        from Modules.consts import GITHUB_RELEASE_API__GEOLITE2 # TODO: Implement adding: `, GITHUB_RELEASE_API__GEOLITE2__BACKUP` in case the first one fails.
 
         geolite2_version_file_path = geolite2_databases_folder_path / "version.json"
         geolite2_databases: dict[str, dict[str, None | str]] = {
@@ -1651,28 +1651,48 @@ def update_and_initialize_geolite2_readers():
                     "download_url": asset["browser_download_url"]
                 })
 
+        failed_fetching_flag_list = []
         for database_name, database_info in geolite2_databases.items():
-            if not database_info["current_version"] == database_info["last_version"]:
-                try:
-                    response = s.get(database_info["download_url"])
-                except Exception as e:
-                    return {
-                        "exception": e,
-                        "url": database_info["download_url"],
-                        "http_code": None
-                    }
-                if response.status_code != 200:
-                    return {
-                        "exception": None,
-                        "url": database_info["download_url"],
-                        "http_code": response.status_code
-                    }
+            if database_info["last_version"]:
+                if not database_info["current_version"] == database_info["last_version"]:
+                    try:
+                        response = s.get(database_info["download_url"])
+                    except Exception as e:
+                        return {
+                            "exception": e,
+                            "url": database_info["download_url"],
+                            "http_code": None
+                        }
+                    if response.status_code != 200:
+                        return {
+                            "exception": None,
+                            "url": database_info["download_url"],
+                            "http_code": response.status_code
+                        }
 
-                geolite2_databases_folder_path.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
-                file_path = geolite2_databases_folder_path / database_name
-                file_path.write_bytes(response.content)
+                    geolite2_databases_folder_path.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
+                    file_path = geolite2_databases_folder_path / database_name
+                    file_path.write_bytes(response.content)
 
-                geolite2_databases[database_name]["current_version"] = database_info["last_version"]
+                    geolite2_databases[database_name]["current_version"] = database_info["last_version"]
+            else:
+                failed_fetching_flag_list.append(database_name)
+
+        if failed_fetching_flag_list:
+            msgbox_title = TITLE
+            msgbox_message = textwrap.indent(textwrap.dedent(f"""
+                ERROR:
+                    Failed fetching MaxMind \"{'\", \"'.join(failed_fetching_flag_list)}\" database{plural(len(failed_fetching_flag_list))}.
+
+                INFOS:
+                    These MaxMind GeoLite2 database{plural(len(failed_fetching_flag_list))} will not be updated.
+
+                DEBUG:
+                    GITHUB_RELEASE_API__GEOLITE2={GITHUB_RELEASE_API__GEOLITE2}
+                    failed_fetching_flag_list={failed_fetching_flag_list}
+            """.removeprefix("\n").removesuffix("\n")), "    ")
+            msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.SystemModal | MsgBox.Style.MsgBoxSetForeground
+            threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
         with geolite2_version_file_path.open("w", encoding="utf-8") as f:
             json.dump({
