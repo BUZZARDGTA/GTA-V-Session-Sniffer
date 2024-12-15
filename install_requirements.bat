@@ -20,6 +20,9 @@ for %%A in (
     geoip2
     prettytable
     psutil
+    pypresence
+    PyQt6
+    pywin32
     requests
     rich
     urllib3
