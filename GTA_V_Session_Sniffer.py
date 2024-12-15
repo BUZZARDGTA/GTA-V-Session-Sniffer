@@ -1990,6 +1990,9 @@ if not is_pyinstaller_compiled():
         "geoip2": "4.8.1",
         "prettytable": "3.12.0",
         "psutil": "6.1.0",
+        "pypresence": "4.3.0",
+        "PyQt6": "6.8.0",
+        "pywin32": "308",
         "requests": "2.32.3",
         "rich": "13.9.4",
         "urllib3": "2.2.3",
@@ -4401,8 +4404,7 @@ class MainWindow(QMainWindow):
 
             # Iterate through each row in the column and calculate the maximum width needed for the row content
             for row_index in range(table_widget.rowCount()):
-                item = table_widget.item(row_index, column_index)
-                if item:  # Check if the cell has content
+                if item := table_widget.item(row_index, column_index):  # Check if the cell has content
                     row_width = QFontMetrics(item.font()).boundingRect(item.text()).width()
                     max_row_width = max(max_row_width, row_width)
 
@@ -4411,7 +4413,7 @@ class MainWindow(QMainWindow):
 
             # Check if the column contains a sort indicator, and add extra margin if it does
             if column_index == table_widget.horizontalHeader().sortIndicatorSection():
-                required_width += 18  # Add extra margin for sort indicator
+                required_width += 16  # Add extra margin for sort indicator
 
             # Get the current column width
             current_width = table_widget.columnWidth(column_index)
@@ -4420,9 +4422,9 @@ class MainWindow(QMainWindow):
             if required_width > current_width:
                 table_widget.setColumnWidth(column_index, required_width)
 
-            ## Ensure the column width doesn't exceed the max resize limit
-            #if table_widget.columnWidth(column_index) > max_row_width + margin:
-            #    table_widget.setColumnWidth(column_index, max_row_width + margin)
+            # Ensure the column width doesn't exceed the max resize limit
+            if table_widget.columnWidth(column_index) > max_row_width + margin + 16:
+                table_widget.setColumnWidth(column_index, max_row_width + margin + 16)
 
 
     #def adjust_column_widths(self, table: QTableWidget):
