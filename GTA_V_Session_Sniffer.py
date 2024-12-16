@@ -865,17 +865,6 @@ class ThirdPartyServers(enum.Enum):
     PS5_AMAZON = ["52.40.62.0/25"]
     MINECRAFTBEDROCKEDITION_PC_AND_PS3_MICROSOFT = ["20.202.0.0/24", "20.224.0.0/16", "168.61.142.128/25", "168.61.143.0/24", "168.61.144.0/20", "168.61.160.0/19"]
 
-class PrintCacher:
-    def __init__(self):
-        self.cache: list[str] = []
-
-    def cache_print(self, string: str):
-        self.cache.append(string)
-
-    def flush_cache(self):
-        print("\n".join(self.cache))
-        self.cache: list[str] = []
-
 class Player_PPS:
     def __init__(self, packet_datetime: datetime):
         self._initialize(packet_datetime)
@@ -1601,9 +1590,9 @@ def show_error__tshark_not_detected():
 
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
-        from Modules.consts import GITHUB_RELEASE_API__GEOLITE2 # TODO: Implement adding: `, GITHUB_RELEASE_API__GEOLITE2__BACKUP` in case the first one fails.
+        from Modules.consts import GEOLITE2_DATABASES_FOLDER_PATH, GITHUB_RELEASE_API__GEOLITE2 # TODO: Implement adding: `, GITHUB_RELEASE_API__GEOLITE2__BACKUP` in case the first one fails.
 
-        geolite2_version_file_path = geolite2_databases_folder_path / "version.json"
+        geolite2_version_file_path = GEOLITE2_DATABASES_FOLDER_PATH / "version.json"
         geolite2_databases: dict[str, dict[str, None | str]] = {
             f"GeoLite2-{db}.mmdb": {
                 "current_version": None,
@@ -1670,8 +1659,8 @@ def update_and_initialize_geolite2_readers():
                             "http_code": response.status_code
                         }
 
-                    geolite2_databases_folder_path.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
-                    file_path = geolite2_databases_folder_path / database_name
+                    GEOLITE2_DATABASES_FOLDER_PATH.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
+                    file_path = GEOLITE2_DATABASES_FOLDER_PATH / database_name
                     file_path.write_bytes(response.content)
 
                     geolite2_databases[database_name]["current_version"] = database_info["last_version"]
@@ -1707,10 +1696,12 @@ def update_and_initialize_geolite2_readers():
         }
 
     def initialize_geolite2_readers():
+        from Modules.consts import GEOLITE2_DATABASES_FOLDER_PATH
+
         try:
-            geolite2_asn_reader = geoip2.database.Reader(geolite2_databases_folder_path / "GeoLite2-ASN.mmdb")
-            geolite2_city_reader = geoip2.database.Reader(geolite2_databases_folder_path / "GeoLite2-City.mmdb")
-            geolite2_country_reader = geoip2.database.Reader(geolite2_databases_folder_path / "GeoLite2-Country.mmdb")
+            geolite2_asn_reader = geoip2.database.Reader(GEOLITE2_DATABASES_FOLDER_PATH / "GeoLite2-ASN.mmdb")
+            geolite2_city_reader = geoip2.database.Reader(GEOLITE2_DATABASES_FOLDER_PATH / "GeoLite2-City.mmdb")
+            geolite2_country_reader = geoip2.database.Reader(GEOLITE2_DATABASES_FOLDER_PATH / "GeoLite2-Country.mmdb")
 
             geolite2_asn_reader.asn("1.1.1.1")
             geolite2_city_reader.city("1.1.1.1")
@@ -1725,8 +1716,6 @@ def update_and_initialize_geolite2_readers():
             exception = None
 
         return exception, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
-
-    geolite2_databases_folder_path = Path("GeoLite2 Databases")
 
     update_geolite2_databases__dict = update_geolite2_databases()
     exception__initialize_geolite2_readers, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = initialize_geolite2_readers()
@@ -2764,7 +2753,7 @@ def iplookup_core():
 tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 class GUIrenderingData:
-    FIELDS_TO_HIDE_IN_STDOUT: list[str] = []
+    FIELDS_TO_HIDE: list[str] = []
     GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str] = []
     GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str] = []
     is_rendering_core_ready: bool = False
@@ -2781,13 +2770,6 @@ class GUIrenderingData:
 def rendering_core():
     with Threads_ExceptionHandler():
         from Modules.consts import ANSI_ESCAPE, HEADER_TEXT_SEPARATOR
-
-        def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
-            updated_field_names = [
-                field + " \u2193" if field == target_field else field
-                for field in field_names
-            ]
-            return updated_field_names
 
         def print_in_header(text: str):
             from Modules.consts import HEADER_TEXT_MAX_LENGTH
@@ -2843,6 +2825,13 @@ def rendering_core():
             return "\n".join(header)
 
         def generate_field_names():
+            def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
+                updated_field_names = [
+                    field + " \u2193" if field == target_field else field
+                    for field in field_names
+                ]
+                return updated_field_names
+
             stdout_connected_players_table__field_names = [
                 field_name
                 for field_name in Settings.stdout_all_connected_fields
@@ -3404,23 +3393,10 @@ def rendering_core():
         def format_player_logging_datetime(datetime_object: datetime):
             return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
 
-        def format_player_usernames(player_usernames: list[str]):
-            return f"{player_color}{', '.join(player_usernames) if player_usernames else 'N/A'}{player_reset}"
+        def format_player_logging_usernames(player_usernames: list[str]):
+            return f"{', '.join(player_usernames) if player_usernames else 'N/A'}"
 
-        def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
-            if pps_rate == 0:
-                if is_pps_first_calculation:
-                    pps_color = player_color
-                else:
-                    pps_color = Fore.RED
-            elif pps_rate == 1:
-                pps_color = Fore.YELLOW
-            else:
-                pps_color = player_color
-
-            return f"{pps_color}{pps_rate}{Fore.RESET}"
-
-        def format_player_ip(player_ip: str):
+        def format_player_logging_ip(player_ip: str):
             if (
                 SessionHost.player
                 and SessionHost.player.ip == player_ip
@@ -3428,25 +3404,12 @@ def rendering_core():
                 return f"{player_ip} 👑"
             return player_ip
 
-        def format_player_intermediate_ports(player_ports: Player_Ports):
+        def format_player_logging_intermediate_ports(player_ports: Player_Ports):
             player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
             if player_ports.intermediate:
                 return ", ".join(map(str, player_ports.intermediate))
             else:
                 return ""
-
-        def safe_print(*args, **kwargs):
-            """
-            Print the provided arguments if the script has not crashed.
-
-            Args:
-                *args: The values to be printed.
-                **kwargs: Additional keyword arguments to pass to the built-in print function.
-            """
-            if ScriptControl.has_crashed():
-                return
-
-            print(*args, **kwargs)
 
         from Modules.consts import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
 
@@ -3454,7 +3417,7 @@ def rendering_core():
 
         SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
-        FIELDS_TO_HIDE_IN_STDOUT = GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT = set(Settings.STDOUT_FIELDS_TO_HIDE)
+        FIELDS_TO_HIDE_IN_STDOUT = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.STDOUT_FIELDS_TO_HIDE)
         HEADER_TEXT = compile_header_text()
 
         (
@@ -3466,7 +3429,6 @@ def rendering_core():
             GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
         ) = generate_field_names()
 
-        printer = PrintCacher()
         global_pps_t1 = time.perf_counter()
         global_pps_rate = 0
         last_userip_parse_time = None
@@ -3622,14 +3584,6 @@ def rendering_core():
                 session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
                 session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
 
-            if (
-                Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER == 0
-                or Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER >= len(session_disconnected)
-            ):
-                len_session_disconnected_message = f"{len(session_disconnected_sorted)}"
-            else:
-                len_session_disconnected_message = f"showing {len(session_disconnected_sorted)}/{len(session_disconnected)}"
-
             current_time = datetime.now()
             one_second_ago = current_time - timedelta(seconds=1)
 
@@ -3643,10 +3597,10 @@ def rendering_core():
             if recent_packets:
                 total_latency_seconds = sum(pkt_latency.total_seconds() for _, pkt_latency in recent_packets)
                 avg_latency_seconds = total_latency_seconds / len(recent_packets)
-                avg_latency_rounded = GUIrenderingData.avg_latency_rounded = round(avg_latency_seconds, 1)
+                GUIrenderingData.avg_latency_rounded = round(avg_latency_seconds, 1)
             else:
                 avg_latency_seconds = 0.0
-                avg_latency_rounded = GUIrenderingData.avg_latency_rounded = 0.0
+                GUIrenderingData.avg_latency_rounded = 0.0
 
             # Determine latency color
             if avg_latency_seconds >= 0.90 * Settings.CAPTURE_OVERFLOW_TIMER:
@@ -3669,199 +3623,28 @@ def rendering_core():
             # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
             # Also these values averagely indicates the max performances my script can run at during my testings. Luckely it's just enough to process GTA V game.
             if global_pps_rate >= 3000:
-                pps_color = Fore.RED
                 GUIrenderingData.pps_color = '<span style="color: red;">'
             elif global_pps_rate >= 1500:
-                pps_color = Fore.YELLOW
                 GUIrenderingData.pps_color = '<span style="color: yellow;">'
             else:
-                pps_color = Fore.GREEN
                 GUIrenderingData.pps_color = '<span style="color: green;">'
 
-            printer.cache_print(HEADER_TEXT)
-
-            color_tshark_restarted_time = Fore.GREEN if tshark_restarted_times == 0 else Fore.RED
             GUIrenderingData.color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
             num_of_userip_files = len(UserIP_Databases.userip_databases)
             if Settings.DISCORD_PRESENCE:
-                rpc_message = f" RPC: {Fore.GREEN}Connected{Fore.RESET}" if discord_rpc_manager.is_connected else f" RPC: {Fore.YELLOW}Waiting for Discord{Fore.RESET}"
                 GUIrenderingData.rpc_message = f' RPC: <span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC: <span style="color: yellow;">Waiting for Discord</span>'
             else:
-                rpc_message = GUIrenderingData.rpc_message = ""
+                GUIrenderingData.rpc_message = ""
 
-            printer.cache_print(print_in_header(f"Packets latency per sec:{latency_color}{avg_latency_rounded}{Fore.RESET}/{Fore.GREEN}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}"))
-            if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
-                printer.cache_print(print_in_header(f"Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}"))
-            if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_ip_conflicts):
-                printer.cache_print(print_in_header(f"Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}"))
-            if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_corrupted):
-                printer.cache_print(print_in_header(f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}"))
-            printer.cache_print(HEADER_TEXT_SEPARATOR)
-
-            stdout_connected_players_table = PrettyTable()
-            stdout_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
-            stdout_connected_players_table.title = f"Player{plural(len(session_connected_sorted))} connected in your session ({len(session_connected_sorted)}):"
-            stdout_connected_players_table.field_names = STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
-            stdout_connected_players_table.align = "l"
-            for player in session_connected_sorted:
-                if (
-                    Settings.USERIP_ENABLED
-                    and player.userip.usernames
-                ):
-                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
-                    player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
-                else:
-                    player_color = Fore.GREEN
-                    player_reset = Fore.RESET
-
-                row = []
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
-                if Settings.USERIP_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{player.rejoins}{player_reset}")
-                row.append(f"{player_color}{player.total_packets}{player_reset}")
-                row.append(f"{player_color}{player.packets}{player_reset}")
-                row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
-                row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
-                if "Last Port" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
-                if "R. Code" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
-                if "District" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.org_short}{player_reset}")
-                if "ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp_short}{player_reset}")
-                if "ASN / ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
-                if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "ASN" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
-                if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
-                stdout_connected_players_table.add_row(row)
-
-            stdout_disconnected_players_table = PrettyTable()
-            stdout_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
-            stdout_disconnected_players_table.title = f"Player{plural(len(session_disconnected_sorted))} who've left your session ({len_session_disconnected_message}):"
-            stdout_disconnected_players_table.field_names = STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
-            stdout_disconnected_players_table.align = "l"
-            for player in session_disconnected_sorted:
-                if (
-                    Settings.USERIP_ENABLED
-                    and player.userip.usernames
-                ):
-                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
-                    player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
-                else:
-                    player_color = Fore.RED
-                    player_reset = Fore.RESET
-
-                row = []
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_seen)}{player_reset}")
-                if Settings.USERIP_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{player.rejoins}{player_reset}")
-                row.append(f"{player_color}{player.total_packets}{player_reset}")
-                row.append(f"{player_color}{player.packets}{player_reset}")
-                row.append(f"{player_color}{player.ip}{player_reset}")
-                if "Last Port" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_short}{player_reset}")
-                if "R. Code" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city_short}{player_reset}")
-                if "District" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.org_short}{player_reset}")
-                if "ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp_short}{player_reset}")
-                if "ASN / ISP" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn_short}{player_reset}")
-                if "AS" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_short}{player_reset}")
-                if "ASN" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name_short}{player_reset}")
-                if "Mobile" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in FIELDS_TO_HIDE_IN_STDOUT:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
-                stdout_disconnected_players_table.add_row(row)
-
-            printer.cache_print("")
-            printer.cache_print(stdout_connected_players_table.get_string())
-            printer.cache_print(stdout_disconnected_players_table.get_string())
-            printer.cache_print("")
+            # TODO:
+            #printer.cache_print(print_in_header(f"Packets latency per sec:{latency_color}{avg_latency_rounded}{Fore.RESET}/{Fore.GREEN}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}"))
+            #if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
+            #    printer.cache_print(print_in_header(f"Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}"))
+            #if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_ip_conflicts):
+            #    printer.cache_print(print_in_header(f"Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}"))
+            #if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_corrupted):
+            #    printer.cache_print(print_in_header(f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}"))
+            #printer.cache_print(HEADER_TEXT_SEPARATOR)
 
             if Settings.STDOUT_SESSIONS_LOGGING:
                 from Modules.consts import SESSIONS_LOGGING_PATH
@@ -3875,14 +3658,14 @@ def rendering_core():
                     row = []
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{format_player_usernames(player.usernames)}")
+                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
-                    row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
-                    row.append(f"{format_player_ip(player.ip)}")
+                    row.append(f"{player.pps.rate}")
+                    row.append(f"{format_player_logging_ip(player.ip)}")
                     row.append(f"{player.ports.last}")
-                    row.append(f"{format_player_intermediate_ports(player.ports)}")
+                    row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
                     row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
@@ -3916,13 +3699,13 @@ def rendering_core():
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
-                    row.append(f"{format_player_usernames(player.usernames)}")
+                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
                     row.append(f"{player.ip}")
                     row.append(f"{player.ports.last}")
-                    row.append(f"{format_player_intermediate_ports(player.ports)}")
+                    row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
                     row.append(f"{player.ports.first}")
                     row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
                     row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
@@ -3958,9 +3741,6 @@ def rendering_core():
                     stdout_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
                     f.write(stdout_without_vt100)
 
-            cls()
-            printer.flush_cache()
-
             if Settings.DISCORD_PRESENCE:
                 if discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0:
                     discord_rpc_manager.update(f"{len(session_connected_sorted)} player{plural(len(session_connected_sorted))} connected in the session.")
@@ -3969,28 +3749,24 @@ def rendering_core():
 
             if Settings.STDOUT_REFRESHING_TIMER == 0:
                 if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                    bottom_text = GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)})"
-                    safe_print("\033[K" + bottom_text, end="\r")
+                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)})"
                     GUIrenderingData.is_rendering_core_ready = True
                     continue
                 else:
-                    bottom_text = GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})"
-                    safe_print("\033[K" + bottom_text, end="\r")
+                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})"
                     GUIrenderingData.is_rendering_core_ready = True
                     continue
 
             if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
                 if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
-                    bottom_text = GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)} ..."
+                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)} ..."
                     GUIrenderingData.is_rendering_core_ready = True
-                    safe_print("\033[K" + bottom_text, end="\r")
                     time.sleep(0.1)
                     continue
             else:
                 if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
-                    bottom_text = GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ..."
+                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ..."
                     GUIrenderingData.is_rendering_core_ready = True
-                    safe_print("\033[K" + bottom_text, end="\r")
                     time.sleep(0.1)
                     continue
 
@@ -4008,9 +3784,8 @@ def rendering_core():
                     remaining_sleep_seconds = 0.9
                     eta = max(round(seconds_left + og_process_refreshing__time_elapsed), 1)
 
-                bottom_text = GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display in {eta} second{plural(eta)} ..."
+                GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display in {eta} second{plural(eta)} ..."
                 GUIrenderingData.is_rendering_core_ready = True
-                safe_print("\033[K" + bottom_text, end="\r")
                 time.sleep(0.1)
 
                 total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
@@ -4340,13 +4115,13 @@ class MainWindow(QMainWindow):
 
     def get_header_text(self):
         return textwrap.dedent(f"""
-            -------------------------------------------------------------------------------------------------<br>
+            ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
             Welcome in {TITLE} {VERSION}<br>
-            The best FREE and Open-Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
-            -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -<br>
+            The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
+            ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
             Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
             Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{GUIrenderingData.color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
-            -------------------------------------------------------------------------------------------------
+            ─────────────────────────────────────────────────────────────────────────────────────────────────
         """.removeprefix("\n").removesuffix("\n"))
 
     def update_header_text(self, text: str):
@@ -4642,57 +4417,57 @@ class WorkerThread(QThread):
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
                 row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
-                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region}{player_reset}")
-                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.city}{player_reset}")
-                if "District" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.org}{player_reset}")
-                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp}{player_reset}")
-                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn}{player_reset}")
-                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled._as}{player_reset}")
-                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name}{player_reset}")
-                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
 
                 updated_session_connected_table.append(row)
@@ -4718,57 +4493,57 @@ class WorkerThread(QThread):
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
                 row.append(f"{player_color}{player.ip}{player_reset}")
-                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region}{player_reset}")
-                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.city}{player_reset}")
-                if "District" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.org}{player_reset}")
-                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp}{player_reset}")
-                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn}{player_reset}")
-                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled._as}{player_reset}")
-                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name}{player_reset}")
-                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE_IN_STDOUT:
+                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
 
                 updated_session_disconnected_table.append(row)
