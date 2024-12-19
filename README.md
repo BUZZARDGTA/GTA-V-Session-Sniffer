@@ -42,7 +42,7 @@
 ## About Usernames Decryption/Resolving
 
 The script **does not decrypt or resolve usernames automatically**\*.  
-This functionality was available on older-generation consoles (PS3 and Xbox 360) but has since been patched on current-generation platforms.  
+This functionality was available on PS3 and Xbox 360 but is patched on current-gen platforms.  
 However, it does allow for manual assignment using UserIP database files.  
 
 \*_As of v1.1.4, username detection for GTA V (PC) is supported via these Session Sniffer **mod menu** plugins:_
