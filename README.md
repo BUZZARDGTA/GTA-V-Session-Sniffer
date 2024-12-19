@@ -41,10 +41,11 @@
 
 ## About Usernames Decryption/Resolving
 
-The script **does not decrypt or resolve usernames**\* but allows manual assignment via UserIP database files.  
-This functionality used to be possible on old-gen consoles (PS3 and Xbox 360) but has been patched in next-gen.  
+The script **does not decrypt or resolve usernames automatically**\*.  
+This functionality was available on older-generation consoles (PS3 and Xbox 360) but has since been patched on current-generation platforms.  
+However, it does allow for manual assignment using UserIP database files.  
 
-\*_As of v1.1.4, username detection for GTA V (PC) is supported via these **mod menu** plugins:_
+\*_As of v1.1.4, username detection for GTA V (PC) is supported via these Session Sniffer **mod menu** plugins:_
 - ~~_[2Take1 Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-2Take1-Lua)_~~ \[ARCHIVED\]  
 - _[Stand Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Stand-Lua)_  
 - _[Cherax Lua Plugin](https://github.com/BUZZARDGTA/GTA_V_Session_Sniffer-plugin-Cherax-Lua)_  
