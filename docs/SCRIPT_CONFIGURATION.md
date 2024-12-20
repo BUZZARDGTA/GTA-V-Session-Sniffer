@@ -231,27 +231,28 @@ This free and limited usage allows for a maximum resolution of (100 \* 15) = 150
 
 ### What's an UserIP database ?
 
-In earlier versions, there was only one database `Blacklist.ini` for blacklisting users.  
-Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to suit your needs.
+A UserIP database tracks users by linking their in-game usernames to their IP addresses.
 
-For example, I personally maintain four lists:
+In earlier versions, the script used a single database, `Blacklist.ini, for blacklisting users.  
+Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to better suit your needs.
 
-* Searchlist.ini: For people whose IPs I am searching for.
-* Blacklist.ini: For individuals whose GTA5 process I want to suspend.
-* Enemylist.ini: For users I want to be notified about when they join the session.
-* Friendlist.ini: For users I don't want notifications for but wish to highlight in green.
+By default, these lists are generated the first time the script runs:
 
-Throughout the INI file, any text following a `;` or `##` symbol is treated as a comment.
+* Blacklist.ini: Highlights users in red and suspends the GTA5 process as a protection.
+* Enemylist.ini: Highlights users in yellow and notifies you when they join the session.
+* Friendlist.ini: Highlights users in green while keeping voice notifications about them.
+* Randomlist.ini: Highlights users in white while suppressing notifications about them.
+* Searchlist.ini: Highlights users in white and tracks whose IPs you are searching for.
 
-Simply create a folder named `UserIP Databases` and add any *.ini files for the script to read.  
+Throughout these INI files, any text following a `;` or `#` symbol is treated as a comment.  
+This allows you to add notes or explanations without affecting the script's functionality.
+
+In the folder named `UserIP Databases` add any *.ini files for the script to read.  
 To create these files, follow these guidelines:
 
 ### UserIP Settings
 
 These are settings specific for each UserIP database files configuration.
-
-If you don't know what value to choose for a specifc setting, set it's value to None.  
-The program will automatically analyzes this file and if needed will regenerate it if it contains errors.
 
 For detailed explanations of each UserIP database settings, **click to expand below:**
 
