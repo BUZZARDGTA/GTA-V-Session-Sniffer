@@ -1,7 +1,7 @@
 # 📖 Documentation (Get Started)
 
 Welcome to the complete documentation for **Session Sniffer**.  
-This guide is designed to help you get started, configure the script, and troubleshoot any issues along the way.  
+This guide is designed to help you get started, configure the script, troubleshoot any issues along the way, and provide useful tips and tricks to enhance your experience.  
 Below, you'll find resources tailored to various aspects of the project.
 
 ---
