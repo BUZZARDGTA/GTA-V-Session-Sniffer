@@ -1809,9 +1809,15 @@ def terminate_process_tree(pid: int = None):
         parent = psutil.Process(pid)
         children = parent.children(recursive=True)
         for child in children:
-            child.terminate()
+            try:
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
         psutil.wait_procs(children, timeout=5)
-        parent.terminate()
+        try:
+            parent.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
         parent.wait(5)
     except psutil.NoSuchProcess:
         pass
@@ -4172,6 +4178,7 @@ class MainWindow(QMainWindow):
         self.worker_thread.wait()  # Wait for the thread to finish
         event.accept()  # Accept the close event
 
+        time.sleep(1) # Gives a second for Windows processes to closes properly
         terminate_script("EXIT")
 
 class WorkerThread(QThread):
