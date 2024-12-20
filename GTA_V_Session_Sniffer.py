@@ -2736,6 +2736,136 @@ def iplookup_core():
 
             throttle_until()
 
+def capture_core():
+    with Threads_ExceptionHandler():
+        def packet_callback(packet: Packet):
+            global tshark_restarted_times, global_pps_counter
+
+            packet_datetime = packet.frame.datetime
+
+            packet_latency = datetime.now() - packet_datetime
+            tshark_packets_latencies.append((packet_datetime, packet_latency))
+            if packet_latency >= timedelta(seconds=Settings.CAPTURE_OVERFLOW_TIMER):
+                tshark_restarted_times += 1
+                raise PacketCaptureOverflow("Packet capture time exceeded 3 seconds.")
+
+            if Settings.CAPTURE_IP_ADDRESS:
+                if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
+                    target_ip = packet.ip.dst
+                    target_port = packet.udp.dstport
+                elif packet.ip.dst == Settings.CAPTURE_IP_ADDRESS:
+                    target_ip = packet.ip.src
+                    target_port = packet.udp.srcport
+                else:
+                    stdout_crash_text = textwrap.dedent(f"""
+                        ERROR:
+                            Developer didn't expect this scenario to be possible.
+
+                        INFOS:
+                            Neither source nor destination IP address matches the specified <CAPTURE_IP_ADDRESS>.
+
+                        DEBUG:
+                            Settings.CAPTURE_IP_ADDRESS: {Settings.CAPTURE_IP_ADDRESS}
+                            packet.ip.src: {packet.ip.src}
+                            packet.ip.dst: {packet.ip.dst}
+                    """.removeprefix("\n").removesuffix("\n"))
+                    terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+            else:
+                is_src_private_ip = is_private_device_ipv4(packet.ip.src)
+                is_dst_private_ip = is_private_device_ipv4(packet.ip.dst)
+
+                if is_src_private_ip and is_dst_private_ip:
+                    return
+                elif is_src_private_ip:
+                    target_ip = packet.ip.dst
+                    target_port = packet.udp.dstport
+                elif is_dst_private_ip:
+                    target_ip = packet.ip.src
+                    target_port = packet.udp.srcport
+                else:
+                    stdout_crash_text = textwrap.dedent(f"""
+                        ERROR:
+                            Developer didn't expect this scenario to be possible.
+
+                        INFOS:
+                            Neither source nor destination is a private IP address.
+
+                        DEBUG:
+                            packet.ip.src: {packet.ip.src}
+                            packet.ip.dst: {packet.ip.dst}
+                    """.removeprefix("\n").removesuffix("\n"))
+                    terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+
+            if target_port is None:
+                stdout_crash_text = textwrap.dedent(f"""
+                    ERROR:
+                        Developer didn't expect this scenario to be possible.
+
+                    INFOS:
+                        A player port was not found.
+                        This situation already happened to me,
+                        but at this time I had not the `target_ip` info
+                        from the packet, so it was useless.
+
+                        Note for the future:
+                        If `target_ip` is a false positive (not a player),
+                        always `continue` on a packet with no port.
+
+                    DEBUG:
+                        target_ip: {target_ip}
+                        target_port: {target_port}
+                """.removeprefix("\n").removesuffix("\n"))
+                terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+
+            global_pps_counter += 1
+
+            player = PlayersRegistry.get_player(target_ip)
+            if player is None:
+                player = PlayersRegistry.add_player(
+                    Player(target_ip, target_port, packet_datetime)
+                )
+
+            if Settings.USERIP_ENABLED:
+                if target_ip in UserIP_Databases.ips_set and not player.userip.detection.as_processed_userip_task:
+                    player.userip.detection.as_processed_userip_task = True
+                    player.userip.detection.type = "Static IP"
+                    player.userip.detection.time = packet_datetime.strftime("%H:%M:%S")
+                    player.userip.detection.date_time = packet_datetime.strftime("%Y-%m-%d_%H:%M:%S")
+                    if UserIP_Databases.update_player_userip_data(player):
+                        threading.Thread(target=process_userip_task, args=(player, "connected"), daemon=True).start()
+
+            if player.is_player_just_registered:
+                player.is_player_just_registered = False
+                return
+
+            # No matter what:
+            player.datetime.last_seen = packet_datetime
+            player.total_packets += 1
+            player.pps.counter += 1
+
+            if player.datetime.left: # player left, rejoined now.
+                player.datetime.left = None
+                player.datetime.last_rejoin = packet_datetime
+                player.rejoins += 1
+                player.packets = 1
+
+                if Settings.STDOUT_RESET_PORTS_ON_REJOINS:
+                    player.ports.reset(target_port)
+                    return
+            else:
+                player.packets += 1
+
+            # player connected, has not been reset
+            if target_port not in player.ports.list:
+                player.ports.list.append(target_port)
+            player.ports.last = target_port
+
+        while True:
+            try:
+                capture.apply_on_packets(callback=packet_callback)
+            except PacketCaptureOverflow:
+                continue
+
 tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
 class GUIrenderingData:
@@ -3733,128 +3863,6 @@ def rendering_core():
 
             time.sleep(0.1)
 
-def packet_callback(packet: Packet):
-    global tshark_restarted_times, global_pps_counter
-
-    packet_datetime = packet.frame.datetime
-
-    packet_latency = datetime.now() - packet_datetime
-    tshark_packets_latencies.append((packet_datetime, packet_latency))
-    if packet_latency >= timedelta(seconds=Settings.CAPTURE_OVERFLOW_TIMER):
-        tshark_restarted_times += 1
-        raise PacketCaptureOverflow("Packet capture time exceeded 3 seconds.")
-
-    if Settings.CAPTURE_IP_ADDRESS:
-        if packet.ip.src == Settings.CAPTURE_IP_ADDRESS:
-            target_ip = packet.ip.dst
-            target_port = packet.udp.dstport
-        elif packet.ip.dst == Settings.CAPTURE_IP_ADDRESS:
-            target_ip = packet.ip.src
-            target_port = packet.udp.srcport
-        else:
-            stdout_crash_text = textwrap.dedent(f"""
-                ERROR:
-                    Developer didn't expect this scenario to be possible.
-
-                INFOS:
-                    Neither source nor destination IP address matches the specified <CAPTURE_IP_ADDRESS>.
-
-                DEBUG:
-                    Settings.CAPTURE_IP_ADDRESS: {Settings.CAPTURE_IP_ADDRESS}
-                    packet.ip.src: {packet.ip.src}
-                    packet.ip.dst: {packet.ip.dst}
-            """.removeprefix("\n").removesuffix("\n"))
-            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-    else:
-        is_src_private_ip = is_private_device_ipv4(packet.ip.src)
-        is_dst_private_ip = is_private_device_ipv4(packet.ip.dst)
-
-        if is_src_private_ip and is_dst_private_ip:
-            return
-        elif is_src_private_ip:
-            target_ip = packet.ip.dst
-            target_port = packet.udp.dstport
-        elif is_dst_private_ip:
-            target_ip = packet.ip.src
-            target_port = packet.udp.srcport
-        else:
-            stdout_crash_text = textwrap.dedent(f"""
-                ERROR:
-                    Developer didn't expect this scenario to be possible.
-
-                INFOS:
-                    Neither source nor destination is a private IP address.
-
-                DEBUG:
-                    packet.ip.src: {packet.ip.src}
-                    packet.ip.dst: {packet.ip.dst}
-            """.removeprefix("\n").removesuffix("\n"))
-            terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-
-    if target_port is None:
-        stdout_crash_text = textwrap.dedent(f"""
-            ERROR:
-                Developer didn't expect this scenario to be possible.
-
-            INFOS:
-                A player port was not found.
-                This situation already happened to me,
-                but at this time I had not the `target_ip` info
-                from the packet, so it was useless.
-
-                Note for the future:
-                If `target_ip` is a false positive (not a player),
-                always `continue` on a packet with no port.
-
-            DEBUG:
-                target_ip: {target_ip}
-                target_port: {target_port}
-        """.removeprefix("\n").removesuffix("\n"))
-        terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
-
-    global_pps_counter += 1
-
-    player = PlayersRegistry.get_player(target_ip)
-    if player is None:
-        player = PlayersRegistry.add_player(
-            Player(target_ip, target_port, packet_datetime)
-        )
-
-    if Settings.USERIP_ENABLED:
-        if target_ip in UserIP_Databases.ips_set and not player.userip.detection.as_processed_userip_task:
-            player.userip.detection.as_processed_userip_task = True
-            player.userip.detection.type = "Static IP"
-            player.userip.detection.time = packet_datetime.strftime("%H:%M:%S")
-            player.userip.detection.date_time = packet_datetime.strftime("%Y-%m-%d_%H:%M:%S")
-            if UserIP_Databases.update_player_userip_data(player):
-                threading.Thread(target=process_userip_task, args=(player, "connected"), daemon=True).start()
-
-    if player.is_player_just_registered:
-        player.is_player_just_registered = False
-        return
-
-    # No matter what:
-    player.datetime.last_seen = packet_datetime
-    player.total_packets += 1
-    player.pps.counter += 1
-
-    if player.datetime.left: # player left, rejoined now.
-        player.datetime.left = None
-        player.datetime.last_rejoin = packet_datetime
-        player.rejoins += 1
-        player.packets = 1
-
-        if Settings.STDOUT_RESET_PORTS_ON_REJOINS:
-            player.ports.reset(target_port)
-            return
-    else:
-        player.packets += 1
-
-    # player connected, has not been reset
-    if target_port not in player.ports.list:
-        player.ports.list.append(target_port)
-    player.ports.last = target_port
-
 cls()
 title(TITLE)
 
@@ -3867,17 +3875,8 @@ rendering_core__thread.start()
 iplookup_core__thread = threading.Thread(target=iplookup_core, daemon=True)
 iplookup_core__thread.start()
 
-def capture_core():
-    with Threads_ExceptionHandler():
-        while True:
-            try:
-                capture.apply_on_packets(callback=packet_callback)
-            except PacketCaptureOverflow:
-                continue
-
 capture_core__thread = threading.Thread(target=capture_core, daemon=True)
 capture_core__thread.start()
-
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QSpacerItem, QAbstractItemView
@@ -4170,6 +4169,8 @@ class MainWindow(QMainWindow):
         self.worker_thread.quit()  # Stop the QThread
         self.worker_thread.wait()  # Wait for the thread to finish
         event.accept()  # Accept the close event
+
+        terminate_script("EXIT")
 
 class WorkerThread(QThread):
     update_header_text_signal = pyqtSignal(str)
@@ -4489,9 +4490,3 @@ if __name__ == "__main__":
 
     # Run the application
     app.exec()
-
-    # Signal rendering_core thread to stop after the app exits
-    gui_closed__event.set()
-    rendering_core__thread.join()
-
-    terminate_script("EXIT")
