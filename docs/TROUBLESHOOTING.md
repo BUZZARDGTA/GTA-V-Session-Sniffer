@@ -29,6 +29,18 @@ Additionally, you can enhance the filtering process by setting `<CAPTURE_BLOCK_T
 You can also adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.  
 These configurations help minimize the display of unrelated IPs.
 
+Furthermore, if none of these solutions worked, you can manually block IPs by editing the `<CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER>` or `<CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER>`.
+For example:
+
+```ini
+<CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER> = "not net 10.0.0.0/24 and not (host 10.0.0.1 or host 10.0.0.2)"
+<CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER> = "ip.addr != 10.0.0.0/24 and not (ip.addr >= 10.0.0.0 and ip.addr <= 10.0.0.255) and not (ip.addr == 10.0.0.1 or ip.addr == 10.0.0.2)"
+```
+
+This capture and display filter serves as an example and demonstrates various ways to block an IP, multiple IPs, or an IP range/CIDR.
+
+Read [📖 Settings Details](SCRIPT_CONFIGURATION.md#editing-settings) for more informations about this.
+
 ## About Screen Refreshing
 
 Refreshing the display of the script positions your terminal's cursor at the very bottom of the script.  
