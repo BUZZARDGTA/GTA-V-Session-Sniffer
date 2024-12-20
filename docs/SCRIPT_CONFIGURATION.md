@@ -231,9 +231,9 @@ This free and limited usage allows for a maximum resolution of (100 \* 15) = 150
 
 ### What's an UserIP database ?
 
-A UserIP database tracks users by linking their in-game usernames to their IP addresses.
+A UserIP database is a file that lets you track users by linking their in-game username to their IP addresss.
 
-In earlier versions, the script used a single database, `Blacklist.ini, for blacklisting users.  
+In earlier versions, the script used a single database, `Blacklist.ini`, for blacklisting users.  
 Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to better suit your needs.
 
 By default, these lists are generated the first time the script runs:
