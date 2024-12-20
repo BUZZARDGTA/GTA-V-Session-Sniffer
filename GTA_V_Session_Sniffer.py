@@ -46,7 +46,7 @@ from colorama import Fore, Back, Style
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
 from Modules.oui_lookup.oui_lookup import MacLookup
-from Modules.capture.capture import PacketCapture, Packet
+from Modules.capture.capture import PacketCapture, Packet, TSharkCrashException
 from Modules.capture.utils import TSharkNotFoundException, InvalidTSharkVersionException, get_tshark_path, is_npcap_or_winpcap_installed
 from Modules.https_utils.unsafe_https import s
 from Modules.msgbox import MsgBox
@@ -2413,6 +2413,7 @@ if not capture.tshark_path == Settings.CAPTURE_TSHARK_PATH:
     Settings.reconstruct_settings()
 
 userip_logging_file_write_lock = threading.Lock()
+gui_closed__event = threading.Event()
 
 def process_userip_task(player: Player, connection_type: Literal["connected", "disconnected"]):
     with Threads_ExceptionHandler():
@@ -2548,7 +2549,7 @@ def iplookup_core():
         MAX_BATCH_IP_API_IPS = 100
         FIELDS_TO_LOOKUP = "continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,mobile,proxy,hosting,query"
 
-        while True:
+        while not gui_closed__event.is_set():
             if ScriptControl.has_crashed():
                 return
 
@@ -2860,9 +2861,13 @@ def capture_core():
                 player.ports.list.append(target_port)
             player.ports.last = target_port
 
-        while True:
+        while not gui_closed__event.is_set():
             try:
                 capture.apply_on_packets(callback=packet_callback)
+            except TSharkCrashException: # IDK why it's not working :/
+                if gui_closed__event.is_set():
+                    return
+                raise
             except PacketCaptureOverflow:
                 continue
 
@@ -3574,7 +3579,7 @@ def rendering_core():
                         if not username in modmenu__plugins__ip_to_usernames[ip]:
                             modmenu__plugins__ip_to_usernames[ip].append(username)
 
-        while True:
+        while not gui_closed__event.is_set():
             if ScriptControl.has_crashed():
                 return
 
@@ -3881,9 +3886,6 @@ capture_core__thread.start()
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QSpacerItem, QAbstractItemView
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QFontMetrics
-
-# Thread stop event
-gui_closed__event = threading.Event()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -4488,5 +4490,4 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
 
-    # Run the application
     app.exec()
