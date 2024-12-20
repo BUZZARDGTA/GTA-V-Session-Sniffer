@@ -210,30 +210,30 @@ In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X)
 5. Start the script and wait for it to enter the "Capture network interface selection" screen.
 6. Then, you'll need to identify the console's IP and MAC Address and select it accordingly.
 
-### Resolving Country, City and ASN fields.
+### Resolving Country, City and ASN / ISP IP Lookup fields
 
-The script relies on [MaxMind’s GeoIP2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) to resolve player information.  
+The script relies on the free [MaxMind’s GeoLite2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) databases to resolve these informations.  
 Upon startup, it automatically attempts to check for updates and downloads the latest version from the [PrxyHunter/GeoLite2](https://github.com/PrxyHunter/GeoLite2) repository.
 
 In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.  
 You can obtain copies of these databases by signing up for GeoLite2 on the [MaxMind](https://www.maxmind.com/) official website and downloading them from there.  
-Then you will need to create a new folder named `GeoLite2 Databases` within the script's directory, and place the database files there.
+Then you will need to place the database files into the existing `GeoLite2 Databases` folder within the script's directory.
 
-Please note that I am not allowed to publicly distribute their database in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).  
+Please note that I am not allowed to publicly distribute their databases in my project due to their strict [license](https://www.maxmind.com/en/site-license-overview).  
 You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 
-### Resolving Mobile, Proxy and Hosting fields.
+### Resolving other IP Lookup fields
 
-The script relies on the free [ip-api](https://ip-api.com/) API website to resolve player's "Mobile", "VPN" and "Hosting" fields.  
+The script relies on the free [IP-API](https://ip-api.com/) website to resolve these informations.  
 This free and limited usage allows for a maximum resolution of (100 \* 15) = 1500 IPs per minute.
 
 ## UserIP INI databases Configuration
 
 ### What's an UserIP database ?
 
-A UserIP database is a file that lets you track users by linking their in-game username to their IP addresss.
+A UserIP database tracks users by linking their in-game usernames to their IP addresses.
 
-In earlier versions, the script used a single database, `Blacklist.ini`, for blacklisting users.  
+In earlier versions, the script used a single database, `Blacklist.ini, for blacklisting users.  
 Since [v1.1.8](https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/releases/tag/v1.1.8), you can create multiple lists with custom behaviors to better suit your needs.
 
 By default, these lists are generated the first time the script runs:
