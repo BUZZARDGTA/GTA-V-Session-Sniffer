@@ -28,6 +28,7 @@ To mitigate this, it is recommended to close all other P2P applications while us
 Additionally, you can enhance the filtering process by setting `<CAPTURE_BLOCK_THIRD_PARTY_SERVERS>` to `True` in your `Settings.ini` file.  
 You can also adjust `<CAPTURE_PROGRAM_PRESET>` to correspond to the program you are scanning.  
 These configurations help minimize the display of unrelated IPs.
+Read [📖 Settings Details](SCRIPT_CONFIGURATION.md#editing-settings) for more informations about these settings.
 
 Furthermore, if none of these solutions worked, you can manually block IPs by editing the `<CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER>` or `<CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER>`.
 For example:
@@ -38,8 +39,6 @@ For example:
 ```
 
 This capture and display filter serves as an example and demonstrates various ways to block an IP, multiple IPs, or an IP range/CIDR.
-
-Read [📖 Settings Details](SCRIPT_CONFIGURATION.md#editing-settings) for more informations about this.
 
 ## About Screen Refreshing
 
