@@ -212,7 +212,7 @@ In order to scan for a console (PS3/PS4/PS5 and Xbox 360/Xbox One/Xbox Series X)
 
 ### Resolving Country, City and ASN / ISP IP Lookup fields
 
-The script relies on the free [MaxMind’s GeoLite2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) databases to resolve these informations.  
+The script relies on the free [MaxMind’s GeoLite2 databases](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) to resolve these informations.  
 Upon startup, it automatically attempts to check for updates and downloads the latest version from the [PrxyHunter/GeoLite2](https://github.com/PrxyHunter/GeoLite2) repository.
 
 In the event that this repository is deleted, you will need to manually download the following MaxMind GeoLite2 databases: `GeoLite2-ASN.mmdb`, `GeoLite2-City.mmdb` and `GeoLite2-Country.mmdb`.  
@@ -225,7 +225,8 @@ You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 ### Resolving other IP Lookup fields
 
 The script relies on the free [IP-API](https://ip-api.com/) website to resolve these informations.  
-This free and limited usage allows for a maximum resolution of (100 \* 15) = 1500 IPs per minute.
+No action is required, as the script handles this process seamlessly.  
+It allows up to 1500 IP resolutions per minute.
 
 ## UserIP INI databases Configuration
 
