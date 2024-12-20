@@ -322,7 +322,6 @@ class DefaultSettings:
     STDOUT_FIELD_AS_NAME_MAX_LEN = 20
     STDOUT_DISCONNECTED_PLAYERS_TIMER = 10.0
     STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
-    STDOUT_REFRESHING_TIMER = 3
     USERIP_ENABLED = True
     DISCORD_PRESENCE = True
 
@@ -701,19 +700,6 @@ class Settings(DefaultSettings):
                     else:
                         if stdout_counter_session_disconnected_players >= 0:
                             Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER = stdout_counter_session_disconnected_players
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_REFRESHING_TIMER":
-                    try:
-                        if "." in setting_value:
-                            stdout_refreshing_timer = float(setting_value)
-                        else:
-                            stdout_refreshing_timer = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_refreshing_timer >= 0:
-                            Settings.STDOUT_REFRESHING_TIMER = stdout_refreshing_timer
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "USERIP_ENABLED":
@@ -2763,7 +2749,6 @@ class GUIrenderingData:
     pps_color: str = '<span style="color: green;">'
     latency_color: str = '<span style="color: green;">'
     color_tshark_restarted_time: str = '<span style="color: green;">'
-    bottom_text: str = "Scanning IPs, refreshing display in N/A second(s) ..."
     session_connected: list[Player] = []
     session_disconnected: list[Player] = []
 
@@ -3469,7 +3454,6 @@ def rendering_core():
             session_disconnected__padding_continent_name = 0
             session_connected: list[Player] = []
             session_disconnected: list[Player] = []
-            main_loop__t1 = time.perf_counter()
 
             if last_mod_menus_logs_parse_time is None or time.perf_counter() - last_mod_menus_logs_parse_time >= 1.0:
                 last_mod_menus_logs_parse_time = time.perf_counter()
@@ -3745,59 +3729,9 @@ def rendering_core():
                 if discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0:
                     discord_rpc_manager.update(f"{len(session_connected_sorted)} player{plural(len(session_connected_sorted))} connected in the session.")
 
-            og_process_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
+            GUIrenderingData.is_rendering_core_ready = True
 
-            if Settings.STDOUT_REFRESHING_TIMER == 0:
-                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)})"
-                    GUIrenderingData.is_rendering_core_ready = True
-                    continue
-                else:
-                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display as fast as possible (last refresh took: ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)})"
-                    GUIrenderingData.is_rendering_core_ready = True
-                    continue
-
-            if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
-                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed, 1)} second{plural(og_process_refreshing__time_elapsed)} ..."
-                    GUIrenderingData.is_rendering_core_ready = True
-                    time.sleep(0.1)
-                    continue
-            else:
-                if og_process_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
-                    GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display took longer than expected, refreshing in ~{round(og_process_refreshing__time_elapsed)} second{plural(og_process_refreshing__time_elapsed)} ..."
-                    GUIrenderingData.is_rendering_core_ready = True
-                    time.sleep(0.1)
-                    continue
-
-            while True:
-                total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
-
-                if isinstance(Settings.STDOUT_REFRESHING_TIMER, float):
-                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - total_refreshing__time_elapsed, 0.1)
-                    seconds_left = round(seconds_left, 1)
-                    remaining_sleep_seconds = 0
-                    eta = max(round(seconds_left + og_process_refreshing__time_elapsed, 1), 0.1)
-                else:
-                    seconds_left = max(Settings.STDOUT_REFRESHING_TIMER - total_refreshing__time_elapsed, 1)
-                    seconds_left = round(seconds_left)
-                    remaining_sleep_seconds = 0.9
-                    eta = max(round(seconds_left + og_process_refreshing__time_elapsed), 1)
-
-                GUIrenderingData.bottom_text = f"Scanning IPs, refreshing display in {eta} second{plural(eta)} ..."
-                GUIrenderingData.is_rendering_core_ready = True
-                time.sleep(0.1)
-
-                total_refreshing__time_elapsed = time.perf_counter() - main_loop__t1
-                if total_refreshing__time_elapsed > Settings.STDOUT_REFRESHING_TIMER:
-                    break
-
-                if remaining_sleep_seconds > 0:
-                    time.sleep(remaining_sleep_seconds)
-
-                    if Settings.USERIP_ENABLED:
-                        if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
-                            last_userip_parse_time = update_userip_databases(last_userip_parse_time)
+            time.sleep(0.1)
 
 def packet_callback(packet: Packet):
     global tshark_restarted_times, global_pps_counter
@@ -4084,12 +4018,6 @@ class MainWindow(QMainWindow):
         #spacer = QSpacerItem(0, 20, QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
         #layout.addItem(spacer)
 
-        # Bottom text
-        self.bottom_text = QLabel(GUIrenderingData.bottom_text)
-        self.bottom_text.setTextFormat(Qt.TextFormat.RichText)
-        self.bottom_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.bottom_text)
-
         # Assign the layout to the central widget
         central_widget.setLayout(layout)
 
@@ -4098,7 +4026,6 @@ class MainWindow(QMainWindow):
         self.worker_thread.update_header_text_signal.connect(self.update_header_text)
         self.worker_thread.update_session_connected_table_signal.connect(self.update_session_connected_table)
         self.worker_thread.update_session_disconnected_table_signal.connect(self.update_session_disconnected_table)
-        self.worker_thread.update_bottom_text_signal.connect(self.update_bottom_text)
         self.worker_thread.start()
 
     def get_sorted_column(self, table: QTableWidget):
@@ -4136,9 +4063,6 @@ class MainWindow(QMainWindow):
         self.session_disconnected_header.setText(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
         self.populate_table(self.session_disconnected, data, QColor('red'))
         self.adjust_column_widths(self.session_disconnected)
-
-    def update_bottom_text(self, text: str):
-        self.bottom_text.setText(text)
 
     def initial_adjust_column_widths(self, table_widget: QTableWidget, margin: int = 30):
         """
@@ -4251,7 +4175,6 @@ class WorkerThread(QThread):
     update_header_text_signal = pyqtSignal(str)
     update_session_connected_table_signal = pyqtSignal(list)
     update_session_disconnected_table_signal = pyqtSignal(list)
-    update_bottom_text_signal = pyqtSignal(str)
 
     def __init__(self, main_window_instance: MainWindow):
         super().__init__()
@@ -4552,9 +4475,8 @@ class WorkerThread(QThread):
             self.update_header_text_signal.emit(header_text)
             self.update_session_connected_table_signal.emit(updated_session_connected_table)
             self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
-            self.update_bottom_text_signal.emit(GUIrenderingData.bottom_text)
 
-            time.sleep(Settings.STDOUT_REFRESHING_TIMER)
+            time.sleep(0.1)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
