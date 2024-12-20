@@ -224,7 +224,7 @@ You must obtain it directly from [MaxMind](https://www.maxmind.com/) website.
 
 ### Resolving other IP Lookup fields
 
-The script relies on the free [IP-API](https://ip-api.com/) website to resolve these informations.  
+The script relies on the free [IP-API website](https://ip-api.com/) to resolve these informations.  
 No action is required, as the script handles this process seamlessly.  
 It allows up to 1500 IP resolutions per minute.
 
