@@ -300,7 +300,6 @@ class DefaultSettings:
     CAPTURE_OVERFLOW_TIMER = 3.0
     CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER = None
     CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = None
-    STDOUT_SHOW_ADVERTISING_HEADER = True
     STDOUT_SESSIONS_LOGGING = True
     STDOUT_RESET_PORTS_ON_REJOINS = True
     STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "ASN"]
@@ -311,17 +310,7 @@ class DefaultSettings:
     STDOUT_FIELD_SHOW_CONTINENT_CODE = True
     STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
     STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
-    STDOUT_FIELD_COUNTRY_MAX_LEN = 20
-    STDOUT_FIELD_CITY_MAX_LEN = 20
-    STDOUT_FIELD_CONTINENT_MAX_LEN = 20
-    STDOUT_FIELD_REGION_MAX_LEN = 20
-    STDOUT_FIELD_ORGANIZATION_MAX_LEN = 20
-    STDOUT_FIELD_ISP_MAX_LEN = 20
-    STDOUT_FIELD_ASN_ISP_MAX_LEN = 20
-    STDOUT_FIELD_AS_MAX_LEN = 20
-    STDOUT_FIELD_AS_NAME_MAX_LEN = 20
     STDOUT_DISCONNECTED_PLAYERS_TIMER = 10.0
-    STDOUT_DISCONNECTED_PLAYERS_COUNTER = 6
     USERIP_ENABLED = True
     DISCORD_PRESENCE = True
 
@@ -515,11 +504,6 @@ class Settings(DefaultSettings):
                             Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = f"({updated_setting_value})"
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_SHOW_ADVERTISING_HEADER":
-                    try:
-                        Settings.STDOUT_SHOW_ADVERTISING_HEADER, need_rewrite_current_setting = custom_str_to_bool(setting_value)
-                    except InvalidBooleanValueError:
-                        need_rewrite_settings = True
                 elif setting_name == "STDOUT_SESSIONS_LOGGING":
                     try:
                         Settings.STDOUT_SESSIONS_LOGGING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
@@ -592,96 +576,6 @@ class Settings(DefaultSettings):
                             need_rewrite_current_setting = True
                     else:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_COUNTRY_MAX_LEN":
-                    try:
-                        stdout_field_country_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_country_max_len >= 1:
-                            Settings.STDOUT_FIELD_COUNTRY_MAX_LEN = stdout_field_country_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_CONTINENT_MAX_LEN":
-                    try:
-                        stdout_field_continent_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_continent_max_len >= 1:
-                            Settings.STDOUT_FIELD_CONTINENT_MAX_LEN = stdout_field_continent_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_REGION_MAX_LEN":
-                    try:
-                        stdout_field_region_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_region_max_len >= 1:
-                            Settings.STDOUT_FIELD_REGION_MAX_LEN = stdout_field_region_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_CITY_MAX_LEN":
-                    try:
-                        stdout_field_city_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_city_max_len >= 1:
-                            Settings.STDOUT_FIELD_CITY_MAX_LEN = stdout_field_city_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_ORGANIZATION_MAX_LEN":
-                    try:
-                        stdout_field_organization_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_organization_max_len >= 1:
-                            Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN = stdout_field_organization_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_ISP_MAX_LEN":
-                    try:
-                        stdout_field_isp_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_isp_max_len >= 1:
-                            Settings.STDOUT_FIELD_ISP_MAX_LEN = stdout_field_isp_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_ASN_ISP_MAX_LEN":
-                    try:
-                        stdout_field_asn_isp_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_asn_isp_max_len >= 1:
-                            Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN = stdout_field_asn_isp_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_AS_MAX_LEN":
-                    try:
-                        stdout_field_as_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_as_max_len >= 1:
-                            Settings.STDOUT_FIELD_AS_MAX_LEN = stdout_field_as_max_len
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_AS_NAME_MAX_LEN":
-                    try:
-                        stdout_field_as_name_max_len = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_field_as_name_max_len >= 1:
-                            Settings.STDOUT_FIELD_AS_NAME_MAX_LEN = stdout_field_as_name_max_len
-                        else:
-                            need_rewrite_settings = True
                 elif setting_name == "STDOUT_DISCONNECTED_PLAYERS_TIMER":
                     try:
                         player_disconnected_timer = float(setting_value)
@@ -690,16 +584,6 @@ class Settings(DefaultSettings):
                     else:
                         if player_disconnected_timer >= 3.0:
                             Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER = player_disconnected_timer
-                        else:
-                            need_rewrite_settings = True
-                elif setting_name == "STDOUT_DISCONNECTED_PLAYERS_COUNTER":
-                    try:
-                        stdout_counter_session_disconnected_players = int(setting_value)
-                    except (ValueError, TypeError):
-                        need_rewrite_settings = True
-                    else:
-                        if stdout_counter_session_disconnected_players >= 0:
-                            Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER = stdout_counter_session_disconnected_players
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "USERIP_ENABLED":
@@ -917,11 +801,11 @@ class MaxMind_GeoLite2:
         """
         self.compiled.country        = "..." if self.country      is None else str(self.country)
         self.compiled.country_code   = "..." if self.country_code is None else str(self.country_code)
-        self.compiled.country_short  = "..." if self.country      is None else truncate_with_ellipsis(str(self.country), Settings.STDOUT_FIELD_COUNTRY_MAX_LEN)
+        self.compiled.country_short  = "..." if self.country      is None else str(self.country)
         self.compiled.city           = "..." if self.city         is None else str(self.city)
-        self.compiled.city_short     = "..." if self.city         is None else truncate_with_ellipsis(str(self.city), Settings.STDOUT_FIELD_CITY_MAX_LEN)
+        self.compiled.city_short     = "..." if self.city         is None else str(self.city)
         self.compiled.asn            = "..." if self.asn          is None else str(self.asn)
-        self.compiled.asn_short      = "..." if self.asn          is None else truncate_with_ellipsis(str(self.asn), Settings.STDOUT_FIELD_ASN_ISP_MAX_LEN)
+        self.compiled.asn_short      = "..." if self.asn          is None else str(self.asn)
 
 class IPAPI_Compiled:
     def __init__(self):
@@ -990,7 +874,7 @@ class IPAPI:
         self.compiled.country        = "..." if self.country        is None else str(self.country)
         self.compiled.country_code   = "..." if self.country_code   is None else str(self.country_code)
         self.compiled.region         = "..." if self.region         is None else str(self.region)
-        self.compiled.region_short   = "..." if self.region         is None else truncate_with_ellipsis(str(self.region), Settings.STDOUT_FIELD_REGION_MAX_LEN)
+        self.compiled.region_short   = "..." if self.region         is None else str(self.region)
         self.compiled.region_code    = "..." if self.region_code    is None else str(self.region_code)
         self.compiled.city           = "..." if self.city           is None else str(self.city)
         self.compiled.district       = "..." if self.district       is None else str(self.district)
@@ -1001,13 +885,13 @@ class IPAPI:
         self.compiled.offset         = "..." if self.offset         is None else str(self.offset)
         self.compiled.currency       = "..." if self.currency       is None else str(self.currency)
         self.compiled.org            = "..." if self.org            is None else str(self.org)
-        self.compiled.org_short      = "..." if self.org            is None else truncate_with_ellipsis(str(self.org), Settings.STDOUT_FIELD_ORGANIZATION_MAX_LEN)
+        self.compiled.org_short      = "..." if self.org            is None else str(self.org)
         self.compiled.isp            = "..." if self.isp            is None else str(self.isp)
-        self.compiled.isp_short      = "..." if self.isp            is None else truncate_with_ellipsis(str(self.isp), Settings.STDOUT_FIELD_ISP_MAX_LEN)
+        self.compiled.isp_short      = "..." if self.isp            is None else str(self.isp)
         self.compiled._as            = "..." if self._as            is None else str(self._as)
-        self.compiled.as_short       = "..." if self._as            is None else truncate_with_ellipsis(str(self._as), Settings.STDOUT_FIELD_AS_MAX_LEN)
+        self.compiled.as_short       = "..." if self._as            is None else str(self._as)
         self.compiled.as_name        = "..." if self.as_name        is None else str(self.as_name)
-        self.compiled.as_name_short  = "..." if self.as_name        is None else truncate_with_ellipsis(str(self.as_name), Settings.STDOUT_FIELD_AS_NAME_MAX_LEN)
+        self.compiled.as_name_short  = "..." if self.as_name        is None else str(self.as_name)
         self.compiled.mobile         = "..." if self.mobile         is None else str(self.mobile)
         self.compiled.proxy          = "..." if self.proxy          is None else str(self.proxy)
         self.compiled.hosting        = "..." if self.hosting        is None else str(self.hosting)
@@ -1541,22 +1425,6 @@ def format_mac_address(mac_address: str):
         terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
     return mac_address.replace("-", ":").upper()
-
-def truncate_with_ellipsis(string: str, max_length: int):
-    """
-    Format a string by truncating it to a specified maximum length, and appending "..." if truncated.
-
-    Args:
-        string: The string to format.
-        max_length: The maximum length of the formatted string.
-
-    Returns:
-        str: The formatted string, truncated with "..." if it exceeds the specified `max_length`.
-             Otherwise, returns the original `string`.
-    """
-    if len(string) > max_length:
-        return f"{string[:max_length]}..."
-    return string
 
 def show_error__tshark_not_detected():
     from Modules.consts import WIRESHARK_REQUIRED_DL
@@ -3673,9 +3541,6 @@ def rendering_core():
                 SESSION_DISCONNECTED_SORTED_KEY
             )
 
-            if Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER > 0:
-                session_disconnected_sorted = take(Settings.STDOUT_DISCONNECTED_PLAYERS_COUNTER, session_disconnected_sorted)
-
             for player in session_disconnected_sorted:
                 session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
                 session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
@@ -3880,16 +3745,19 @@ class MainWindow(QMainWindow):
             # Find the column index for the given field name
             column_count = table_widget.columnCount()
             column_index = None
-            for col in range(column_count):
-                header_item = table_widget.horizontalHeaderItem(col)
+            for column in range(column_count):
+                header_item = table_widget.horizontalHeaderItem(column)
                 if header_item and header_item.text() == field_name:
-                    column_index = col
+                    column_index = column
                     break
 
             if column_index is not None:
                 # Set the sort indicator for the column
                 sort_order = Qt.SortOrder.AscendingOrder if ascending else Qt.SortOrder.DescendingOrder
+                table_widget.setSortingEnabled(False)
                 table_widget.horizontalHeader().setSortIndicator(column_index, sort_order)
+                table_widget.horizontalHeader().setSortIndicatorShown(True)
+
 
         self.setWindowTitle(TITLE)
         self.setGeometry(100, 100, 800, 600)  # Initial window size
@@ -3928,38 +3796,23 @@ class MainWindow(QMainWindow):
         self.session_connected.setColumnCount(len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES))
         self.session_connected.setHorizontalHeaderLabels(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.session_connected.verticalHeader().setVisible(False)  # Hide row index
-        self.session_connected.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing columns
         self.session_connected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.session_connected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_connected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Disable editing for both tables
-        # Disable editing for both tables (by setting flags for each item)
-        #self.set_table_non_editable(self.session_connected)
-        #self.set_table_non_editable(self.session_disconnected)
-
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_connected, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
-        self.session_connected.setSortingEnabled(False)
-        self.session_connected.horizontalHeader().setSortIndicator(1, Qt.SortOrder.AscendingOrder)
-        self.session_connected.horizontalHeader().setSortIndicatorShown(True)
 
         self.adjust_column_widths(self.session_connected)
 
         # Add Session Connected table to the layout
         layout.addWidget(self.session_connected)
 
-        # Add a larger vertical spacer (increased height and expanded)
-        #layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
         # Add a horizontal line separator
         separator = QFrame(self)
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)  # Optional shadow effect
         layout.addWidget(separator)
-
-        # Add a larger vertical spacer (increased height and expanded)
-        #layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Custom header for the Session Disconnected table with matching background as first column
         self.session_disconnected_header = QLabel(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
@@ -3976,25 +3829,17 @@ class MainWindow(QMainWindow):
         self.session_disconnected.setColumnCount(len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES))
         self.session_disconnected.setHorizontalHeaderLabels(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.session_disconnected.verticalHeader().setVisible(False)  # Hide row index
-        self.session_disconnected.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # Allow user resizing columns
         self.session_disconnected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.session_disconnected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_disconnected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_disconnected, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
-        self.session_disconnected.setSortingEnabled(False)
-        self.session_disconnected.horizontalHeader().setSortIndicator(2, Qt.SortOrder.AscendingOrder)
-        self.session_disconnected.horizontalHeader().setSortIndicatorShown(True)
 
         self.adjust_column_widths(self.session_disconnected)
 
         # Add Session Disconnected table to the layout
         layout.addWidget(self.session_disconnected)
-
-        # Add a larger vertical spacer (increased height and expanded)
-        #spacer = QSpacerItem(0, 20, QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
-        #layout.addItem(spacer)
 
         # Assign the layout to the central widget
         central_widget.setLayout(layout)
@@ -4049,8 +3894,19 @@ class MainWindow(QMainWindow):
         """Adjust the column widths to fit the max content length."""
         for column in range(table.columnCount()):
             header_label = table.horizontalHeaderItem(column).text()
+
             if header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+            elif header_label == "Usernames":
+                all_na = True
+                for row in range(table.rowCount()):
+                    if table.item(row, column) is None or table.item(row, column).text() != "N/A":
+                        all_na = False
+                        break
+                if all_na:
+                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                else:
+                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
             else:
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
 
