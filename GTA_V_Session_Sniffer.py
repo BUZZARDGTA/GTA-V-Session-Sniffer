@@ -3617,7 +3617,7 @@ def rendering_core():
                 logging_connected_players_table.field_names = LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
                 logging_connected_players_table.align = "l"
                 for player in session_connected_sorted:
-                    row = []
+                    row: list[str] = []
                     row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
@@ -3657,7 +3657,7 @@ def rendering_core():
                 logging_disconnected_players_table.field_names = LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
                 logging_disconnected_players_table.align = "l"
                 for player in session_disconnected:
-                    row = []
+                    row: list[str] = []
                     row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
@@ -4102,8 +4102,9 @@ class WorkerThread(QThread):
         while not gui_closed__event.is_set():
             start_time = time.time()
 
-            updated_session_connected_table = []
-            updated_session_disconnected_table = []
+            updated_session_connected_table: list[list[str]] = []
+            updated_session_disconnected_table: list[list[str]] = []
+
 
             session_connected_sorted_column_name, session_connected_sort_order = self.main_window.get_sorted_column(self.main_window.session_connected)
             session_disconnected_sorted_column_name, session_disconnected_sort_order = self.main_window.get_sorted_column(self.main_window.session_disconnected)
@@ -4277,14 +4278,14 @@ class WorkerThread(QThread):
             self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
 
             while time.time() - start_time < 3:
-                time.sleep(0.1)
+                self.msleep(100)
 
                 if self.main_window.user_requested_sorting_by_field:
                     self.main_window.user_requested_sorting_by_field = False
                     break
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication([])
 
     while not GUIrenderingData.is_rendering_core_ready:
         time.sleep(0.1)
