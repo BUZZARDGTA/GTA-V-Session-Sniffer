@@ -4105,7 +4105,6 @@ class WorkerThread(QThread):
             updated_session_connected_table: list[list[str]] = []
             updated_session_disconnected_table: list[list[str]] = []
 
-
             session_connected_sorted_column_name, session_connected_sort_order = self.main_window.get_sorted_column(self.main_window.session_connected)
             session_disconnected_sorted_column_name, session_disconnected_sort_order = self.main_window.get_sorted_column(self.main_window.session_disconnected)
 
