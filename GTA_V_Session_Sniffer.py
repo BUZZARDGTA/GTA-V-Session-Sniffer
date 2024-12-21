@@ -3913,6 +3913,13 @@ class MainWindow(QMainWindow):
             else:
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
 
+            # BUG: Unfortunately this doesnt work because of the code just above.
+            ## Check if the column has a sort indicator
+            #if table.horizontalHeader().sortIndicatorSection() == column:
+            #    current_width = table.horizontalHeader().sectionSize(column)
+            #    # Add 100 pixels of padding if the sort indicator is shown
+            #    table.horizontalHeader().resizeSection(column, current_width + 100)
+
     def populate_table(self, table: QTableWidget, data: list[list[str]], default_text_color: QColor):
         """
         Populate a QTableWidget with data and set the text color.
