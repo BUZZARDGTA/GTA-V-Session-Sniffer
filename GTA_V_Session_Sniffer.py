@@ -2922,34 +2922,6 @@ def rendering_core():
             padding_width = calculate_padding_width(HEADER_TEXT_MAX_LENGTH, len(ANSI_ESCAPE.sub("", text)))
             return f"{' ' * padding_width}{text}"
 
-        def compile_header_text():
-            def format_network_interface_message():
-                """Generates a formatted message for the network interface being scanned."""
-                global displayed_capture_ip_address, is_arp_enabled
-
-                is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-                displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-
-                return print_in_header(f"Scanning on interface:{Fore.YELLOW}{capture.interface}{Fore.RESET} at IP:{Fore.YELLOW}{displayed_capture_ip_address}{Fore.RESET} (ARP:{Fore.YELLOW}{is_arp_enabled}{Fore.RESET})")
-
-            from Modules.consts import HEADER_TEXT_MIDDLE_SEPARATOR
-
-            header = [""]
-            if Settings.STDOUT_SHOW_ADVERTISING_HEADER:
-                header.append(HEADER_TEXT_SEPARATOR)
-                header.append(f"{UNDERLINE}Advertising{UNDERLINE_RESET}:")
-                header.append("  * https://github.com/BUZZARDGTA")
-                header.append("")
-                header.append(f"{UNDERLINE}Contact Details{UNDERLINE_RESET}:")
-                header.append("    You can contact me from Email: BUZZARDGTA@protonmail.com, Discord: waitingforharukatoaddme or Telegram: https://t.me/waitingforharukatoaddme")
-                header.append("")
-            header.append(HEADER_TEXT_SEPARATOR)
-            header.append(print_in_header(f"Welcome in {TITLE} {VERSION}"))
-            header.append(print_in_header("The best FREE and Open-Source packet sniffer aka IP grabber, works WITHOUT mods."))
-            header.append(HEADER_TEXT_MIDDLE_SEPARATOR)
-            header.append(format_network_interface_message())
-            return "\n".join(header)
-
         def generate_field_names():
             def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
                 updated_field_names = [
@@ -3544,7 +3516,6 @@ def rendering_core():
         SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
         SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
         FIELDS_TO_HIDE_IN_STDOUT = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.STDOUT_FIELDS_TO_HIDE)
-        HEADER_TEXT = compile_header_text()
 
         (
             STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
@@ -3872,7 +3843,7 @@ def rendering_core():
 
             GUIrenderingData.is_rendering_core_ready = True
 
-            time.sleep(0.1)
+            time.sleep(1)
 
 cls()
 title(TITLE)
@@ -3973,7 +3944,7 @@ class MainWindow(QMainWindow):
         self.session_connected.horizontalHeader().setSortIndicator(1, Qt.SortOrder.AscendingOrder)
         self.session_connected.horizontalHeader().setSortIndicatorShown(True)
 
-        self.initial_adjust_column_widths(self.session_connected)
+        self.adjust_column_widths(self.session_connected)
 
         # Add Session Connected table to the layout
         layout.addWidget(self.session_connected)
@@ -4016,7 +3987,7 @@ class MainWindow(QMainWindow):
         self.session_disconnected.horizontalHeader().setSortIndicator(2, Qt.SortOrder.AscendingOrder)
         self.session_disconnected.horizontalHeader().setSortIndicatorShown(True)
 
-        self.initial_adjust_column_widths(self.session_disconnected)
+        self.adjust_column_widths(self.session_disconnected)
 
         # Add Session Disconnected table to the layout
         layout.addWidget(self.session_disconnected)
@@ -4048,6 +4019,9 @@ class MainWindow(QMainWindow):
         return sorted_column_name, sort_order
 
     def get_header_text(self):
+        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+        displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+
         return textwrap.dedent(f"""
             ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
             Welcome in {TITLE} {VERSION}<br>
@@ -4071,74 +4045,14 @@ class MainWindow(QMainWindow):
         self.populate_table(self.session_disconnected, data, QColor('red'))
         self.adjust_column_widths(self.session_disconnected)
 
-    def initial_adjust_column_widths(self, table_widget: QTableWidget, margin: int = 30):
-        """
-        Adjusts column widths based on the header text.
-        Each column will be resized to the width of its header text plus a margin for error.
-
-        Args:
-            table_widget: The table widget to adjust columns for.
-            margin: The additional margin (in pixels) to add to the calculated width.
-        """
-        for column_index in range(table_widget.columnCount()):
-            header_item = table_widget.horizontalHeaderItem(column_index)
-
-            # Get the width of the header text using QFontMetrics
-            header_width = QFontMetrics(header_item.font()).boundingRect(header_item.text()).width()
-
-            # Set the column width to the header text width plus the margin
-            table_widget.setColumnWidth(column_index, header_width + margin)
-
-    def adjust_column_widths(self, table_widget: QTableWidget, margin: int = 20):
-        """
-        Adjusts column widths based on the header text and the content of the rows.\n
-        Each column will be resized to the width of its header text plus the maximum width of the row text,\n
-        plus a margin for error. If the column contains a sort indicator, an additional margin is added.\n
-        If the calculated width exceeds a reasonable threshold, it will be resized to a smaller value with the margin.
-
-        Args:
-            table_widget: The table widget to adjust columns for.
-            margin: The additional margin (in pixels) to add to the calculated width.
-        """
-        for column_index in range(table_widget.columnCount()):
-            # Get the header item and calculate the header text width
-            header_item = table_widget.horizontalHeaderItem(column_index)
-            header_width = QFontMetrics(header_item.font()).boundingRect(header_item.text()).width()
-
-            # Initialize a variable to track the maximum row content width for this column
-            max_row_width = header_width
-
-            # Iterate through each row in the column and calculate the maximum width needed for the row content
-            for row_index in range(table_widget.rowCount()):
-                if item := table_widget.item(row_index, column_index):  # Check if the cell has content
-                    row_width = QFontMetrics(item.font()).boundingRect(item.text()).width()
-                    max_row_width = max(max_row_width, row_width)
-
-            # Calculate the total width needed: max(header_width, max_row_width) + margin
-            required_width = header_width + margin
-
-            # Check if the column contains a sort indicator, and add extra margin if it does
-            if column_index == table_widget.horizontalHeader().sortIndicatorSection():
-                required_width += 16  # Add extra margin for sort indicator
-
-            # Get the current column width
-            current_width = table_widget.columnWidth(column_index)
-
-            # Resize to the calculated width if it's larger than the current width
-            if required_width > current_width:
-                table_widget.setColumnWidth(column_index, required_width)
-
-            # Ensure the column width doesn't exceed the max resize limit
-            if table_widget.columnWidth(column_index) > max_row_width + margin + 16:
-                table_widget.setColumnWidth(column_index, max_row_width + margin + 16)
-
-
-    #def adjust_column_widths(self, table: QTableWidget):
-    #    """Adjust the column widths to fit the max content length."""
-    #    for column in range(table.columnCount()):
-    #        table.resizeColumnToContents(column)
-    #        # Optionally, you can set a minimum width to prevent columns from being too small
-    #        table.horizontalHeader().setMinimumSectionSize(10)  # Set a min width for the columns if needed
+    def adjust_column_widths(self, table: QTableWidget):
+        """Adjust the column widths to fit the max content length."""
+        for column in range(table.columnCount()):
+            header_label = table.horizontalHeaderItem(column).text()
+            if header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+            else:
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
 
     def populate_table(self, table: QTableWidget, data: list[list[str]], default_text_color: QColor):
         """
@@ -4481,12 +4395,12 @@ class WorkerThread(QThread):
 
                 updated_session_disconnected_table.append(row)
 
-            header_text = self.main_window.get_header_text()  # Call the method on the instance
+            header_text = self.main_window.get_header_text()
             self.update_header_text_signal.emit(header_text)
             self.update_session_connected_table_signal.emit(updated_session_connected_table)
             self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
 
-            time.sleep(0.1)
+            time.sleep(3)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
