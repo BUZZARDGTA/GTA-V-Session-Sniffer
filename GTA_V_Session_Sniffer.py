@@ -316,10 +316,10 @@ class DefaultSettings:
 
 class Settings(DefaultSettings):
     stdout_fields_mapping = {
+        "Usernames": "userip.usernames",
         "First Seen": "datetime.first_seen",
         "Last Rejoin": "datetime.last_rejoin",
         "Last Seen": "datetime.last_seen",
-        "Usernames": "userip.usernames",
         "Rejoins": "rejoins",
         "T. Packets": "total_packets",
         "Packets": "packets",
@@ -349,7 +349,7 @@ class Settings(DefaultSettings):
         "VPN": "iplookup.ipapi.compiled.proxy",
         "Hosting": "iplookup.ipapi.compiled.hosting"
     }
-    stdout_forced_fields = ["First Seen", "Last Rejoin", "Last Seen", "Usernames", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address"]
+    stdout_forced_fields = ["Usernames", "First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address"]
     stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
     stdout_all_connected_fields = [field for field in stdout_forced_fields if field != "Last Seen"] + stdout_hideable_fields
     stdout_all_disconnected_fields = [field for field in stdout_forced_fields if field != "PPS"] + stdout_hideable_fields
@@ -3617,9 +3617,9 @@ def rendering_core():
                 logging_connected_players_table.align = "l"
                 for player in session_connected_sorted:
                     row = []
+                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
@@ -3657,10 +3657,10 @@ def rendering_core():
                 logging_disconnected_players_table.align = "l"
                 for player in session_disconnected:
                     row = []
+                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
                     row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
-                    row.append(f"{format_player_logging_usernames(player.usernames)}")
                     row.append(f"{player.rejoins}")
                     row.append(f"{player.total_packets}")
                     row.append(f"{player.packets}")
@@ -3895,9 +3895,7 @@ class MainWindow(QMainWindow):
         for column in range(table.columnCount()):
             header_label = table.horizontalHeaderItem(column).text()
 
-            if header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-            elif header_label == "Usernames":
+            if header_label == "Usernames":
                 all_na = True
                 for row in range(table.rowCount()):
                     if table.item(row, column) is None or table.item(row, column).text() != "N/A":
@@ -3907,6 +3905,8 @@ class MainWindow(QMainWindow):
                     table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
                 else:
                     table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+            elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
             else:
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
 
@@ -4111,10 +4111,10 @@ class WorkerThread(QThread):
                     player_reset = Fore.RESET
 
                 row = []
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
                 if Settings.USERIP_ENABLED:
                     row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
@@ -4187,11 +4187,11 @@ class WorkerThread(QThread):
                     player_reset = Fore.RESET
 
                 row = []
+                if Settings.USERIP_ENABLED:
+                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
                 row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
                 row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_seen)}{player_reset}")
-                if Settings.USERIP_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
