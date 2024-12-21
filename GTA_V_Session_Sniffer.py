@@ -3801,6 +3801,7 @@ class MainWindow(QMainWindow):
         self.session_connected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_connected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.session_connected.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.session_connected.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_connected, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
@@ -3835,6 +3836,7 @@ class MainWindow(QMainWindow):
         self.session_disconnected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_disconnected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.session_disconnected.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.session_disconnected.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_disconnected, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
