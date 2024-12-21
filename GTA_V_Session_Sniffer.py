@@ -3758,9 +3758,10 @@ class MainWindow(QMainWindow):
                 table_widget.horizontalHeader().setSortIndicator(column_index, sort_order)
                 table_widget.horizontalHeader().setSortIndicatorShown(True)
 
-
         self.setWindowTitle(TITLE)
         self.setGeometry(100, 100, 800, 600)  # Initial window size
+
+        self.user_requested_sorting_by_field = False
 
         # Central widget setup
         central_widget = QWidget()
@@ -3799,6 +3800,7 @@ class MainWindow(QMainWindow):
         self.session_connected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.session_connected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_connected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.session_connected.horizontalHeader().sectionClicked.connect(self.on_header_click)
 
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_connected, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
@@ -3832,6 +3834,7 @@ class MainWindow(QMainWindow):
         self.session_disconnected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.session_disconnected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.session_disconnected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.session_disconnected.horizontalHeader().sectionClicked.connect(self.on_header_click)
 
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_disconnected, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
@@ -3850,6 +3853,9 @@ class MainWindow(QMainWindow):
         self.worker_thread.update_session_connected_table_signal.connect(self.update_session_connected_table)
         self.worker_thread.update_session_disconnected_table_signal.connect(self.update_session_disconnected_table)
         self.worker_thread.start()
+
+    def on_header_click(self, table: QTableWidget):
+        self.user_requested_sorting_by_field = True
 
     def get_sorted_column(self, table: QTableWidget):
         # Get the index of the currently sorted column
@@ -3896,15 +3902,12 @@ class MainWindow(QMainWindow):
             header_label = table.horizontalHeaderItem(column).text()
 
             if header_label == "Usernames":
-                all_na = True
-                for row in range(table.rowCount()):
-                    if table.item(row, column) is None or table.item(row, column).text() != "N/A":
-                        all_na = False
-                        break
-                if all_na:
-                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                else:
-                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
+                #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
+                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+                #else:
+                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
             elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
             else:
@@ -4256,7 +4259,13 @@ class WorkerThread(QThread):
             self.update_session_connected_table_signal.emit(updated_session_connected_table)
             self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
 
-            time.sleep(3)
+            start_time = time.time()
+            while time.time() - start_time < 3:
+                time.sleep(0.1)
+
+                if self.main_window.user_requested_sorting_by_field:
+                    self.main_window.user_requested_sorting_by_field = False
+                    break
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
