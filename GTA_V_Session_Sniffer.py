@@ -1842,6 +1842,7 @@ if not is_pyinstaller_compiled():
         "pypresence": "4.3.0",
         "PyQt6": "6.8.0",
         "pywin32": "308",
+        "QDarkStyle": "3.2.3",
         "requests": "2.32.3",
         "rich": "13.9.4",
         "urllib3": "2.2.3",
@@ -3725,6 +3726,7 @@ iplookup_core__thread.start()
 capture_core__thread = threading.Thread(target=capture_core, daemon=True)
 capture_core__thread.start()
 
+import qdarkstyle
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QSpacerItem, QAbstractItemView
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QFontMetrics
@@ -3760,6 +3762,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(TITLE)
         self.setGeometry(100, 100, 800, 600)  # Initial window size
+        app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
 
         self.user_requested_sorting_by_field = False
 
@@ -3792,6 +3795,7 @@ class MainWindow(QMainWindow):
 
         # Session Connected table
         self.session_connected = QTableWidget()
+        self.session_connected.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.session_connected.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.session_connected.setAlternatingRowColors(True)
         self.session_connected.setColumnCount(len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES))
@@ -3827,6 +3831,7 @@ class MainWindow(QMainWindow):
 
         # Session Disconnected table
         self.session_disconnected = QTableWidget()
+        self.session_disconnected.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.session_disconnected.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.session_disconnected.setAlternatingRowColors(True)
         self.session_disconnected.setColumnCount(len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES))
@@ -3938,20 +3943,21 @@ class MainWindow(QMainWindow):
         for row_idx, row_data in enumerate(data):
             for col_idx, col_data in enumerate(row_data):
                 item = QTableWidgetItem()
-                detected_color = None
+                detected_color = default_text_color
 
-                # Check if the cell contains a `colorama.Fore` code
+                # Check for ANSI escape sequence and extract color
                 match = ANSI_ESCAPE.match(col_data)
                 if match:
                     escape_sequence = match.group(0)
-                    detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color) # re.compile(r'\x1b\[3\dm')
-                    plain_text = re.sub(ANSI_ESCAPE, '', col_data)  # Remove colorama codes
-                    item.setText(plain_text)
-                else:
-                    item.setText(col_data)  # Use raw text if no color is detected
+                    detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color)
+                    col_data = re.sub(ANSI_ESCAPE, '', col_data)  # Remove escape sequences
 
-                # Set text color
-                item.setForeground(QBrush(detected_color if detected_color else default_text_color))
+                if not isinstance(detected_color, QColor):
+                    raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
+
+                # Set text and color
+                item.setText(col_data)
+                item.setForeground(QBrush(detected_color))
                 table.setItem(row_idx, col_idx, item)
 
     def closeEvent(self, event: QCloseEvent):
@@ -4094,6 +4100,8 @@ class WorkerThread(QThread):
                 return ""
 
         while not gui_closed__event.is_set():
+            start_time = time.time()
+
             updated_session_connected_table = []
             updated_session_disconnected_table = []
 
@@ -4268,7 +4276,6 @@ class WorkerThread(QThread):
             self.update_session_connected_table_signal.emit(updated_session_connected_table)
             self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
 
-            start_time = time.time()
             while time.time() - start_time < 3:
                 time.sleep(0.1)
 

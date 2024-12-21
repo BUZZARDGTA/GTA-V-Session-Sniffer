@@ -23,6 +23,7 @@ for %%A in (
     pypresence
     PyQt6
     pywin32
+    QDarkStyle
     requests
     rich
     urllib3
