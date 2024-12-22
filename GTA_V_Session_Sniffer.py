@@ -3897,15 +3897,13 @@ class MainWindow(QMainWindow):
         table.setRowCount(len(data))
         for row_idx, row_data in enumerate(data):
             for col_idx, col_data in enumerate(row_data):
-                detected_color = default_text_color
-
                 # Check for ANSI escape sequence and extract color
+                detected_color = default_text_color
                 match = ANSI_ESCAPE.match(col_data)
                 if match:
                     escape_sequence = match.group(0)
                     detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color)
                     col_data = re.sub(ANSI_ESCAPE, '', col_data)  # Remove escape sequences
-
                 if not isinstance(detected_color, QColor):
                     raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
 
