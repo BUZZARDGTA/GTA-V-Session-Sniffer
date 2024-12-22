@@ -3858,30 +3858,6 @@ class MainWindow(QMainWindow):
         self.populate_table(self.session_disconnected, data, QColor('red'))
         self.adjust_column_widths(self.session_disconnected)
 
-    def adjust_column_widths(self, table: QTableWidget):
-        """Adjust the column widths to fit the max content length."""
-        for column in range(table.columnCount()):
-            header_label = table.horizontalHeaderItem(column).text()
-
-            if header_label == "Usernames":
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
-                #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
-                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-                #else:
-                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-            elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-            else:
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-
-            # BUG: Unfortunately this doesnt work because of the code just above.
-            ## Check if the column has a sort indicator
-            #if table.horizontalHeader().sortIndicatorSection() == column:
-            #    current_width = table.horizontalHeader().sectionSize(column)
-            #    # Add 100 pixels of padding if the sort indicator is shown
-            #    table.horizontalHeader().resizeSection(column, current_width + 100)
-
     def populate_table(self, table: QTableWidget, data: list[list[str]], default_text_color: QColor):
         """
         Populate a QTableWidget with data and set the text color.
@@ -3914,6 +3890,30 @@ class MainWindow(QMainWindow):
                 item.setText(col_data)
                 item.setForeground(QBrush(detected_color))
                 table.setItem(row_idx, col_idx, item)
+
+    def adjust_column_widths(self, table: QTableWidget):
+        """Adjust the column widths to fit the max content length."""
+        for column in range(table.columnCount()):
+            header_label = table.horizontalHeaderItem(column).text()
+
+            if header_label == "Usernames":
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
+                #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
+                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+                #else:
+                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+            elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+            else:
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+
+            # BUG: Unfortunately this doesnt work because of the code just above.
+            ## Check if the column has a sort indicator
+            #if table.horizontalHeader().sortIndicatorSection() == column:
+            #    current_width = table.horizontalHeader().sectionSize(column)
+            #    # Add 100 pixels of padding if the sort indicator is shown
+            #    table.horizontalHeader().resizeSection(column, current_width + 100)
 
     def closeEvent(self, event: QCloseEvent):
         gui_closed__event.set()  # Signal the thread to stop
