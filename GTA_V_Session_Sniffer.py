@@ -3332,6 +3332,7 @@ def rendering_core():
         global_pps_rate = 0
         last_userip_parse_time = None
         last_mod_menus_logs_parse_time = None
+        last_session_logging_processing_time = None
 
         if Settings.DISCORD_PRESENCE:
             from Modules.discord.rpc import DiscordRPCManager
@@ -3526,8 +3527,10 @@ def rendering_core():
             else:
                 GUIrenderingData.rpc_message = ""
 
-            if Settings.GUI_SESSIONS_LOGGING:
+            if Settings.GUI_SESSIONS_LOGGING and (last_session_logging_processing_time is None or time.perf_counter() - last_session_logging_processing_time >= 1.0):
                 from Modules.consts import SESSIONS_LOGGING_PATH
+
+                last_session_logging_processing_time = time.perf_counter()
 
                 logging_connected_players_table = PrettyTable()
                 logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
@@ -3621,9 +3624,8 @@ def rendering_core():
                     tables_output_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
                     f.write(tables_output_without_vt100)
 
-            if Settings.DISCORD_PRESENCE:
-                if discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0:
-                    discord_rpc_manager.update(f"{len(session_connected_sorted)} player{plural(len(session_connected_sorted))} connected in the session.")
+            if Settings.DISCORD_PRESENCE and (discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0):
+                discord_rpc_manager.update(f"{len(session_connected_sorted)} player{plural(len(session_connected_sorted))} connected in the session.")
 
             GUIrenderingData.is_rendering_core_ready = True
 
