@@ -3729,7 +3729,7 @@ capture_core__thread.start()
 import qdarkstyle
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QSpacerItem, QAbstractItemView
-from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QFontMetrics
+from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -3764,14 +3764,12 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 800, 600)  # Initial window size
         app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
 
-        self.user_requested_sorting_by_field = False
-
         # Central widget setup
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
 
-        # Create layout
-        layout = QVBoxLayout(central_widget)
+        # Layout setup
+        self.main_layout = QVBoxLayout(self.central_widget)  # Create a layout and assign it to the central widget
 
         # Header text
         self.header_text = QLabel(self.get_header_text())
@@ -3779,10 +3777,10 @@ class MainWindow(QMainWindow):
         self.header_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_text.setWordWrap(True)
         self.header_text.setFont(QFont("Courier", 10, QFont.Weight.Bold))  # Optional: Courier-like font for CLI feel
-        layout.addWidget(self.header_text)
+        self.main_layout.addWidget(self.header_text)
 
         # Add a larger vertical spacer (increased height and expanded)
-        #layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        #self.main_layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Custom header for the Session Connected table with matching background as first column
         self.session_connected_header = QLabel(f"Players connected in your session ({len(GUIrenderingData.session_connected)}):")
@@ -3791,7 +3789,7 @@ class MainWindow(QMainWindow):
         self.session_connected_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.session_connected_header.setFont(QFont("Courier", 9, QFont.Weight.Bold))
 
-        layout.addWidget(self.session_connected_header)
+        self.main_layout.addWidget(self.session_connected_header)
 
         # Session Connected table
         self.session_connected = QTableWidget()
@@ -3813,13 +3811,13 @@ class MainWindow(QMainWindow):
         self.adjust_column_widths(self.session_connected)
 
         # Add Session Connected table to the layout
-        layout.addWidget(self.session_connected)
+        self.main_layout.addWidget(self.session_connected)
 
         # Add a horizontal line separator
-        separator = QFrame(self)
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)  # Optional shadow effect
-        layout.addWidget(separator)
+        self.tables_separator = QFrame(self)
+        self.tables_separator.setFrameShape(QFrame.Shape.HLine)
+        self.tables_separator.setFrameShadow(QFrame.Shadow.Sunken)  # Optional shadow effect
+        self.main_layout.addWidget(self.tables_separator)
 
         # Custom header for the Session Disconnected table with matching background as first column
         self.session_disconnected_header = QLabel(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
@@ -3827,7 +3825,7 @@ class MainWindow(QMainWindow):
         self.session_disconnected_header.setStyleSheet("background-color: red; color: white; font-size: 16px; font-weight: bold; padding: 5px;")
         self.session_disconnected_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.session_disconnected_header.setFont(QFont("Courier", 9, QFont.Weight.Bold))
-        layout.addWidget(self.session_disconnected_header)
+        self.main_layout.addWidget(self.session_disconnected_header)
 
         # Session Disconnected table
         self.session_disconnected = QTableWidget()
@@ -3849,10 +3847,10 @@ class MainWindow(QMainWindow):
         self.adjust_column_widths(self.session_disconnected)
 
         # Add Session Disconnected table to the layout
-        layout.addWidget(self.session_disconnected)
+        self.main_layout.addWidget(self.session_disconnected)
 
-        # Assign the layout to the central widget
-        central_widget.setLayout(layout)
+        # Custom variables
+        self.user_requested_sorting_by_field = False
 
         # Worker thread
         self.worker_thread = WorkerThread(self)
