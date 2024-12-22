@@ -4030,10 +4030,7 @@ class WorkerThread(QThread):
             return f"{pps_color}{pps_rate}{Fore.RESET}"
 
         def format_player_ip(player_ip: str):
-            if (
-                SessionHost.player
-                and SessionHost.player.ip == player_ip
-            ):
+            if SessionHost.player and SessionHost.player.ip == player_ip:
                 return f"{player_ip} 👑"
             return player_ip
 
