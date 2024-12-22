@@ -3871,10 +3871,6 @@ class MainWindow(QMainWindow):
 class WorkerThread(QThread):
     update_signal = pyqtSignal(str, list, list)
 
-    update_header_text_signal = pyqtSignal(str)
-    update_session_connected_table_signal = pyqtSignal(list)
-    update_session_disconnected_table_signal = pyqtSignal(list)
-
     def __init__(self, main_window_instance: MainWindow):
         super().__init__()
         self.main_window = main_window_instance  # Store the MainWindow instance
