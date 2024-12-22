@@ -3681,7 +3681,7 @@ class MainWindow(QMainWindow):
                 table_widget.horizontalHeader().setSortIndicatorShown(True)
 
         self.setWindowTitle(TITLE)
-        self.setGeometry(100, 100, 800, 600)  # Initial window size
+        self.adjust_gui_size()
         app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
 
         # Central widget setup
@@ -3778,6 +3778,25 @@ class MainWindow(QMainWindow):
         self.worker_thread.update_session_connected_table_signal.connect(self.update_session_connected_table)
         self.worker_thread.update_session_disconnected_table_signal.connect(self.update_session_disconnected_table)
         self.worker_thread.start()
+
+    def adjust_gui_size(self):
+        def get_screen_size():
+            screen = app.primaryScreen()
+            size = screen.size()
+            return size.width(), size.height()
+
+        screen_width, screen_height = get_screen_size()
+
+        # Set a minimum size for the window
+        self.setMinimumSize(800, 600)
+
+        # Resize the window based on screen size
+        if screen_width >= 2560 and screen_height >= 1440:
+            self.resize(1400, 900)
+        elif screen_width >= 1920 and screen_height >= 1080:
+            self.resize(1200, 720)
+        elif screen_width >= 1024 and screen_height >= 768:
+            self.resize(940, 680)
 
     def on_header_click(self, table: QTableWidget):
         self.user_requested_sorting_by_field = True
