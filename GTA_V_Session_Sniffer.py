@@ -3728,8 +3728,6 @@ class MainWindow(QMainWindow):
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_connected, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
 
-        self.adjust_column_widths(self.session_connected)
-
         # Add Session Connected table to the layout
         self.main_layout.addWidget(self.session_connected)
 
@@ -3764,8 +3762,6 @@ class MainWindow(QMainWindow):
         # Set default sort column and order
         add_sort_indicator_by_field_name(self.session_disconnected, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
-        self.adjust_column_widths(self.session_disconnected)
-
         # Add Session Disconnected table to the layout
         self.main_layout.addWidget(self.session_disconnected)
 
@@ -3774,9 +3770,7 @@ class MainWindow(QMainWindow):
 
         # Worker thread
         self.worker_thread = WorkerThread(self)
-        self.worker_thread.update_header_text_signal.connect(self.update_header_text)
-        self.worker_thread.update_session_connected_table_signal.connect(self.update_session_connected_table)
-        self.worker_thread.update_session_disconnected_table_signal.connect(self.update_session_disconnected_table)
+        self.worker_thread.update_signal.connect(self.update_table)
         self.worker_thread.start()
 
     def adjust_gui_size(self):
@@ -3845,75 +3839,73 @@ class MainWindow(QMainWindow):
 
         return header
 
-    def update_header_text(self, text: str):
-        self.header_text.setText(text)
+    def update_table(self, header_text: str, session_connected: list[list[str]], session_disconnected: list[list[str]]):
+        def populate_table(table: QTableWidget, data: list[list[str]], default_text_color: QColor):
+            """
+            Populate a QTableWidget with data and set the text color.
+            If a `colorama.Fore` color is detected in the text, it overrides the default color.
 
-    def update_session_connected_table(self, data: list[list[str]]):
+            Args:
+                table (QTableWidget): The table to populate.
+                data (list[list[str]]): 2D list containing table content.
+                default_text_color (QColor): Default text color if no color is specified.
+            """
+            from Modules.consts import ANSI_ESCAPE, COLORAMA_FORE_TO_QCOLOR
+
+            table.setRowCount(len(data))
+            for row_idx, row_data in enumerate(data):
+                for col_idx, col_data in enumerate(row_data):
+                    # Check for ANSI escape sequence and extract color
+                    detected_color = default_text_color
+
+                    match = ANSI_ESCAPE.match(col_data)
+                    if match:
+                        escape_sequence = match.group(0)
+                        detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color)
+                        col_data = re.sub(ANSI_ESCAPE, '', col_data)
+
+                    if not isinstance(detected_color, QColor):
+                        raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
+
+                    # Set text and color
+                    item = QTableWidgetItem()
+                    item.setText(col_data)
+                    item.setForeground(QBrush(detected_color))
+                    table.setItem(row_idx, col_idx, item)
+
+        def adjust_table_column_widths(table: QTableWidget):
+            """Adjust the column widths to fit the max content length."""
+            for column in range(table.columnCount()):
+                header_label = table.horizontalHeaderItem(column).text()
+
+                if header_label == "Usernames":
+                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                    ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
+                    #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
+                    #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+                    #else:
+                    #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
+                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                else:
+                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+
+                # BUG: Unfortunately this doesnt work because of the code just above.
+                ## Check if the column has a sort indicator
+                #if table.horizontalHeader().sortIndicatorSection() == column:
+                #    current_width = table.horizontalHeader().sectionSize(column)
+                #    # Add 100 pixels of padding if the sort indicator is shown
+                #    table.horizontalHeader().resizeSection(column, current_width + 100)
+
+        self.header_text.setText(header_text)
+
         self.session_connected_header.setText(f"Players connected in your session ({len(GUIrenderingData.session_connected)}):")
-        self.populate_table(self.session_connected, data, QColor('green'))
-        self.adjust_column_widths(self.session_connected)
+        populate_table(self.session_connected, session_connected, QColor('green'))
+        adjust_table_column_widths(self.session_connected)
 
-    def update_session_disconnected_table(self, data: list[list[str]]):
         self.session_disconnected_header.setText(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
-        self.populate_table(self.session_disconnected, data, QColor('red'))
-        self.adjust_column_widths(self.session_disconnected)
-
-    def populate_table(self, table: QTableWidget, data: list[list[str]], default_text_color: QColor):
-        """
-        Populate a QTableWidget with data and set the text color.
-        If a `colorama.Fore` color is detected in the text, it overrides the default color.
-
-        Args:
-            table (QTableWidget): The table to populate.
-            data (list[list[str]]): 2D list containing table content.
-            default_text_color (QColor): Default text color if no color is specified.
-        """
-        from Modules.consts import ANSI_ESCAPE, COLORAMA_FORE_TO_QCOLOR
-
-        table.setRowCount(len(data))
-        for row_idx, row_data in enumerate(data):
-            for col_idx, col_data in enumerate(row_data):
-                # Check for ANSI escape sequence and extract color
-                detected_color = default_text_color
-
-                match = ANSI_ESCAPE.match(col_data)
-                if match:
-                    escape_sequence = match.group(0)
-                    detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color)
-                    col_data = re.sub(ANSI_ESCAPE, '', col_data)
-
-                if not isinstance(detected_color, QColor):
-                    raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
-
-                # Set text and color
-                item = QTableWidgetItem()
-                item.setText(col_data)
-                item.setForeground(QBrush(detected_color))
-                table.setItem(row_idx, col_idx, item)
-
-    def adjust_column_widths(self, table: QTableWidget):
-        """Adjust the column widths to fit the max content length."""
-        for column in range(table.columnCount()):
-            header_label = table.horizontalHeaderItem(column).text()
-
-            if header_label == "Usernames":
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
-                #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
-                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-                #else:
-                #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-            elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-            else:
-                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-
-            # BUG: Unfortunately this doesnt work because of the code just above.
-            ## Check if the column has a sort indicator
-            #if table.horizontalHeader().sortIndicatorSection() == column:
-            #    current_width = table.horizontalHeader().sectionSize(column)
-            #    # Add 100 pixels of padding if the sort indicator is shown
-            #    table.horizontalHeader().resizeSection(column, current_width + 100)
+        populate_table(self.session_disconnected, session_disconnected, QColor('red'))
+        adjust_table_column_widths(self.session_disconnected)
 
     def closeEvent(self, event: QCloseEvent):
         gui_closed__event.set()  # Signal the thread to stop
@@ -3925,6 +3917,8 @@ class MainWindow(QMainWindow):
         terminate_script("EXIT")
 
 class WorkerThread(QThread):
+    update_signal = pyqtSignal(str, list, list)
+
     update_header_text_signal = pyqtSignal(str)
     update_session_connected_table_signal = pyqtSignal(list)
     update_session_disconnected_table_signal = pyqtSignal(list)
@@ -4227,9 +4221,7 @@ class WorkerThread(QThread):
                 updated_session_disconnected_table.append(row)
 
             header_text = self.main_window.get_header_text()
-            self.update_header_text_signal.emit(header_text)
-            self.update_session_connected_table_signal.emit(updated_session_connected_table)
-            self.update_session_disconnected_table_signal.emit(updated_session_disconnected_table)
+            self.update_signal.emit(header_text, updated_session_connected_table, updated_session_disconnected_table)
 
             while time.time() - start_time < 3:
                 self.msleep(100)
