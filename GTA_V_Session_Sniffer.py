@@ -3682,7 +3682,6 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(TITLE)
         self.adjust_gui_size()
-        app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
 
         # Central widget setup
         self.central_widget = QWidget()
@@ -4229,6 +4228,7 @@ class WorkerThread(QThread):
 
 if __name__ == "__main__":
     app = QApplication([])
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
 
     while not GUIrenderingData.is_rendering_core_ready:
         time.sleep(0.1)
