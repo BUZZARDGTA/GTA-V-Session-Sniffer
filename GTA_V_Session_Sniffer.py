@@ -4047,9 +4047,6 @@ class WorkerThread(QThread):
         while not gui_closed__event.is_set():
             start_time = time.time()
 
-            updated_session_connected_table: list[list[str]] = []
-            updated_session_disconnected_table: list[list[str]] = []
-
             session_connected_sorted_column_name, session_connected_sort_order = self.main_window.get_sorted_column(self.main_window.session_connected)
             session_disconnected_sorted_column_name, session_disconnected_sort_order = self.main_window.get_sorted_column(self.main_window.session_disconnected)
 
@@ -4063,6 +4060,9 @@ class WorkerThread(QThread):
                 session_disconnected_sorted_column_name,
                 session_disconnected_sort_order
             )
+
+            updated_session_connected_table: list[list[str]] = []
+            updated_session_disconnected_table: list[list[str]] = []
 
             for player in session_connected_sorted:
                 if (
