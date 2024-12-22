@@ -2758,7 +2758,6 @@ class GUIrenderingData:
     global_pps_rate: int = 0
     pps_color: str = '<span style="color: green;">'
     latency_color: str = '<span style="color: green;">'
-    color_tshark_restarted_time: str = '<span style="color: green;">'
     session_connected: list[Player] = []
     session_disconnected: list[Player] = []
 
@@ -2821,8 +2820,6 @@ def rendering_core():
             ]
 
             return (
-                add_down_arrow_char_to_sorted_table_field(stdout_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-                add_down_arrow_char_to_sorted_table_field(stdout_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
                 add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
                 add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
                 stdout_connected_players_table__field_names,
@@ -3387,8 +3384,6 @@ def rendering_core():
         FIELDS_TO_HIDE_IN_STDOUT = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.STDOUT_FIELDS_TO_HIDE)
 
         (
-            STDOUT_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
-            STDOUT_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
@@ -3566,13 +3561,10 @@ def rendering_core():
 
             # Determine latency color
             if avg_latency_seconds >= 0.90 * Settings.CAPTURE_OVERFLOW_TIMER:
-                latency_color = Fore.RED
                 GUIrenderingData.latency_color = '<span style="color: red;">'
             elif avg_latency_seconds >= 0.75 * Settings.CAPTURE_OVERFLOW_TIMER:
-                latency_color = Fore.YELLOW
                 GUIrenderingData.latency_color = '<span style="color: yellow;">'
             else:
-                latency_color = Fore.GREEN
                 GUIrenderingData.latency_color = '<span style="color: green;">'
 
             seconds_elapsed = time.perf_counter() - global_pps_t1
@@ -3591,22 +3583,10 @@ def rendering_core():
             else:
                 GUIrenderingData.pps_color = '<span style="color: green;">'
 
-            GUIrenderingData.color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
-            num_of_userip_files = len(UserIP_Databases.userip_databases)
             if Settings.DISCORD_PRESENCE:
                 GUIrenderingData.rpc_message = f' RPC: <span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC: <span style="color: yellow;">Waiting for Discord</span>'
             else:
                 GUIrenderingData.rpc_message = ""
-
-            # TODO:
-            #printer.cache_print(print_in_header(f"Packets latency per sec:{latency_color}{avg_latency_rounded}{Fore.RESET}/{Fore.GREEN}{Settings.CAPTURE_OVERFLOW_TIMER}{Fore.RESET} (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}{Fore.RESET}) PPS:{pps_color}{global_pps_rate}{Fore.RESET}{rpc_message}"))
-            #if number_of_ip_invalid_in_userip_files := len(UserIP_Databases.notified_ip_invalid):
-            #    printer.cache_print(print_in_header(f"Number of invalid IP{plural(number_of_ip_invalid_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_ip_invalid_in_userip_files}{Fore.RESET}"))
-            #if number_of_conflicting_ip_in_userip_files := len(UserIP_Databases.notified_ip_conflicts):
-            #    printer.cache_print(print_in_header(f"Number of conflicting IP{plural(number_of_conflicting_ip_in_userip_files)} in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_conflicting_ip_in_userip_files}{Fore.RESET}"))
-            #if number_of_corrupted_userip_settings_files := len(UserIP_Databases.notified_settings_corrupted):
-            #    printer.cache_print(print_in_header(f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: {Fore.RED}{number_of_corrupted_userip_settings_files}{Fore.RESET}"))
-            #printer.cache_print(HEADER_TEXT_SEPARATOR)
 
             if Settings.STDOUT_SESSIONS_LOGGING:
                 from Modules.consts import SESSIONS_LOGGING_PATH
@@ -3877,16 +3857,34 @@ class MainWindow(QMainWindow):
     def get_header_text(self):
         is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
         displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+        color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
+        num_of_userip_files = len(UserIP_Databases.userip_databases)
 
-        return textwrap.dedent(f"""
+        invalid_ip_count = len(UserIP_Databases.notified_ip_invalid)
+        conflict_ip_count = len(UserIP_Databases.notified_ip_conflicts)
+        corrupted_settings_count = len(UserIP_Databases.notified_settings_corrupted)
+
+        header = textwrap.dedent(f"""
             ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
             Welcome in {TITLE} {VERSION}<br>
             The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
             ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
             Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
-            Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{GUIrenderingData.color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
+            Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
             ─────────────────────────────────────────────────────────────────────────────────────────────────
         """.removeprefix("\n").removesuffix("\n"))
+
+        if any([invalid_ip_count, conflict_ip_count, corrupted_settings_count]):
+            header += "<br>"
+            if invalid_ip_count:
+                header += f"Number of invalid IP{plural(invalid_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{invalid_ip_count}</span><br>"
+            if conflict_ip_count:
+                header += f"Number of conflicting IP{plural(conflict_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{conflict_ip_count}</span><br>"
+            if corrupted_settings_count:
+                header += f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{corrupted_settings_count}</span><br>"
+            header += "─────────────────────────────────────────────────────────────────────────────────────────────────"
+
+        return header
 
     def update_header_text(self, text: str):
         self.header_text.setText(text)
