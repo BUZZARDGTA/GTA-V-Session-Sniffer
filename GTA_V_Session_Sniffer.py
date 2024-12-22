@@ -3648,7 +3648,7 @@ capture_core__thread.start()
 
 import qdarkstyle
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QSpacerItem, QAbstractItemView
+from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QAbstractItemView
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent
 
 class MainWindow(QMainWindow):
