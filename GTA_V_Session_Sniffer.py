@@ -2673,7 +2673,7 @@ def capture_core():
                     terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
 
             if target_port is None:
-                stdout_crash_text = textwrap.dedent(f"""
+                msgbox_message = textwrap.dedent(f"""
                     ERROR:
                         Developer didn't expect this scenario to be possible.
 
@@ -2691,7 +2691,10 @@ def capture_core():
                         target_ip: {target_ip}
                         target_port: {target_port}
                 """.removeprefix("\n").removesuffix("\n"))
-                terminate_script("EXIT", stdout_crash_text, stdout_crash_text)
+                msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Exclamation | MsgBox.Style.MsgBoxSetForeground
+                msgbox_title = TITLE
+                threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+                return
 
             global_pps_counter += 1
 
