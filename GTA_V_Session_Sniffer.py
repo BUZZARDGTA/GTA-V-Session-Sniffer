@@ -3691,7 +3691,7 @@ class MainWindow(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)  # Create a layout and assign it to the central widget
 
         # Header text
-        self.header_text = QLabel(self.get_header_text())
+        self.header_text = QLabel()
         self.header_text.setTextFormat(Qt.TextFormat.RichText)
         self.header_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_text.setWordWrap(True)
@@ -3791,50 +3791,6 @@ class MainWindow(QMainWindow):
     def on_header_click(self, table: QTableWidget):
         self.user_requested_sorting_by_field = True
 
-    def get_sorted_column(self, table: QTableWidget):
-        # Get the index of the currently sorted column
-        sorted_column_index = table.horizontalHeader().sortIndicatorSection()
-
-        # Get the sort order (ascending or descending)
-        sort_order = table.horizontalHeader().sortIndicatorOrder()
-
-        # Get the name of the sorted column
-        sorted_column_name = table.horizontalHeaderItem(sorted_column_index).text()
-
-        return sorted_column_name, sort_order
-
-    def get_header_text(self):
-        is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-        displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-        color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
-        num_of_userip_files = len(UserIP_Databases.userip_databases)
-
-        invalid_ip_count = len(UserIP_Databases.notified_ip_invalid)
-        conflict_ip_count = len(UserIP_Databases.notified_ip_conflicts)
-        corrupted_settings_count = len(UserIP_Databases.notified_settings_corrupted)
-
-        header = textwrap.dedent(f"""
-            ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
-            Welcome in {TITLE} {VERSION}<br>
-            The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
-            ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
-            Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
-            Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
-            ─────────────────────────────────────────────────────────────────────────────────────────────────
-        """.removeprefix("\n").removesuffix("\n"))
-
-        if any([invalid_ip_count, conflict_ip_count, corrupted_settings_count]):
-            header += "<br>"
-            if invalid_ip_count:
-                header += f"Number of invalid IP{plural(invalid_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{invalid_ip_count}</span><br>"
-            if conflict_ip_count:
-                header += f"Number of conflicting IP{plural(conflict_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{conflict_ip_count}</span><br>"
-            if corrupted_settings_count:
-                header += f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{corrupted_settings_count}</span><br>"
-            header += "─────────────────────────────────────────────────────────────────────────────────────────────────"
-
-        return header
-
     def update_table(self, header_text: str, session_connected: list[list[str]], session_disconnected: list[list[str]]):
         def populate_table(table: QTableWidget, data: list[list[str]], default_text_color: QColor):
             """
@@ -3924,6 +3880,50 @@ class WorkerThread(QThread):
         self.main_window = main_window_instance  # Store the MainWindow instance
 
     def run(self):
+        def get_table_sorted_column(table: QTableWidget):
+            # Get the index of the currently sorted column
+            sorted_column_index = table.horizontalHeader().sortIndicatorSection()
+
+            # Get the sort order (ascending or descending)
+            sort_order = table.horizontalHeader().sortIndicatorOrder()
+
+            # Get the name of the sorted column
+            sorted_column_name = table.horizontalHeaderItem(sorted_column_index).text()
+
+            return sorted_column_name, sort_order
+
+        def generate_header_text():
+            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+            color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
+            num_of_userip_files = len(UserIP_Databases.userip_databases)
+
+            invalid_ip_count = len(UserIP_Databases.notified_ip_invalid)
+            conflict_ip_count = len(UserIP_Databases.notified_ip_conflicts)
+            corrupted_settings_count = len(UserIP_Databases.notified_settings_corrupted)
+
+            header = textwrap.dedent(f"""
+                ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
+                Welcome in {TITLE} {VERSION}<br>
+                The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
+                ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
+                Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
+                Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
+                ─────────────────────────────────────────────────────────────────────────────────────────────────
+            """.removeprefix("\n").removesuffix("\n"))
+
+            if any([invalid_ip_count, conflict_ip_count, corrupted_settings_count]):
+                header += "<br>"
+                if invalid_ip_count:
+                    header += f"Number of invalid IP{plural(invalid_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{invalid_ip_count}</span><br>"
+                if conflict_ip_count:
+                    header += f"Number of conflicting IP{plural(conflict_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{conflict_ip_count}</span><br>"
+                if corrupted_settings_count:
+                    header += f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{corrupted_settings_count}</span><br>"
+                header += "─────────────────────────────────────────────────────────────────────────────────────────────────"
+
+            return header
+
         def sort_session_table(session_list: list[Player], sorted_column_name: str, sort_order: str) -> list[Player]:
             """
             Sorts a list of players based on the given column name and sort order.
@@ -4044,8 +4044,8 @@ class WorkerThread(QThread):
         while not gui_closed__event.is_set():
             start_time = time.time()
 
-            session_connected_sorted_column_name, session_connected_sort_order = self.main_window.get_sorted_column(self.main_window.session_connected)
-            session_disconnected_sorted_column_name, session_disconnected_sort_order = self.main_window.get_sorted_column(self.main_window.session_disconnected)
+            session_connected_sorted_column_name, session_connected_sort_order = get_table_sorted_column(self.main_window.session_connected)
+            session_disconnected_sorted_column_name, session_disconnected_sort_order = get_table_sorted_column(self.main_window.session_disconnected)
 
             session_connected_sorted = sort_session_table(
                 GUIrenderingData.session_connected,
@@ -4213,7 +4213,7 @@ class WorkerThread(QThread):
 
                 updated_session_disconnected_table.append(row)
 
-            header_text = self.main_window.get_header_text()
+            header_text = generate_header_text()
             self.update_signal.emit(header_text, updated_session_connected_table, updated_session_disconnected_table)
 
             while time.time() - start_time < 3:
