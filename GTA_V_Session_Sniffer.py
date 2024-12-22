@@ -3699,9 +3699,6 @@ class MainWindow(QMainWindow):
         self.header_text.setFont(QFont("Courier", 10, QFont.Weight.Bold))  # Optional: Courier-like font for CLI feel
         self.main_layout.addWidget(self.header_text)
 
-        # Add a larger vertical spacer (increased height and expanded)
-        #self.main_layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
         # Custom header for the Session Connected table with matching background as first column
         self.session_connected_header = QLabel(f"Players connected in your session ({len(GUIrenderingData.session_connected)}):")
         self.session_connected_header.setTextFormat(Qt.TextFormat.RichText)
