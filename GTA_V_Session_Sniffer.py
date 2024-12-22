@@ -3897,7 +3897,6 @@ class MainWindow(QMainWindow):
         table.setRowCount(len(data))
         for row_idx, row_data in enumerate(data):
             for col_idx, col_data in enumerate(row_data):
-                item = QTableWidgetItem()
                 detected_color = default_text_color
 
                 # Check for ANSI escape sequence and extract color
@@ -3911,6 +3910,7 @@ class MainWindow(QMainWindow):
                     raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
 
                 # Set text and color
+                item = QTableWidgetItem()
                 item.setText(col_data)
                 item.setForeground(QBrush(detected_color))
                 table.setItem(row_idx, col_idx, item)
