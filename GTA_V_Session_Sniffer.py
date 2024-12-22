@@ -300,22 +300,22 @@ class DefaultSettings:
     CAPTURE_OVERFLOW_TIMER = 3.0
     CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER = None
     CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = None
-    STDOUT_SESSIONS_LOGGING = True
-    STDOUT_RESET_PORTS_ON_REJOINS = True
-    STDOUT_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "ASN"]
-    STDOUT_DATE_FIELDS_SHOW_DATE = False
-    STDOUT_DATE_FIELDS_SHOW_TIME = False
-    STDOUT_DATE_FIELDS_SHOW_ELAPSED = True
-    STDOUT_FIELD_SHOW_COUNTRY_CODE = True
-    STDOUT_FIELD_SHOW_CONTINENT_CODE = True
-    STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
-    STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
-    STDOUT_DISCONNECTED_PLAYERS_TIMER = 10.0
+    GUI_SESSIONS_LOGGING = True
+    GUI_RESET_PORTS_ON_REJOINS = True
+    GUI_FIELDS_TO_HIDE = ["Intermediate Ports", "First Port", "Continent", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "AS", "ASN"]
+    GUI_DATE_FIELDS_SHOW_DATE = False
+    GUI_DATE_FIELDS_SHOW_TIME = False
+    GUI_DATE_FIELDS_SHOW_ELAPSED = True
+    GUI_FIELD_SHOW_COUNTRY_CODE = True
+    GUI_FIELD_SHOW_CONTINENT_CODE = True
+    GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY = "Last Rejoin"
+    GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = "Last Seen"
+    GUI_DISCONNECTED_PLAYERS_TIMER = 10.0
     USERIP_ENABLED = True
     DISCORD_PRESENCE = True
 
 class Settings(DefaultSettings):
-    stdout_fields_mapping = {
+    gui_fields_mapping = {
         "Usernames": "userip.usernames",
         "First Seen": "datetime.first_seen",
         "Last Rejoin": "datetime.last_rejoin",
@@ -349,10 +349,10 @@ class Settings(DefaultSettings):
         "VPN": "iplookup.ipapi.compiled.proxy",
         "Hosting": "iplookup.ipapi.compiled.hosting"
     }
-    stdout_forced_fields = ["Usernames", "First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address"]
-    stdout_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
-    stdout_all_connected_fields = [field for field in stdout_forced_fields if field != "Last Seen"] + stdout_hideable_fields
-    stdout_all_disconnected_fields = [field for field in stdout_forced_fields if field != "PPS"] + stdout_hideable_fields
+    gui_forced_fields = ["Usernames", "First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address"]
+    gui_hideable_fields = ["Last Port", "Intermediate Ports", "First Port", "Continent", "Country", "Region", "R. Code", "City", "District", "ZIP Code", "Lat", "Lon", "Time Zone", "Offset", "Currency", "Organization", "ISP", "ASN / ISP", "AS", "ASN", "Mobile", "VPN", "Hosting"]
+    gui_all_connected_fields = [field for field in gui_forced_fields if field != "Last Seen"] + gui_hideable_fields
+    gui_all_disconnected_fields = [field for field in gui_forced_fields if field != "PPS"] + gui_hideable_fields
 
     @classmethod
     def iterate_over_settings(cls):
@@ -362,7 +362,7 @@ class Settings(DefaultSettings):
             if (
                 callable(attr_value)
                 or attr_name.startswith("_")
-                or attr_name in ["stdout_fields_mapping", "stdout_forced_fields", "stdout_hideable_fields", "stdout_all_connected_fields", "stdout_all_disconnected_fields"]
+                or attr_name in ["gui_fields_mapping", "gui_forced_fields", "gui_hideable_fields", "gui_all_connected_fields", "gui_all_disconnected_fields"]
                 or not attr_name.isupper()
                 or not isinstance(attr_value, _allowed_settings_types)
             ):
@@ -504,86 +504,86 @@ class Settings(DefaultSettings):
                             Settings.CAPTURE_PREPEND_CUSTOM_DISPLAY_FILTER = f"({updated_setting_value})"
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_SESSIONS_LOGGING":
+                elif setting_name == "GUI_SESSIONS_LOGGING":
                     try:
-                        Settings.STDOUT_SESSIONS_LOGGING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_SESSIONS_LOGGING, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_RESET_PORTS_ON_REJOINS":
+                elif setting_name == "GUI_RESET_PORTS_ON_REJOINS":
                     try:
-                        Settings.STDOUT_RESET_PORTS_ON_REJOINS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_RESET_PORTS_ON_REJOINS, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELDS_TO_HIDE":
+                elif setting_name == "GUI_FIELDS_TO_HIDE":
                     try:
-                        stdout_fields_to_hide: list[str] = ast.literal_eval(setting_value)
+                        gui_fields_to_hide: list[str] = ast.literal_eval(setting_value)
                     except (ValueError, SyntaxError):
                         need_rewrite_settings = True
                     else:
-                        if isinstance(stdout_fields_to_hide, list) and all(isinstance(item, str) for item in stdout_fields_to_hide):
-                            filtered_stdout_fields_to_hide: list[str] = []
+                        if isinstance(gui_fields_to_hide, list) and all(isinstance(item, str) for item in gui_fields_to_hide):
+                            filtered_gui_fields_to_hide: list[str] = []
 
-                            for value in stdout_fields_to_hide:
-                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, Settings.stdout_hideable_fields)
+                            for value in gui_fields_to_hide:
+                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, Settings.gui_hideable_fields)
                                 if case_insensitive_match:
-                                    filtered_stdout_fields_to_hide.append(normalized_match)
+                                    filtered_gui_fields_to_hide.append(normalized_match)
                                     if not case_sensitive_match:
                                         need_rewrite_current_setting = True
                                 else:
                                     need_rewrite_settings = True
 
-                            Settings.STDOUT_FIELDS_TO_HIDE = filtered_stdout_fields_to_hide
+                            Settings.GUI_FIELDS_TO_HIDE = filtered_gui_fields_to_hide
                         else:
                             need_rewrite_settings = True
-                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_DATE":
+                elif setting_name == "GUI_DATE_FIELDS_SHOW_DATE":
                     try:
-                        Settings.STDOUT_DATE_FIELDS_SHOW_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_DATE_FIELDS_SHOW_DATE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_TIME":
+                elif setting_name == "GUI_DATE_FIELDS_SHOW_TIME":
                     try:
-                        Settings.STDOUT_DATE_FIELDS_SHOW_TIME, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_DATE_FIELDS_SHOW_TIME, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_DATE_FIELDS_SHOW_ELAPSED":
+                elif setting_name == "GUI_DATE_FIELDS_SHOW_ELAPSED":
                     try:
-                        Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_DATE_FIELDS_SHOW_ELAPSED, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_SHOW_CONTINENT_CODE":
+                elif setting_name == "GUI_FIELD_SHOW_CONTINENT_CODE":
                     try:
-                        Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_FIELD_SHOW_CONTINENT_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_SHOW_COUNTRY_CODE":
+                elif setting_name == "GUI_FIELD_SHOW_COUNTRY_CODE":
                     try:
-                        Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
+                        Settings.GUI_FIELD_SHOW_COUNTRY_CODE, need_rewrite_current_setting = custom_str_to_bool(setting_value)
                     except InvalidBooleanValueError:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY":
-                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_all_connected_fields)
+                elif setting_name == "GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY":
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.gui_all_connected_fields)
                     if case_insensitive_match:
-                        Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY = normalized_match
+                        Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY = normalized_match
                         if not case_sensitive_match:
                             need_rewrite_current_setting = True
                     else:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY":
-                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.stdout_all_disconnected_fields)
+                elif setting_name == "GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY":
+                    case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(setting_value, Settings.gui_all_disconnected_fields)
                     if case_insensitive_match:
-                        Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = normalized_match
+                        Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY = normalized_match
                         if not case_sensitive_match:
                             need_rewrite_current_setting = True
                     else:
                         need_rewrite_settings = True
-                elif setting_name == "STDOUT_DISCONNECTED_PLAYERS_TIMER":
+                elif setting_name == "GUI_DISCONNECTED_PLAYERS_TIMER":
                     try:
                         player_disconnected_timer = float(setting_value)
                     except (ValueError, TypeError):
                         need_rewrite_settings = True
                     else:
                         if player_disconnected_timer >= 3.0:
-                            Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER = player_disconnected_timer
+                            Settings.GUI_DISCONNECTED_PLAYERS_TIMER = player_disconnected_timer
                         else:
                             need_rewrite_settings = True
                 elif setting_name == "USERIP_ENABLED":
@@ -606,10 +606,10 @@ class Settings(DefaultSettings):
         if need_rewrite_settings:
             Settings.reconstruct_settings()
 
-        for field_name in Settings.STDOUT_FIELDS_TO_HIDE:
+        for field_name in Settings.GUI_FIELDS_TO_HIDE:
             for sort_field_name, sort_field_value, default_sort_value in [
-                ("STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-                ("STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+                ("GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY", Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY, DefaultSettings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+                ("GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY", Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY, DefaultSettings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
             ]:
                 if field_name in sort_field_value:
                     need_rewrite_settings = True
@@ -618,7 +618,7 @@ class Settings(DefaultSettings):
                     msgbox_message = textwrap.dedent(f"""
                         ERROR in your custom \"Settings.ini\" file:
 
-                        You cannot sort players in the output from a hidden stdout field (STDOUT_FIELDS_TO_HIDE).
+                        You cannot sort players in the output from a hidden gui field (<GUI_FIELDS_TO_HIDE>).
 
                         Would you like to replace:
                         {sort_field_name}={sort_field_value}
@@ -634,15 +634,15 @@ class Settings(DefaultSettings):
                     setattr(Settings, sort_field_name, getattr(DefaultSettings, sort_field_name)) # Replace the incorrect field with its default value
                     Settings.reconstruct_settings()
 
-        if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False and Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED is False:
+        if Settings.GUI_DATE_FIELDS_SHOW_DATE is False and Settings.GUI_DATE_FIELDS_SHOW_TIME is False and Settings.GUI_DATE_FIELDS_SHOW_ELAPSED is False:
             msgbox_title = TITLE
             msgbox_message = textwrap.dedent(f"""
                 ERROR in your custom \"Settings.ini\" file:
 
                 At least one of these settings must be set to \"True\" value:
-                <STDOUT_DATE_FIELDS_SHOW_DATE>
-                <STDOUT_DATE_FIELDS_SHOW_TIME>
-                <STDOUT_DATE_FIELDS_SHOW_ELAPSED>
+                <GUI_DATE_FIELDS_SHOW_DATE>
+                <GUI_DATE_FIELDS_SHOW_TIME>
+                <GUI_DATE_FIELDS_SHOW_ELAPSED>
 
                 Would you like to apply their default values and continue?
             """.removeprefix("\n").removesuffix("\n"))
@@ -652,7 +652,7 @@ class Settings(DefaultSettings):
             if errorlevel != MsgBox.ReturnValues.IDYES:
                 terminate_script("EXIT")
 
-            for setting_name in ["STDOUT_DATE_FIELDS_SHOW_DATE", "STDOUT_DATE_FIELDS_SHOW_TIME", "STDOUT_DATE_FIELDS_SHOW_ELAPSED"]:
+            for setting_name in ["GUI_DATE_FIELDS_SHOW_DATE", "GUI_DATE_FIELDS_SHOW_TIME", "GUI_DATE_FIELDS_SHOW_ELAPSED"]:
                 setattr(Settings, setting_name, getattr(DefaultSettings, setting_name))
 
             Settings.reconstruct_settings()
@@ -2725,7 +2725,7 @@ def capture_core():
                 player.rejoins += 1
                 player.packets = 1
 
-                if Settings.STDOUT_RESET_PORTS_ON_REJOINS:
+                if Settings.GUI_RESET_PORTS_ON_REJOINS:
                     player.ports.reset(target_port)
                     return
             else:
@@ -2765,31 +2765,6 @@ def rendering_core():
     with Threads_ExceptionHandler():
         from Modules.consts import ANSI_ESCAPE, HEADER_TEXT_SEPARATOR
 
-        def print_in_header(text: str):
-            from Modules.consts import HEADER_TEXT_MAX_LENGTH
-
-            def calculate_padding_width(total_width: int, *lengths: int):
-                """
-                Calculate the padding width based on the total width and the lengths of provided strings.
-
-                Args:
-                    total_width: Total width available for padding
-                    *lengths: Integrers for which lengths are used to calculate padding width
-
-                Returns:
-                    padding_width: Calculated padding width
-                """
-                # Calculate the total length of all strings
-                total_length = sum(length for length in lengths)
-
-                # Calculate the padding width
-                padding_width = max(0, (total_width - total_length) // 2)
-
-                return padding_width
-
-            padding_width = calculate_padding_width(HEADER_TEXT_MAX_LENGTH, len(ANSI_ESCAPE.sub("", text)))
-            return f"{' ' * padding_width}{text}"
-
         def generate_field_names():
             def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
                 updated_field_names = [
@@ -2798,32 +2773,32 @@ def rendering_core():
                 ]
                 return updated_field_names
 
-            stdout_connected_players_table__field_names = [
+            gui_connected_players_table__field_names = [
                 field_name
-                for field_name in Settings.stdout_all_connected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_STDOUT
+                for field_name in Settings.gui_all_connected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_GUI
             ]
-            stdout_disconnected_players_table__field_names = [
+            gui_disconnected_players_table__field_names = [
                 field_name
-                for field_name in Settings.stdout_all_disconnected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_STDOUT
+                for field_name in Settings.gui_all_disconnected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_GUI
             ]
             logging_connected_players_table__field_names = [
                 field_name
-                for field_name in Settings.stdout_all_connected_fields
+                for field_name in Settings.gui_all_connected_fields
                 if (Settings.USERIP_ENABLED or field_name != "Usernames")
             ]
             logging_disconnected_players_table__field_names = [
                 field_name
-                for field_name in Settings.stdout_all_disconnected_fields
+                for field_name in Settings.gui_all_disconnected_fields
                 if (Settings.USERIP_ENABLED or field_name != "Usernames")
             ]
 
             return (
-                add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-                add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
-                stdout_connected_players_table__field_names,
-                stdout_disconnected_players_table__field_names
+                add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+                add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
+                gui_connected_players_table__field_names,
+                gui_disconnected_players_table__field_names
             )
 
         def parse_userip_ini_file(ini_path: Path, unresolved_ip_invalid: set[str]):
@@ -3314,46 +3289,6 @@ def rendering_core():
                     reverse=must_reverse_sort
                 )
 
-        def format_player_stdout_datetime(datetime_object: datetime):
-            formatted_elapsed = None
-
-            if Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED:
-                elapsed_time = datetime.now() - datetime_object
-
-                hours, remainder = divmod(elapsed_time.total_seconds(), 3600)
-                minutes, remainder = divmod(remainder, 60)
-                seconds, milliseconds = divmod(remainder * 1000, 1000)
-
-                elapsed_parts: list[str] = []
-                if hours >= 1:
-                    elapsed_parts.append(f"{int(hours):02}h")
-                if elapsed_parts or minutes >= 1:
-                    elapsed_parts.append(f"{int(minutes):02}m")
-                if elapsed_parts or seconds >= 1:
-                    elapsed_parts.append(f"{int(seconds):02}s")
-                if not elapsed_parts and milliseconds > 0:
-                    elapsed_parts.append(f"{int(milliseconds):03}ms")
-
-                formatted_elapsed = " ".join(elapsed_parts)
-
-                if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False:
-                    return formatted_elapsed
-
-            parts = []
-            if Settings.STDOUT_DATE_FIELDS_SHOW_DATE:
-                parts.append(datetime_object.strftime("%m/%d/%Y"))
-            if Settings.STDOUT_DATE_FIELDS_SHOW_TIME:
-                parts.append(datetime_object.strftime("%H:%M:%S.%f")[:-3])
-
-            formatted_stdout_datetime = " ".join(parts)
-            if not formatted_stdout_datetime:
-                raise ValueError("Invalid settings: Both date and time are disabled.")
-
-            if formatted_elapsed:
-                formatted_stdout_datetime += f" ({formatted_elapsed})"
-
-            return formatted_stdout_datetime
-
         def format_player_logging_datetime(datetime_object: datetime):
             return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
 
@@ -3379,9 +3314,9 @@ def rendering_core():
 
         global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
 
-        SESSION_CONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY]
-        SESSION_DISCONNECTED_SORTED_KEY = Settings.stdout_fields_mapping[Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
-        FIELDS_TO_HIDE_IN_STDOUT = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.STDOUT_FIELDS_TO_HIDE)
+        SESSION_CONNECTED_SORTED_KEY = Settings.gui_fields_mapping[Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY]
+        SESSION_DISCONNECTED_SORTED_KEY = Settings.gui_fields_mapping[Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
+        FIELDS_TO_HIDE_IN_GUI = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.GUI_FIELDS_TO_HIDE)
 
         (
             LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
@@ -3473,7 +3408,7 @@ def rendering_core():
 
                 if (
                     not player.datetime.left
-                    and (datetime.now() - player.datetime.last_seen).total_seconds() >= Settings.STDOUT_DISCONNECTED_PLAYERS_TIMER
+                    and (datetime.now() - player.datetime.last_seen).total_seconds() >= Settings.GUI_DISCONNECTED_PLAYERS_TIMER
                 ):
                     player.datetime.left = player.datetime.last_seen
                     if Settings.USERIP_ENABLED:
@@ -3528,12 +3463,12 @@ def rendering_core():
 
             session_connected_sorted = sort_session_table(
                 session_connected,
-                Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY,
+                Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY,
                 SESSION_CONNECTED_SORTED_KEY
             )
             session_disconnected_sorted = sort_session_table(
                 session_disconnected,
-                Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY,
+                Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY,
                 SESSION_DISCONNECTED_SORTED_KEY
             )
 
@@ -3588,7 +3523,7 @@ def rendering_core():
             else:
                 GUIrenderingData.rpc_message = ""
 
-            if Settings.STDOUT_SESSIONS_LOGGING:
+            if Settings.GUI_SESSIONS_LOGGING:
                 from Modules.consts import SESSIONS_LOGGING_PATH
 
                 logging_connected_players_table = PrettyTable()
@@ -3680,8 +3615,8 @@ def rendering_core():
                     SESSIONS_LOGGING_PATH.touch()  # Create the file if it doesn't exist
 
                 with SESSIONS_LOGGING_PATH.open("w", encoding="utf-8") as f:
-                    stdout_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
-                    f.write(stdout_without_vt100)
+                    tables_output_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
+                    f.write(tables_output_without_vt100)
 
             if Settings.DISCORD_PRESENCE:
                 if discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0:
@@ -3786,7 +3721,7 @@ class MainWindow(QMainWindow):
         self.session_connected.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
-        add_sort_indicator_by_field_name(self.session_connected, Settings.STDOUT_FIELD_CONNECTED_PLAYERS_SORTED_BY)
+        add_sort_indicator_by_field_name(self.session_connected, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
 
         self.adjust_column_widths(self.session_connected)
 
@@ -3822,7 +3757,7 @@ class MainWindow(QMainWindow):
         self.session_disconnected.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
-        add_sort_indicator_by_field_name(self.session_disconnected, Settings.STDOUT_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        add_sort_indicator_by_field_name(self.session_disconnected, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
         self.adjust_column_widths(self.session_disconnected)
 
@@ -4013,21 +3948,21 @@ class WorkerThread(QThread):
 
                 return sorted(
                     session_list,
-                    key=attrgetter(Settings.stdout_fields_mapping[sorted_column_name]),
+                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
                     reverse=should_reverse
                 )
             else:
                 # Handle sorting for other columns
                 return sorted(
                     session_list,
-                    key=attrgetter(Settings.stdout_fields_mapping[sorted_column_name]),
+                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
                     reverse=sort_order_to_reverse(sort_order)
                 )
 
-        def format_player_stdout_datetime(datetime_object: datetime):
+        def format_player_datetime(datetime_object: datetime):
             formatted_elapsed = None
 
-            if Settings.STDOUT_DATE_FIELDS_SHOW_ELAPSED:
+            if Settings.GUI_DATE_FIELDS_SHOW_ELAPSED:
                 elapsed_time = datetime.now() - datetime_object
 
                 hours, remainder = divmod(elapsed_time.total_seconds(), 3600)
@@ -4046,23 +3981,23 @@ class WorkerThread(QThread):
 
                 formatted_elapsed = " ".join(elapsed_parts)
 
-                if Settings.STDOUT_DATE_FIELDS_SHOW_DATE is False and Settings.STDOUT_DATE_FIELDS_SHOW_TIME is False:
+                if Settings.GUI_DATE_FIELDS_SHOW_DATE is False and Settings.GUI_DATE_FIELDS_SHOW_TIME is False:
                     return formatted_elapsed
 
             parts = []
-            if Settings.STDOUT_DATE_FIELDS_SHOW_DATE:
+            if Settings.GUI_DATE_FIELDS_SHOW_DATE:
                 parts.append(datetime_object.strftime("%m/%d/%Y"))
-            if Settings.STDOUT_DATE_FIELDS_SHOW_TIME:
+            if Settings.GUI_DATE_FIELDS_SHOW_TIME:
                 parts.append(datetime_object.strftime("%H:%M:%S.%f")[:-3])
 
-            formatted_stdout_datetime = " ".join(parts)
-            if not formatted_stdout_datetime:
+            formatted_datetime = " ".join(parts)
+            if not formatted_datetime:
                 raise ValueError("Invalid settings: Both date and time are disabled.")
 
             if formatted_elapsed:
-                formatted_stdout_datetime += f" ({formatted_elapsed})"
+                formatted_datetime += f" ({formatted_elapsed})"
 
-            return formatted_stdout_datetime
+            return formatted_datetime
 
         def format_player_usernames(player_usernames: list[str]):
             return f"{player_color}{', '.join(player_usernames) if player_usernames else 'N/A'}{player_reset}"
@@ -4129,8 +4064,8 @@ class WorkerThread(QThread):
                 row = []
                 if Settings.USERIP_ENABLED:
                     row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
@@ -4143,12 +4078,12 @@ class WorkerThread(QThread):
                 if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
                 if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
+                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
                 if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
+                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
@@ -4205,9 +4140,9 @@ class WorkerThread(QThread):
                 row = []
                 if Settings.USERIP_ENABLED:
                     row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_rejoin)}{player_reset}")
-                row.append(f"{player_color}{format_player_stdout_datetime(player.datetime.last_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
+                row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
                 row.append(f"{player_color}{player.rejoins}{player_reset}")
                 row.append(f"{player_color}{player.total_packets}{player_reset}")
                 row.append(f"{player_color}{player.packets}{player_reset}")
@@ -4219,12 +4154,12 @@ class WorkerThread(QThread):
                 if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
                     row.append(f"{player_color}{player.ports.first}{player_reset}")
                 if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.STDOUT_FIELD_SHOW_CONTINENT_CODE:
+                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
                 if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.STDOUT_FIELD_SHOW_COUNTRY_CODE:
+                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
                     else:
                         row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
