@@ -3307,16 +3307,16 @@ def rendering_core():
 
             return asn
 
+        def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
+            current_padding = len(str(var))
+
+            if current_padding <= padding:
+                if current_padding > max_padding:
+                    max_padding = current_padding
+
+            return max_padding
+
         def process_session_logging():
-            def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
-                current_padding = len(str(var))
-
-                if current_padding <= padding:
-                    if current_padding > max_padding:
-                        max_padding = current_padding
-
-                return max_padding
-
             def format_player_logging_datetime(datetime_object: datetime):
                 return datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]
 
@@ -3334,12 +3334,6 @@ def rendering_core():
                     return ", ".join(map(str, player_ports.intermediate))
                 else:
                     return ""
-
-            session_connected__padding_country_name = 0
-            session_connected__padding_continent_name = 0
-            for player in session_connected_sorted:
-                session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
-                session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
 
             logging_connected_players_table = PrettyTable()
             logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
@@ -3380,12 +3374,6 @@ def rendering_core():
                 row.append(f"{player.iplookup.ipapi.compiled.proxy}")
                 row.append(f"{player.iplookup.ipapi.compiled.hosting}")
                 logging_connected_players_table.add_row(row)
-
-            session_disconnected__padding_country_name = 0
-            session_disconnected__padding_continent_name = 0
-            for player in session_disconnected_sorted:
-                session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
-                session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
 
             logging_disconnected_players_table = PrettyTable()
             logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
@@ -3508,10 +3496,6 @@ def rendering_core():
                     return ""
 
             from Modules.consts import QColorPalette
-
-            # Define the column name to index mapping for connected and disconnected players
-            CONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
-            DISCONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
 
             session_connected_table__processed_data: list[list[str]] = []
             session_connected_table__compiled_colors: list[list[QColor]] = []
@@ -3771,6 +3755,9 @@ def rendering_core():
         ) = generate_field_names()
         GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
+        # Define the column name to index mapping for connected and disconnected players
+        CONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
+        #DISCONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
 
         global_pps_t1 = time.perf_counter()
         global_pps_rate = 0
@@ -3841,6 +3828,11 @@ def rendering_core():
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
                     last_userip_parse_time = update_userip_databases(last_userip_parse_time)
 
+            session_connected__padding_country_name = 0
+            session_connected__padding_continent_name = 0
+            session_disconnected__padding_country_name = 0
+            session_disconnected__padding_continent_name = 0
+
             for player in PlayersRegistry.iterate_players_from_registry():
                 if Settings.USERIP_ENABLED:
                     if player.ip in UserIP_Databases.ips_set:
@@ -3875,8 +3867,14 @@ def rendering_core():
 
                 if player.datetime.left:
                     session_disconnected.append(player)
+
+                    session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
+                    session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
                 else:
                     session_connected.append(player)
+
+                    session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
+                    session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
 
                     if (player_timedelta := (datetime.now() - player.pps.t1)).total_seconds() >= 1.0:
                         player.pps.rate = round(player.pps.counter / player_timedelta.total_seconds())
@@ -4151,7 +4149,7 @@ class MainWindow(QWidget):
         self.header_text.setTextFormat(Qt.TextFormat.RichText)
         self.header_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_text.setWordWrap(True)
-        self.header_text.setFont(QFont("Courier", 14, QFont.Weight.Bold))
+        self.header_text.setFont(QFont("Courier", 12, QFont.Weight.Bold))
 
         # Custom header for the Session Connected table with matching background as first column
         self.session_connected_header = QLabel(f"Players connected in your session (0):")
