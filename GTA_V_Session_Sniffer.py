@@ -33,14 +33,18 @@ import wmi
 import psutil
 import colorama
 import requests
+import qdarkstyle
 import geoip2.errors
 import geoip2.database
+from wmi import _wmi_namespace, _wmi_object
+from prettytable import PrettyTable, TableStyle
+from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from wmi import _wmi_namespace, _wmi_object
-from prettytable import PrettyTable, TableStyle
-from colorama import Fore, Back, Style
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel
+from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QAbstractItemView
+from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent
 
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
@@ -2751,25 +2755,78 @@ def capture_core():
 
 tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
+@dataclass
 class GUIrenderingData:
-    FIELDS_TO_HIDE: list[str] = []
-    GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str] = []
-    GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str] = []
-    is_rendering_core_ready: bool = False
-    rpc_message: str = ""
-    avg_latency_rounded: float = 0.0
-    global_pps_rate: int = 0
-    pps_color: str = '<span style="color: green;">'
-    latency_color: str = '<span style="color: green;">'
-    session_connected: list[Player] = []
-    session_disconnected: list[Player] = []
+    FIELDS_TO_HIDE: list[str]
+    GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str]
+    GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str]
+
+    session_connected_sorted_column_name: str
+    session_connected_sort_order: Qt.SortOrder
+    session_disconnected_sorted_column_name: str
+    session_disconnected_sort_order: Qt.SortOrder
+
+    header_text: str
+    SESSION_CONNECTED_TABLE__NUM_COLS: int
+    session_connected_table__num_rows: int
+    session_connected_table__processed_data: list[list[str]]
+    session_connected_table__compiled_colors: list[list[QColor]]
+    SESSION_DISCONNECTED_TABLE__NUM_COLS: int
+    session_disconnected_table__num_rows: int
+    session_disconnected_table__processed_data: list[list[str]]
+    session_disconnected_table__compiled_colors: list[list[QColor]]
+
+    is_gui_rendering_ready: bool = False
 
 def rendering_core():
     with Threads_ExceptionHandler():
-        from Modules.consts import ANSI_ESCAPE, HEADER_TEXT_SEPARATOR
+        def sort_session_table(session_list: list[Player], sorted_column_name: str, sort_order: Qt.SortOrder) -> list[Player]:
+            """
+            Sorts a list of players based on the given column name and sort order.
+
+            Args:
+                session_list: The list of players to sort.
+                sorted_column_name: The column name to sort by.
+                sort_order: The sort order ("ascending" or "descending").
+
+            Returns:
+                The sorted list of players.
+            """
+            def sort_order_to_reverse(sort_order: Qt.SortOrder):
+                """
+                Converts a Qt.SortOrder to a reverse parameter for sorted().
+
+                Args:
+                    sort_order: The sort order from Qt (Ascending or Descending).
+                """
+                return sort_order == Qt.SortOrder.DescendingOrder
+
+
+            if sorted_column_name == "IP Address":
+                import ipaddress
+
+                return sorted(
+                    session_list,
+                    key=lambda player: ipaddress.ip_address(player.ip),
+                    reverse=sort_order_to_reverse(sort_order)
+                )
+            elif sorted_column_name in ["First Seen", "Last Rejoin", "Last Seen"]:
+                return sorted(
+                    session_list,
+                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
+                    reverse=not sort_order_to_reverse(sort_order)
+                )
+            else:
+                # Handle sorting for other columns
+                return sorted(
+                    session_list,
+                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
+                    reverse=sort_order_to_reverse(sort_order)
+                )
 
         def generate_field_names():
-            def add_down_arrow_char_to_sorted_table_field(field_names: list[str], target_field: str):
+            # TODO: I need to put this somewhere in the loop so it's actually keep synced with the GUI cuz now it's an init
+            def add_down_arrow_char_to_sorted_logging_table_field(field_names: list[str], target_field: str):
                 updated_field_names = [
                     field + " \u2193" if field == target_field else field
                     for field in field_names
@@ -2779,12 +2836,12 @@ def rendering_core():
             gui_connected_players_table__field_names = [
                 field_name
                 for field_name in Settings.gui_all_connected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_GUI
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
             ]
             gui_disconnected_players_table__field_names = [
                 field_name
                 for field_name in Settings.gui_all_disconnected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in FIELDS_TO_HIDE_IN_GUI
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
             ]
             logging_connected_players_table__field_names = [
                 field_name
@@ -2798,8 +2855,8 @@ def rendering_core():
             ]
 
             return (
-                add_down_arrow_char_to_sorted_table_field(logging_connected_players_table__field_names, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-                add_down_arrow_char_to_sorted_table_field(logging_disconnected_players_table__field_names, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
+                add_down_arrow_char_to_sorted_logging_table_field(logging_connected_players_table__field_names, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY),
+                add_down_arrow_char_to_sorted_logging_table_field(logging_disconnected_players_table__field_names, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
                 gui_connected_players_table__field_names,
                 gui_disconnected_players_table__field_names
             )
@@ -3250,83 +3307,470 @@ def rendering_core():
 
             return asn
 
-        def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
-            current_padding = len(str(var))
+        def process_session_logging():
+            def get_minimum_padding(var: Union[str, float, int, bool], max_padding: int, padding: int):
+                current_padding = len(str(var))
 
-            if current_padding <= padding:
-                if current_padding > max_padding:
-                    max_padding = current_padding
+                if current_padding <= padding:
+                    if current_padding > max_padding:
+                        max_padding = current_padding
 
-            return max_padding
+                return max_padding
 
-        def sort_session_table(session_list: list[Player], sorted_column_name: str, sorted_key: str) -> list[Player]:
-            """
-            Sorts a list of players based on the given column name.
+            def format_player_logging_datetime(datetime_object: datetime):
+                return datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]
 
-            Args:
-                session_list: The list of players to sort.
-                sorted_column_name: The column name to sort by.
-                sorted_key: The compiled default sorted key attribute to sort by.
+            def format_player_logging_usernames(player_usernames: list[str]):
+                return ", ".join(player_usernames) if player_usernames else "N/A"
 
-            Returns:
-                list[Player]: The sorted list of players.
-            """
-            import ipaddress
+            def format_player_logging_ip(player_ip: str):
+                if SessionHost.player and SessionHost.player.ip == player_ip:
+                    return f"{player_ip} 👑"
+                return player_ip
 
-            must_reverse_sort = False
-            if sorted_column_name in ["T. Packets", "Packets", "PPS"]:
-                must_reverse_sort = True
+            def format_player_logging_intermediate_ports(player_ports: Player_Ports):
+                player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
+                if player_ports.intermediate:
+                    return ", ".join(map(str, player_ports.intermediate))
+                else:
+                    return ""
 
-            if sorted_column_name == "IP Address":
-                # Sort players by their IP addresses using ipaddress module
-                return sorted(
-                    session_list,
-                    key=lambda player: ipaddress.ip_address(player.ip),
-                    reverse=must_reverse_sort
-                )
+            session_connected__padding_country_name = 0
+            session_connected__padding_continent_name = 0
+            for player in session_connected_sorted:
+                session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
+                session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
+
+            logging_connected_players_table = PrettyTable()
+            logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
+            logging_connected_players_table.title = f"Player{plural(len(session_connected_sorted))} connected in your session ({len(session_connected_sorted)}):"
+            logging_connected_players_table.field_names = LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
+            logging_connected_players_table.align = "l"
+            for player in session_connected_sorted:
+                row: list[str] = []
+                row.append(f"{format_player_logging_usernames(player.usernames)}")
+                row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
+                row.append(f"{player.rejoins}")
+                row.append(f"{player.total_packets}")
+                row.append(f"{player.packets}")
+                row.append(f"{player.pps.rate}")
+                row.append(f"{format_player_logging_ip(player.ip)}")
+                row.append(f"{player.ports.last}")
+                row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
+                row.append(f"{player.ports.first}")
+                row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
+                row.append(f"{player.iplookup.ipapi.compiled.region}")
+                row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                row.append(f"{player.iplookup.maxmind.compiled.city}")
+                row.append(f"{player.iplookup.ipapi.compiled.district}")
+                row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                row.append(f"{player.iplookup.ipapi.compiled.org}")
+                row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                row.append(f"{player.iplookup.ipapi.compiled._as}")
+                row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                logging_connected_players_table.add_row(row)
+
+            session_disconnected__padding_country_name = 0
+            session_disconnected__padding_continent_name = 0
+            for player in session_disconnected_sorted:
+                session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
+                session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
+
+            logging_disconnected_players_table = PrettyTable()
+            logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
+            logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected_sorted))} who've left your session ({len(session_disconnected_sorted)}):"
+            logging_disconnected_players_table.field_names = LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
+            logging_disconnected_players_table.align = "l"
+            for player in session_disconnected_sorted:
+                row: list[str] = []
+                row.append(f"{format_player_logging_usernames(player.usernames)}")
+                row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
+                row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
+                row.append(f"{player.rejoins}")
+                row.append(f"{player.total_packets}")
+                row.append(f"{player.packets}")
+                row.append(f"{player.ip}")
+                row.append(f"{player.ports.last}")
+                row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
+                row.append(f"{player.ports.first}")
+                row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
+                row.append(f"{player.iplookup.ipapi.compiled.region}")
+                row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                row.append(f"{player.iplookup.maxmind.compiled.city}")
+                row.append(f"{player.iplookup.ipapi.compiled.district}")
+                row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                row.append(f"{player.iplookup.ipapi.compiled.org}")
+                row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                row.append(f"{player.iplookup.ipapi.compiled._as}")
+                row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                logging_disconnected_players_table.add_row(row)
+
+            from Modules.consts import SESSIONS_LOGGING_PATH
+
+            # Check if the directories exist, if not create them
+            if not SESSIONS_LOGGING_PATH.parent.exists():
+                SESSIONS_LOGGING_PATH.parent.mkdir(parents=True)  # Create the directories if they don't exist
+
+            # Check if the file exists, if not create it
+            if not SESSIONS_LOGGING_PATH.exists():
+                SESSIONS_LOGGING_PATH.touch()  # Create the file if it doesn't exist
+
+            with SESSIONS_LOGGING_PATH.open("w", encoding="utf-8") as f:
+                f.write(logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
+
+        def process_gui_session_tables_rendering():
+            def format_player_gui_datetime(datetime_object: datetime):
+                formatted_elapsed = None
+
+                if Settings.GUI_DATE_FIELDS_SHOW_ELAPSED:
+                    elapsed_time = datetime.now() - datetime_object
+
+                    hours, remainder = divmod(elapsed_time.total_seconds(), 3600)
+                    minutes, remainder = divmod(remainder, 60)
+                    seconds, milliseconds = divmod(remainder * 1000, 1000)
+
+                    elapsed_parts: list[str] = []
+                    if hours >= 1:
+                        elapsed_parts.append(f"{int(hours):02}h")
+                    if elapsed_parts or minutes >= 1:
+                        elapsed_parts.append(f"{int(minutes):02}m")
+                    if elapsed_parts or seconds >= 1:
+                        elapsed_parts.append(f"{int(seconds):02}s")
+                    if not elapsed_parts and milliseconds > 0:
+                        elapsed_parts.append(f"{int(milliseconds):03}ms")
+
+                    formatted_elapsed = " ".join(elapsed_parts)
+
+                    if Settings.GUI_DATE_FIELDS_SHOW_DATE is False and Settings.GUI_DATE_FIELDS_SHOW_TIME is False:
+                        return formatted_elapsed
+
+                parts = []
+                if Settings.GUI_DATE_FIELDS_SHOW_DATE:
+                    parts.append(datetime_object.strftime("%m/%d/%Y"))
+                if Settings.GUI_DATE_FIELDS_SHOW_TIME:
+                    parts.append(datetime_object.strftime("%H:%M:%S.%f")[:-3])
+
+                formatted_datetime = " ".join(parts)
+                if not formatted_datetime:
+                    raise ValueError("Invalid settings: Both date and time are disabled.")
+
+                if formatted_elapsed:
+                    formatted_datetime += f" ({formatted_elapsed})"
+
+                return formatted_datetime
+
+            def format_player_gui_usernames(player_usernames: list[str]):
+                return ", ".join(player_usernames) if player_usernames else "N/A"
+
+            def format_player_gui_pps(pps_color: QColor, is_pps_first_calculation: bool, pps_rate: int):
+                from Modules.consts import QColorPalette
+
+                if not is_pps_first_calculation:
+                    if pps_rate == 0:
+                        pps_color = QColorPalette.RED
+                    elif pps_rate >= 1 and pps_rate <= 3:
+                        pps_color = QColorPalette.YELLOW
+
+                return pps_color, f"{pps_rate}"
+
+            def format_player_gui_ip(player_ip: str):
+                if SessionHost.player and SessionHost.player.ip == player_ip:
+                    return f"{player_ip} 👑"
+                return player_ip
+
+            def format_player_gui_intermediate_ports(player_ports: Player_Ports):
+                player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
+                if player_ports.intermediate:
+                    return ", ".join(map(str, player_ports.intermediate))
+                else:
+                    return ""
+
+            from Modules.consts import QColorPalette
+
+            # Define the column name to index mapping for connected and disconnected players
+            CONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
+            DISCONNECTED_COLUMN_MAPPING = {header: index for index, header in enumerate(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)}
+
+            session_connected_table__processed_data: list[list[str]] = []
+            session_connected_table__compiled_colors: list[list[QColor]] = []
+            session_disconnected_table__processed_data: list[list[str]] = []
+            session_disconnected_table__compiled_colors: list[list[QColor]] = []
+
+            for player in session_connected_sorted:
+                if Settings.USERIP_ENABLED and player.userip.usernames:
+                    row_color = QColorPalette.WHITE # TODO: Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT (set the background color)
+                else:
+                    row_color = QColorPalette.GREEN
+                cell_color = row_color
+
+                # Initialize a list for cell colors for the current row
+                cell_colors = [row_color] * GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS
+
+                row: list[str] = []
+                if Settings.USERIP_ENABLED:
+                    row.append(f"{format_player_gui_usernames(player.usernames)}")
+                row.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
+                row.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
+                row.append(f"{player.rejoins}")
+                row.append(f"{player.total_packets}")
+                row.append(f"{player.packets}")
+                cell_color, player_pps = format_player_gui_pps(row_color, player.pps.is_first_calculation, player.pps.rate)
+                cell_colors[CONNECTED_COLUMN_MAPPING["PPS"]] = cell_color
+                row.append(f"{player_pps}")
+                row.append(f"{format_player_gui_ip(player.ip)}")
+                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.ports.last}")
+                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{format_player_gui_intermediate_ports(player.ports)}")
+                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.ports.first}")
+                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
+                        row.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
+                    else:
+                        row.append(f"{player.iplookup.ipapi.compiled.continent}")
+                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
+                        row.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
+                    else:
+                        row.append(f"{player.iplookup.maxmind.compiled.country}")
+                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.region}")
+                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.maxmind.compiled.city}")
+                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.district}")
+                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.org}")
+                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled._as}")
+                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+
+                session_connected_table__processed_data.append(row)
+                session_connected_table__compiled_colors.append(cell_colors)
+
+            for player in session_disconnected_sorted:
+                if Settings.USERIP_ENABLED and player.userip.usernames:
+                    row_color = QColorPalette.WHITE # TODO: Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT (set the background color)
+                else:
+                    row_color = QColorPalette.RED
+                cell_color = row_color
+
+                # Initialize a list for cell colors for the current row
+                cell_colors = [row_color] * GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS
+
+                row: list[str] = []
+                if Settings.USERIP_ENABLED:
+                    row.append(f"{format_player_gui_usernames(player.usernames)}")
+                row.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
+                row.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
+                row.append(f"{format_player_gui_datetime(player.datetime.last_seen)}")
+                row.append(f"{player.rejoins}")
+                row.append(f"{player.total_packets}")
+                row.append(f"{player.packets}")
+                row.append(f"{player.ip}")
+                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.ports.last}")
+                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{format_player_gui_intermediate_ports(player.ports)}")
+                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.ports.first}")
+                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
+                        row.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
+                    else:
+                        row.append(f"{player.iplookup.ipapi.compiled.continent}")
+                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
+                        row.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
+                    else:
+                        row.append(f"{player.iplookup.maxmind.compiled.country}")
+                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.region}")
+                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.maxmind.compiled.city}")
+                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.district}")
+                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.org}")
+                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled._as}")
+                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
+                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+
+                session_disconnected_table__processed_data.append(row)
+                session_disconnected_table__compiled_colors.append(cell_colors)
+
+            return (
+                len(session_connected_table__processed_data),
+                session_connected_table__processed_data,
+                session_connected_table__compiled_colors,
+                len(session_disconnected_table__processed_data),
+                session_disconnected_table__processed_data,
+                session_disconnected_table__compiled_colors
+            )
+
+        def generate_gui_header_text(global_pps_t1: float, global_pps_rate: int):
+            global global_pps_counter, tshark_packets_latencies
+
+            one_second_ago = datetime.now() - timedelta(seconds=1)
+
+            # Filter packets received in the last second
+            recent_packets = [(pkt_time, pkt_latency) for pkt_time, pkt_latency in tshark_packets_latencies if pkt_time >= one_second_ago]
+
+            # Update latencies list to only keep recent packets
+            tshark_packets_latencies[:] = recent_packets
+
+            # Calculate average latency
+            if recent_packets:
+                total_latency_seconds = sum(pkt_latency.total_seconds() for _, pkt_latency in recent_packets)
+                avg_latency_seconds = total_latency_seconds / len(recent_packets)
+                avg_latency_rounded = round(avg_latency_seconds, 1)
             else:
-                # Handle sorting for other columns
-                return sorted(
-                    session_list,
-                    key=attrgetter(sorted_key),
-                    reverse=must_reverse_sort
-                )
+                avg_latency_seconds = 0.0
+                avg_latency_rounded = 0.0
 
-        def format_player_logging_datetime(datetime_object: datetime):
-            return f"{datetime_object.strftime('%m/%d/%Y %H:%M:%S.%f')[:-3]}"
-
-        def format_player_logging_usernames(player_usernames: list[str]):
-            return f"{', '.join(player_usernames) if player_usernames else 'N/A'}"
-
-        def format_player_logging_ip(player_ip: str):
-            if (
-                SessionHost.player
-                and SessionHost.player.ip == player_ip
-            ):
-                return f"{player_ip} 👑"
-            return player_ip
-
-        def format_player_logging_intermediate_ports(player_ports: Player_Ports):
-            player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
-            if player_ports.intermediate:
-                return ", ".join(map(str, player_ports.intermediate))
+            # Determine latency color
+            if avg_latency_seconds >= 0.90 * Settings.CAPTURE_OVERFLOW_TIMER:
+                latency_color = '<span style="color: red;">'
+            elif avg_latency_seconds >= 0.75 * Settings.CAPTURE_OVERFLOW_TIMER:
+                latency_color = '<span style="color: yellow;">'
             else:
-                return ""
+                latency_color = '<span style="color: green;">'
+
+            seconds_elapsed = time.perf_counter() - global_pps_t1
+            if seconds_elapsed >= 1:
+                global_pps_rate = round(global_pps_counter / seconds_elapsed)
+                global_pps_counter = 0
+                global_pps_t1 = time.perf_counter()
+
+            # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
+            # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
+            # Also these values averagely indicates the max performances my script can run at during my testings. Luckely it's just enough to process GTA V game.
+            if global_pps_rate >= 3000:
+                pps_color = '<span style="color: red;">'
+            elif global_pps_rate >= 1500:
+                pps_color = '<span style="color: yellow;">'
+            else:
+                pps_color = '<span style="color: green;">'
+
+            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
+            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
+            color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
+            if Settings.DISCORD_PRESENCE:
+                rpc_message = f' RPC: <span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC: <span style="color: yellow;">Waiting for Discord</span>'
+            else:
+                rpc_message = ""
+
+            num_of_userip_files = len(UserIP_Databases.userip_databases)
+            invalid_ip_count = len(UserIP_Databases.notified_ip_invalid)
+            conflict_ip_count = len(UserIP_Databases.notified_ip_conflicts)
+            corrupted_settings_count = len(UserIP_Databases.notified_settings_corrupted)
+
+            header = textwrap.dedent(f"""
+                ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
+                Welcome in {TITLE} {VERSION}<br>
+                The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
+                ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
+                Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
+                Packets latency per sec:{latency_color}{avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{pps_color}{global_pps_rate}</span>{rpc_message}<br>
+                ─────────────────────────────────────────────────────────────────────────────────────────────────
+            """.removeprefix("\n").removesuffix("\n"))
+
+            if any([invalid_ip_count, conflict_ip_count, corrupted_settings_count]):
+                header += "<br>"
+                if invalid_ip_count:
+                    header += f"Number of invalid IP{plural(invalid_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{invalid_ip_count}</span><br>"
+                if conflict_ip_count:
+                    header += f"Number of conflicting IP{plural(conflict_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{conflict_ip_count}</span><br>"
+                if corrupted_settings_count:
+                    header += f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{corrupted_settings_count}</span><br>"
+                header += "─────────────────────────────────────────────────────────────────────────────────────────────────"
+
+            return header, global_pps_t1, global_pps_rate
 
         from Modules.consts import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
 
-        global iplookup_core__thread, global_pps_counter, tshark_packets_latencies
-
-        SESSION_CONNECTED_SORTED_KEY = Settings.gui_fields_mapping[Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY]
-        SESSION_DISCONNECTED_SORTED_KEY = Settings.gui_fields_mapping[Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY]
-        FIELDS_TO_HIDE_IN_GUI = GUIrenderingData.FIELDS_TO_HIDE = set(Settings.GUI_FIELDS_TO_HIDE)
-
+        GUIrenderingData.FIELDS_TO_HIDE = set(Settings.GUI_FIELDS_TO_HIDE)
         (
             LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
         ) = generate_field_names()
+        GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
+        GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
 
         global_pps_t1 = time.perf_counter()
         global_pps_rate = 0
@@ -3363,10 +3807,11 @@ def rendering_core():
             if ScriptControl.has_crashed():
                 return
 
-            session_connected__padding_country_name = 0
-            session_connected__padding_continent_name = 0
-            session_disconnected__padding_country_name = 0
-            session_disconnected__padding_continent_name = 0
+            # Wait for sorting fields to be initialized from the GUI
+            while GUIrenderingData.session_connected_sorted_column_name is None or GUIrenderingData.session_connected_sort_order is None:
+                time.sleep(0.1)
+                continue
+
             session_connected: list[Player] = []
             session_disconnected: list[Player] = []
 
@@ -3431,8 +3876,7 @@ def rendering_core():
                 if player.datetime.left:
                     session_disconnected.append(player)
                 else:
-                    session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
-                    session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
+                    session_connected.append(player)
 
                     if (player_timedelta := (datetime.now() - player.pps.t1)).total_seconds() >= 1.0:
                         player.pps.rate = round(player.pps.counter / player_timedelta.total_seconds())
@@ -3440,10 +3884,6 @@ def rendering_core():
                         player.pps.t1 = datetime.now()
                         player.pps.is_first_calculation = False
 
-                    session_connected.append(player)
-
-            GUIrenderingData.session_connected = session_connected
-            GUIrenderingData.session_disconnected = session_disconnected
 
             if Settings.CAPTURE_PROGRAM_PRESET == "GTA5":
                 if SessionHost.player:
@@ -3467,167 +3907,32 @@ def rendering_core():
 
             session_connected_sorted = sort_session_table(
                 session_connected,
-                Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY,
-                SESSION_CONNECTED_SORTED_KEY
+                GUIrenderingData.session_connected_sorted_column_name,
+                GUIrenderingData.session_connected_sort_order
             )
             session_disconnected_sorted = sort_session_table(
                 session_disconnected,
-                Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY,
-                SESSION_DISCONNECTED_SORTED_KEY
+                GUIrenderingData.session_disconnected_sorted_column_name,
+                GUIrenderingData.session_disconnected_sort_order
             )
 
-            for player in session_disconnected_sorted:
-                session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
-                session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
-
-            current_time = datetime.now()
-            one_second_ago = current_time - timedelta(seconds=1)
-
-            # Filter packets received in the last second
-            recent_packets = [(pkt_time, pkt_latency) for pkt_time, pkt_latency in tshark_packets_latencies if pkt_time >= one_second_ago]
-
-            # Update latencies list to only keep recent packets
-            tshark_packets_latencies[:] = recent_packets
-
-            # Calculate average latency
-            if recent_packets:
-                total_latency_seconds = sum(pkt_latency.total_seconds() for _, pkt_latency in recent_packets)
-                avg_latency_seconds = total_latency_seconds / len(recent_packets)
-                GUIrenderingData.avg_latency_rounded = round(avg_latency_seconds, 1)
-            else:
-                avg_latency_seconds = 0.0
-                GUIrenderingData.avg_latency_rounded = 0.0
-
-            # Determine latency color
-            if avg_latency_seconds >= 0.90 * Settings.CAPTURE_OVERFLOW_TIMER:
-                GUIrenderingData.latency_color = '<span style="color: red;">'
-            elif avg_latency_seconds >= 0.75 * Settings.CAPTURE_OVERFLOW_TIMER:
-                GUIrenderingData.latency_color = '<span style="color: yellow;">'
-            else:
-                GUIrenderingData.latency_color = '<span style="color: green;">'
-
-            seconds_elapsed = time.perf_counter() - global_pps_t1
-            if seconds_elapsed >= 1:
-                global_pps_rate = GUIrenderingData.global_pps_rate = round(global_pps_counter / seconds_elapsed)
-                global_pps_counter = 0
-                global_pps_t1 = time.perf_counter()
-
-            # For reference, in a GTA Online session, the packets per second (PPS) typically range from 0 (solo session) to 1500 (public session, 32 players).
-            # If the packet rate exceeds these ranges, we flag them with yellow or red color to indicate potential issues (such as scanning unwanted packets outside of the GTA game).
-            # Also these values averagely indicates the max performances my script can run at during my testings. Luckely it's just enough to process GTA V game.
-            if global_pps_rate >= 3000:
-                GUIrenderingData.pps_color = '<span style="color: red;">'
-            elif global_pps_rate >= 1500:
-                GUIrenderingData.pps_color = '<span style="color: yellow;">'
-            else:
-                GUIrenderingData.pps_color = '<span style="color: green;">'
-
-            if Settings.DISCORD_PRESENCE:
-                GUIrenderingData.rpc_message = f' RPC: <span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC: <span style="color: yellow;">Waiting for Discord</span>'
-            else:
-                GUIrenderingData.rpc_message = ""
-
-            if Settings.GUI_SESSIONS_LOGGING and (last_session_logging_processing_time is None or time.perf_counter() - last_session_logging_processing_time >= 1.0):
-                from Modules.consts import SESSIONS_LOGGING_PATH
-
+            if Settings.GUI_SESSIONS_LOGGING and (last_session_logging_processing_time is None or (time.perf_counter() - last_session_logging_processing_time) >= 1.0):
+                process_session_logging()
                 last_session_logging_processing_time = time.perf_counter()
 
-                logging_connected_players_table = PrettyTable()
-                logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
-                logging_connected_players_table.title = f"Player{plural(len(session_connected_sorted))} connected in your session ({len(session_connected_sorted)}):"
-                logging_connected_players_table.field_names = LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
-                logging_connected_players_table.align = "l"
-                for player in session_connected_sorted:
-                    row: list[str] = []
-                    row.append(f"{format_player_logging_usernames(player.usernames)}")
-                    row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
-                    row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{player.rejoins}")
-                    row.append(f"{player.total_packets}")
-                    row.append(f"{player.packets}")
-                    row.append(f"{player.pps.rate}")
-                    row.append(f"{format_player_logging_ip(player.ip)}")
-                    row.append(f"{player.ports.last}")
-                    row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
-                    row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                    row.append(f"{player.iplookup.ipapi.compiled.region}")
-                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
-                    row.append(f"{player.iplookup.ipapi.compiled.district}")
-                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
-                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
-                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
-                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
-                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
-                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
-                    row.append(f"{player.iplookup.ipapi.compiled.org}")
-                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
-                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
-                    row.append(f"{player.iplookup.ipapi.compiled._as}")
-                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
-                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
-                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
-                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
-                    logging_connected_players_table.add_row(row)
-
-                logging_disconnected_players_table = PrettyTable()
-                logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
-                logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected))} who've left your session ({len(session_disconnected)}):"
-                logging_disconnected_players_table.field_names = LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
-                logging_disconnected_players_table.align = "l"
-                for player in session_disconnected:
-                    row: list[str] = []
-                    row.append(f"{format_player_logging_usernames(player.usernames)}")
-                    row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
-                    row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                    row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
-                    row.append(f"{player.rejoins}")
-                    row.append(f"{player.total_packets}")
-                    row.append(f"{player.packets}")
-                    row.append(f"{player.ip}")
-                    row.append(f"{player.ports.last}")
-                    row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
-                    row.append(f"{player.ports.first}")
-                    row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
-                    row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                    row.append(f"{player.iplookup.ipapi.compiled.region}")
-                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
-                    row.append(f"{player.iplookup.ipapi.compiled.district}")
-                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
-                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
-                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
-                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
-                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
-                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
-                    row.append(f"{player.iplookup.ipapi.compiled.org}")
-                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
-                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
-                    row.append(f"{player.iplookup.ipapi.compiled._as}")
-                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
-                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
-                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
-                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
-                    logging_disconnected_players_table.add_row(row)
-
-                # Check if the directories exist, if not create them
-                if not SESSIONS_LOGGING_PATH.parent.exists():
-                    SESSIONS_LOGGING_PATH.parent.mkdir(parents=True)  # Create the directories if they don't exist
-
-                # Check if the file exists, if not create it
-                if not SESSIONS_LOGGING_PATH.exists():
-                    SESSIONS_LOGGING_PATH.touch()  # Create the file if it doesn't exist
-
-                with SESSIONS_LOGGING_PATH.open("w", encoding="utf-8") as f:
-                    tables_output_without_vt100 = ANSI_ESCAPE.sub("", logging_connected_players_table.get_string() + "\n" + logging_disconnected_players_table.get_string())
-                    f.write(tables_output_without_vt100)
-
-            if Settings.DISCORD_PRESENCE and (discord_rpc_manager.last_update_time is None or time.perf_counter() - discord_rpc_manager.last_update_time >= 3.0):
+            if Settings.DISCORD_PRESENCE and (discord_rpc_manager.last_update_time is None or (time.perf_counter() - discord_rpc_manager.last_update_time) >= 3.0):
                 discord_rpc_manager.update(f"{len(session_connected_sorted)} player{plural(len(session_connected_sorted))} connected in the session.")
 
-            GUIrenderingData.is_rendering_core_ready = True
+            GUIrenderingData.header_text, global_pps_t1, global_pps_rate = generate_gui_header_text(global_pps_t1, global_pps_rate)
+            (
+                GUIrenderingData.session_connected_table__num_rows,
+                GUIrenderingData.session_connected_table__processed_data,
+                GUIrenderingData.session_connected_table__compiled_colors,
+                GUIrenderingData.session_disconnected_table__num_rows,
+                GUIrenderingData.session_disconnected_table__processed_data,
+                GUIrenderingData.session_disconnected_table__compiled_colors
+            ) = process_gui_session_tables_rendering()
+            GUIrenderingData.is_gui_rendering_ready = True
 
             time.sleep(1)
 
@@ -3646,128 +3951,328 @@ iplookup_core__thread.start()
 capture_core__thread = threading.Thread(target=capture_core, daemon=True)
 capture_core__thread.start()
 
-import qdarkstyle
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QMainWindow, QSizePolicy, QLabel, QHeaderView, QFrame, QAbstractItemView
-from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent
+class SessionTableModel(QAbstractTableModel):
+    def __init__(self, headers: list[str]):
+        super().__init__()
+        self._headers = headers  # The column headers
+        self._data: list[list[str]] = []  # The data to be displayed in the table
+        self._compiled_colors: list[list[QColor]] = []  # The compiled colors for the table
+        self._num_rows = 0  # Default number of rows, initially 0
+        self._num_cols = 0  # Default number of columns, initially 0
 
-class MainWindow(QMainWindow):
+    def rowCount(self, parent=None):
+        return len(self._data)  # The number of rows in the model
+
+    def columnCount(self, parent=None):
+        return len(self._headers)  # The number of columns in the model
+
+    def data(self, index, role: int):
+        """Override data method to customize data retrieval and alignment."""
+        if not index.isValid():
+            return None
+
+        row_idx = index.row()
+        col_idx = index.column()
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            # Return the cell's text
+            return self._data[row_idx][col_idx]
+
+        if role == Qt.ItemDataRole.ForegroundRole:
+            ## Return the color for the cell
+            #return QBrush(self._compiled_colors[row_idx][col_idx])
+
+            if row_idx < len(self._compiled_colors) and col_idx < len(self._compiled_colors[row_idx]):
+                return QBrush(self._compiled_colors[row_idx][col_idx])
+            else:
+                # Handle the error, for example, return a default color
+                return QBrush(QColor(0, 0, 255))  # Example: return white if out of range
+
+
+        return None
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                return self._headers[section]  # Return the header for the column
+        return None
+
+    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+        if role == Qt.ItemDataRole.EditRole:
+            self._data[index.row()][index.column()] = value  # Set the data at the specified index
+            self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])  # Notify the view of data change
+            return True
+        return False
+
+    # TODO: ABSOLUTELY NEED TO IMPLEMENT SORTING for best performances !!!
+    #def sort(self, column, order):
+    #    """Override sort method to sort data based on column and order."""
+    #    column_key = self._headers[column]  # Get the column key (e.g., 'Name', 'Age')
+    #    reverse = (order == Qt.SortOrder.DescendingOrder)  # Reverse for descending order
+    #    try:
+    #        # Sort the data in place
+    #        self._data.sort(key=lambda x: x[column_key], reverse=reverse)
+    #        self.layoutChanged.emit()  # Notify view about data change
+    #    except Exception as e:
+    #        print(f"Error sorting column {column}: {e}")
+
+    def flags(self, index):
+        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+
+    # Custom Methods:
+
+    def update_table(self, num_cols: int, num_rows: int, new_data: list[list[str]], compiled_colors: list[list[QColor]]):
+        """Update the table size, data, and colors in one operation to avoid flickers."""
+        # Check if the data, layout, or colors have actually changed
+        if num_rows != self._num_rows or num_cols != self._num_cols or new_data != self._data or compiled_colors != self._compiled_colors:
+            # Only emit layout changes if rows, columns, or data have changed
+            self.layoutAboutToBeChanged.emit()  # Notify that the layout will change
+
+            # Update the table size, data, and colors
+            self._num_cols = num_cols
+            self._num_rows = num_rows
+            self._data = new_data
+            self._compiled_colors = compiled_colors  # Store the compiled colors for future rendering
+
+            # Emit layoutChanged since the layout/data/colors have changed
+            self.layoutChanged.emit()  # Notify that the layout has changed
+
+            # Emit dataChanged for the entire table (to update the display)
+            if self._num_rows > 0 and self._num_cols > 0:
+                top_left = self.index(0, 0)
+                bottom_right = self.index(self._num_rows - 1, self._num_cols - 1)
+                self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
+
+class GUIWorkerThread(QThread):
+    update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
+
+    def __init__(self, gui_closed_event: threading.Event, user_requested_sorting_by_field: threading.Event, connected_table_view: QTableView, disconnected_table_view: QTableView):
+        super().__init__()
+        self.gui_closed_event = gui_closed_event
+        self.user_requested_sorting_by_field = user_requested_sorting_by_field
+        self.connected_table_view = connected_table_view
+        self.disconnected_table_view = disconnected_table_view
+
+    def run(self):
+        def get_table_sorted_column(table: QTableView):
+            """Get the currently sorted column and its order from a specific QTableView."""
+            # Ensure we are fetching from the correct header of the provided table
+            header = table.horizontalHeader()
+
+            # Get the index of the currently sorted column
+            sorted_column_index = header.sortIndicatorSection()
+
+            # Get the sort order (ascending or descending)
+            sort_order = header.sortIndicatorOrder()
+
+            # Get the name of the sorted column
+            sorted_column_name = table.model().headerData(sorted_column_index, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+
+            return sorted_column_name, sort_order
+
+        while not self.gui_closed_event.is_set():
+            GUIrenderingData.session_connected_sorted_column_name, GUIrenderingData.session_connected_sort_order = get_table_sorted_column(self.connected_table_view)
+            GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
+
+            if GUIrenderingData.is_gui_rendering_ready:
+                self.update_signal.emit(
+                    GUIrenderingData.header_text,
+                    GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS,
+                    GUIrenderingData.session_connected_table__num_rows,
+                    GUIrenderingData.session_connected_table__processed_data,
+                    GUIrenderingData.session_connected_table__compiled_colors,
+                    GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS,
+                    GUIrenderingData.session_disconnected_table__num_rows,
+                    GUIrenderingData.session_disconnected_table__processed_data,
+                    GUIrenderingData.session_disconnected_table__compiled_colors
+                )
+
+            start_time = time.time()
+            while time.time() - start_time < 1:
+                self.msleep(100)
+
+                if self.user_requested_sorting_by_field.is_set():
+                    self.user_requested_sorting_by_field.clear()
+                    break
+
+class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        def add_sort_indicator_by_field_name(table_widget: QTableWidget, field_name: str, ascending = True):
+        def initialize_table_sort_indicator_by_field(table_name: Literal["connected_table", "disconnected_table"], table_view: QTableView, field_name: str):
             """
-            Sorts the table by the specified field name (header label) and updates the display.
+            Set the sort indicator for the given field name in the table view.
 
             Args:
-                table_widget (QTableWidget): The table widget to sort.
-                field_name (str): The name of the column (header label) to sort by.
-                ascending (bool): Whether to sort in ascending order. Defaults to True.
+                table_name: The name of the table to set the sort indicator for.
+                table_view: The table view to set the sort indicator for.
+                field_name: The field name to set the sort indicator for.
             """
             # Find the column index for the given field name
-            column_count = table_widget.columnCount()
+            table_view_model = table_view.model()
+            if not isinstance(table_view_model, SessionTableModel):
+                raise TypeError(f'Expected "QAbstractItemModel", got "{type(table_view_model)}"')
+
+            column_count = table_view_model.columnCount()
             column_index = None
+
+            # Search for the field_name in the header and get the column index
             for column in range(column_count):
-                header_item = table_widget.horizontalHeaderItem(column)
-                if header_item and header_item.text() == field_name:
+                header_item: str = table_view_model.headerData(column, Qt.Orientation.Horizontal)
+                if not isinstance(header_item, str):
+                    raise TypeError(f'Expected "str", got "{type(header_item)}"')
+                if header_item == field_name:
                     column_index = column
                     break
 
-            if column_index is not None:
-                # Set the sort indicator for the column
-                sort_order = Qt.SortOrder.AscendingOrder if ascending else Qt.SortOrder.DescendingOrder
-                table_widget.setSortingEnabled(False)
-                table_widget.horizontalHeader().setSortIndicator(column_index, sort_order)
-                table_widget.horizontalHeader().setSortIndicatorShown(True)
+            if column_index is None:
+                return
 
+            # Determine the sort order based on the field name
+            if table_name == "disconnected_table" and field_name in ["Last Rejoin", "Last Seen"]:
+                sort_order = Qt.SortOrder.AscendingOrder
+            else:
+                sort_order = Qt.SortOrder.DescendingOrder
+
+            # Set the sort indicator for the column
+            table_view.horizontalHeader().setSortIndicator(column_index, sort_order)
+            table_view.horizontalHeader().setSortIndicatorShown(True)
+
+        # Custom variables
+        self.gui_closed_event = threading.Event()
+        self.user_requested_sorting_by_field = threading.Event()
+
+        # Set up the window
         self.setWindowTitle(TITLE)
         self.adjust_gui_size()
-
-        # Central widget setup
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-
-        # Layout setup
-        self.main_layout = QVBoxLayout(self.central_widget)  # Create a layout and assign it to the central widget
 
         # Header text
         self.header_text = QLabel()
         self.header_text.setTextFormat(Qt.TextFormat.RichText)
         self.header_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_text.setWordWrap(True)
-        self.header_text.setFont(QFont("Courier", 10, QFont.Weight.Bold))  # Optional: Courier-like font for CLI feel
-        self.main_layout.addWidget(self.header_text)
+        self.header_text.setFont(QFont("Courier", 14, QFont.Weight.Bold))
 
         # Custom header for the Session Connected table with matching background as first column
-        self.session_connected_header = QLabel(f"Players connected in your session ({len(GUIrenderingData.session_connected)}):")
+        self.session_connected_header = QLabel(f"Players connected in your session (0):")
         self.session_connected_header.setTextFormat(Qt.TextFormat.RichText)
         self.session_connected_header.setStyleSheet("background-color: green; color: white; font-size: 16px; font-weight: bold; padding: 5px;")
         self.session_connected_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.session_connected_header.setFont(QFont("Courier", 9, QFont.Weight.Bold))
 
-        self.main_layout.addWidget(self.session_connected_header)
+        # Create the table model and view
+        self.connected_table_model = SessionTableModel(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
+        self.connected_table_view = QTableView(self)
+        self.connected_table_view.setModel(self.connected_table_model)
 
-        # Session Connected table
-        self.session_connected = QTableWidget()
-        self.session_connected.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.session_connected.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.session_connected.setAlternatingRowColors(True)
-        self.session_connected.setColumnCount(len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES))
-        self.session_connected.setHorizontalHeaderLabels(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
-        self.session_connected.verticalHeader().setVisible(False)  # Hide row index
-        self.session_connected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
-        self.session_connected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.session_connected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.session_connected.horizontalHeader().sectionClicked.connect(self.on_header_click)
-        self.session_connected.horizontalHeader().setSectionsMovable(True)
+        # Apply the necessary settings to the view
+        self.connected_table_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.connected_table_view.verticalHeader().setVisible(False)  # Hide row index
+        self.connected_table_view.setAlternatingRowColors(True)
+        self.connected_table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.connected_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        #self.connected_table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.connected_table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.connected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.connected_table_view.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
-        add_sort_indicator_by_field_name(self.session_connected, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
-
-        # Add Session Connected table to the layout
-        self.main_layout.addWidget(self.session_connected)
+        initialize_table_sort_indicator_by_field("connected_table", self.connected_table_view, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
 
         # Add a horizontal line separator
         self.tables_separator = QFrame(self)
         self.tables_separator.setFrameShape(QFrame.Shape.HLine)
         self.tables_separator.setFrameShadow(QFrame.Shadow.Sunken)  # Optional shadow effect
-        self.main_layout.addWidget(self.tables_separator)
 
         # Custom header for the Session Disconnected table with matching background as first column
-        self.session_disconnected_header = QLabel(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
+        self.session_disconnected_header = QLabel(f"Players who've left your session (0):")
         self.session_disconnected_header.setTextFormat(Qt.TextFormat.RichText)
         self.session_disconnected_header.setStyleSheet("background-color: red; color: white; font-size: 16px; font-weight: bold; padding: 5px;")
         self.session_disconnected_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.session_disconnected_header.setFont(QFont("Courier", 9, QFont.Weight.Bold))
-        self.main_layout.addWidget(self.session_disconnected_header)
 
-        # Session Disconnected table
-        self.session_disconnected = QTableWidget()
-        self.session_disconnected.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.session_disconnected.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.session_disconnected.setAlternatingRowColors(True)
-        self.session_disconnected.setColumnCount(len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES))
-        self.session_disconnected.setHorizontalHeaderLabels(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
-        self.session_disconnected.verticalHeader().setVisible(False)  # Hide row index
-        self.session_disconnected.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
-        self.session_disconnected.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.session_disconnected.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.session_disconnected.horizontalHeader().sectionClicked.connect(self.on_header_click)
-        self.session_disconnected.horizontalHeader().setSectionsMovable(True)
+        # Create the table model and view
+        self.disconnected_table_model = SessionTableModel(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
+        self.disconnected_table_view = QTableView(self)
+        self.disconnected_table_view.setModel(self.disconnected_table_model)
+
+        # Apply the necessary settings to the view
+        self.disconnected_table_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.disconnected_table_view.verticalHeader().setVisible(False)  # Hide row index
+        self.disconnected_table_view.setAlternatingRowColors(True)
+        self.disconnected_table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.disconnected_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        #self.disconnected_table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.disconnected_table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.disconnected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.disconnected_table_view.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
-        add_sort_indicator_by_field_name(self.session_disconnected, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
+        initialize_table_sort_indicator_by_field("disconnected_table", self.disconnected_table_view, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
 
-        # Add Session Disconnected table to the layout
-        self.main_layout.addWidget(self.session_disconnected)
+        # Layout to organize the widgets
+        self.main_layout = QVBoxLayout()
+        self.main_layout.addWidget(self.header_text)
+        self.main_layout.addWidget(self.session_connected_header)
+        self.main_layout.addWidget(self.connected_table_view)
+        self.main_layout.addWidget(self.tables_separator)
+        self.main_layout.addWidget(self.session_disconnected_header)
+        self.main_layout.addWidget(self.disconnected_table_view)
 
-        # Custom variables
-        self.user_requested_sorting_by_field = False
+        # Set the layout for the window
+        self.setLayout(self.main_layout)
 
-        # Worker thread
-        self.worker_thread = WorkerThread(self)
-        self.worker_thread.update_signal.connect(self.update_table)
+        # Create the worker thread for table updates
+        self.worker_thread = GUIWorkerThread(self.gui_closed_event, self.user_requested_sorting_by_field, self.connected_table_view, self.disconnected_table_view)
+        self.worker_thread.update_signal.connect(self.update_gui)
         self.worker_thread.start()
+
+    def update_gui(self,
+        header_text: str,
+        session_connected_table__num_cols: int,
+        session_connected_table__num_rows: int,
+        session_connected_table__processed_data: list[list[str]],
+        session_connected_table__compiled_colors: list[list[QColor]],
+        session_disconnected_table__num_cols: int,
+        session_disconnected_table__num_rows: int,
+        session_disconnected_table__processed_data: list[list[str]],
+        session_disconnected_table__compiled_colors: list[list[QColor]]
+    ):
+        """This method updates the header text and calls update_table for both tables, along with their respective header texts."""
+        def adjust_table_column_widths(view: QTableView):
+            """Adjust the column widths of a QTableView to fit content."""
+            header = view.horizontalHeader()
+            model = view.model()  # The table model assigned to the QTableView
+
+            for column in range(model.columnCount()):
+                # Get the header label for the column
+                header_label = model.headerData(column, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+
+                if header_label == "Usernames":
+                    # Check if the column contains any data other than "N/A"
+                    contains_non_na = any(
+                        model.data(model.index(row, column), Qt.ItemDataRole.DisplayRole) != "N/A"
+                        for row in range(model.rowCount())
+                    )
+
+                    if contains_non_na:
+                        header.setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+                    else:
+                        header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
+                    header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+                else:
+                    header.setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+
+        self.header_text.setText(header_text)
+
+        self.session_connected_header.setText(f"Players connected in your session ({session_connected_table__num_rows}):")
+        self.connected_table_model.update_table(session_connected_table__num_cols, session_connected_table__num_rows, session_connected_table__processed_data, session_connected_table__compiled_colors)
+        adjust_table_column_widths(self.connected_table_view)
+
+        self.session_disconnected_header.setText(f"Players who've left your session ({session_disconnected_table__num_rows}):")
+        self.disconnected_table_model.update_table(session_disconnected_table__num_cols, session_disconnected_table__num_rows, session_disconnected_table__processed_data, session_disconnected_table__compiled_colors)
+        adjust_table_column_widths(self.disconnected_table_view)
 
     def adjust_gui_size(self):
         def get_screen_size():
@@ -3788,79 +4293,11 @@ class MainWindow(QMainWindow):
         elif screen_width >= 1024 and screen_height >= 768:
             self.resize(940, 680)
 
-    def on_header_click(self, table: QTableWidget):
-        self.user_requested_sorting_by_field = True
-
-    def update_table(self, header_text: str, session_connected: list[list[str]], session_disconnected: list[list[str]]):
-        def populate_table(table: QTableWidget, data: list[list[str]], default_text_color: QColor):
-            """
-            Populate a QTableWidget with data and set the text color.
-            If a `colorama.Fore` color is detected in the text, it overrides the default color.
-
-            Args:
-                table (QTableWidget): The table to populate.
-                data (list[list[str]]): 2D list containing table content.
-                default_text_color (QColor): Default text color if no color is specified.
-            """
-            from Modules.consts import ANSI_ESCAPE, COLORAMA_FORE_TO_QCOLOR
-
-            table.setRowCount(len(data))
-            for row_idx, row_data in enumerate(data):
-                for col_idx, col_data in enumerate(row_data):
-                    # Check for ANSI escape sequence and extract color
-                    detected_color = default_text_color
-
-                    match = ANSI_ESCAPE.match(col_data)
-                    if match:
-                        escape_sequence = match.group(0)
-                        detected_color = COLORAMA_FORE_TO_QCOLOR.get(escape_sequence, default_text_color)
-                        col_data = re.sub(ANSI_ESCAPE, '', col_data)
-
-                    if not isinstance(detected_color, QColor):
-                        raise TypeError(f'Excepted "QColor", got "{type(detected_color)}"')
-
-                    # Set text and color
-                    item = QTableWidgetItem()
-                    item.setText(col_data)
-                    item.setForeground(QBrush(detected_color))
-                    table.setItem(row_idx, col_idx, item)
-
-        def adjust_table_column_widths(table: QTableWidget):
-            """Adjust the column widths to fit the max content length."""
-            for column in range(table.columnCount()):
-                header_label = table.horizontalHeaderItem(column).text()
-
-                if header_label == "Usernames":
-                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                    ## Stretch if at least one item from the table is not "N/A" otherwise resize to content
-                    #if any(table.item(row, column).text() != "N/A" for row in range(table.rowCount())):
-                    #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-                    #else:
-                    #    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                elif header_label in ["First Seen", "Last Rejoin", "Last Seen", "Rejoins", "T. Packets", "Packets", "PPS", "IP Address", "First Port", "Last Port", "Mobile", "VPN", "Hosting"]:
-                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-                else:
-                    table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-
-                # BUG: Unfortunately this doesnt work because of the code just above.
-                ## Check if the column has a sort indicator
-                #if table.horizontalHeader().sortIndicatorSection() == column:
-                #    current_width = table.horizontalHeader().sectionSize(column)
-                #    # Add 100 pixels of padding if the sort indicator is shown
-                #    table.horizontalHeader().resizeSection(column, current_width + 100)
-
-        self.header_text.setText(header_text)
-
-        self.session_connected_header.setText(f"Players connected in your session ({len(GUIrenderingData.session_connected)}):")
-        populate_table(self.session_connected, session_connected, QColor('green'))
-        adjust_table_column_widths(self.session_connected)
-
-        self.session_disconnected_header.setText(f"Players who've left your session ({len(GUIrenderingData.session_disconnected)}):")
-        populate_table(self.session_disconnected, session_disconnected, QColor('red'))
-        adjust_table_column_widths(self.session_disconnected)
+    def on_header_click(self):
+        self.user_requested_sorting_by_field.set()
 
     def closeEvent(self, event: QCloseEvent):
-        gui_closed__event.set()  # Signal the thread to stop
+        self.gui_closed_event.set()  # Signal the thread to stop
         self.worker_thread.quit()  # Stop the QThread
         self.worker_thread.wait()  # Wait for the thread to finish
         event.accept()  # Accept the close event
@@ -3868,363 +4305,10 @@ class MainWindow(QMainWindow):
         time.sleep(1) # Gives a second for Windows processes to closes properly
         terminate_script("EXIT")
 
-class WorkerThread(QThread):
-    update_signal = pyqtSignal(str, list, list)
-
-    def __init__(self, main_window_instance: MainWindow):
-        super().__init__()
-        self.main_window = main_window_instance  # Store the MainWindow instance
-
-    def run(self):
-        def get_table_sorted_column(table: QTableWidget):
-            # Get the index of the currently sorted column
-            sorted_column_index = table.horizontalHeader().sortIndicatorSection()
-
-            # Get the sort order (ascending or descending)
-            sort_order = table.horizontalHeader().sortIndicatorOrder()
-
-            # Get the name of the sorted column
-            sorted_column_name = table.horizontalHeaderItem(sorted_column_index).text()
-
-            return sorted_column_name, sort_order
-
-        def generate_header_text():
-            is_arp_enabled = "Enabled" if interfaces_options[user_interface_selection]["is_arp"] else "Disabled"
-            displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
-            color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
-            num_of_userip_files = len(UserIP_Databases.userip_databases)
-
-            invalid_ip_count = len(UserIP_Databases.notified_ip_invalid)
-            conflict_ip_count = len(UserIP_Databases.notified_ip_conflicts)
-            corrupted_settings_count = len(UserIP_Databases.notified_settings_corrupted)
-
-            header = textwrap.dedent(f"""
-                ─────────────────────────────────────────────────────────────────────────────────────────────────<br>
-                Welcome in {TITLE} {VERSION}<br>
-                The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
-                ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
-                Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
-                Packets latency per sec:{GUIrenderingData.latency_color}{GUIrenderingData.avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{GUIrenderingData.pps_color}{GUIrenderingData.global_pps_rate}</span>{GUIrenderingData.rpc_message}<br>
-                ─────────────────────────────────────────────────────────────────────────────────────────────────
-            """.removeprefix("\n").removesuffix("\n"))
-
-            if any([invalid_ip_count, conflict_ip_count, corrupted_settings_count]):
-                header += "<br>"
-                if invalid_ip_count:
-                    header += f"Number of invalid IP{plural(invalid_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{invalid_ip_count}</span><br>"
-                if conflict_ip_count:
-                    header += f"Number of conflicting IP{plural(conflict_ip_count)} in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{conflict_ip_count}</span><br>"
-                if corrupted_settings_count:
-                    header += f"Number of corrupted setting(s) in UserIP file{plural(num_of_userip_files)}: <span style=\"color: red;\">{corrupted_settings_count}</span><br>"
-                header += "─────────────────────────────────────────────────────────────────────────────────────────────────"
-
-            return header
-
-        def sort_session_table(session_list: list[Player], sorted_column_name: str, sort_order: str) -> list[Player]:
-            """
-            Sorts a list of players based on the given column name and sort order.
-
-            Args:
-                session_list: The list of players to sort.
-                sorted_column_name: The column name to sort by.
-                sort_order: The sort order ("ascending" or "descending").
-
-            Returns:
-                list[Player]: The sorted list of players.
-            """
-            import ipaddress
-
-            def sort_order_to_reverse(sort_order: Qt.SortOrder):
-                """
-                Converts a Qt.SortOrder to a reverse parameter for sorted().
-
-                Args:
-                    sort_order: The sort order from Qt (Ascending or Descending).
-                """
-                return sort_order == Qt.SortOrder.DescendingOrder
-
-
-            if sorted_column_name == "IP Address":
-                return sorted(
-                    session_list,
-                    key=lambda player: ipaddress.ip_address(player.ip),
-                    reverse=sort_order_to_reverse(sort_order)
-                )
-            elif sorted_column_name in ["First Seen", "Last Rejoin", "Last Seen"]:
-                if sort_order == Qt.SortOrder.DescendingOrder:
-                    should_reverse = True
-                else:
-                    should_reverse = False
-
-                return sorted(
-                    session_list,
-                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
-                    reverse=should_reverse
-                )
-            else:
-                # Handle sorting for other columns
-                return sorted(
-                    session_list,
-                    key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
-                    reverse=sort_order_to_reverse(sort_order)
-                )
-
-        def format_player_datetime(datetime_object: datetime):
-            formatted_elapsed = None
-
-            if Settings.GUI_DATE_FIELDS_SHOW_ELAPSED:
-                elapsed_time = datetime.now() - datetime_object
-
-                hours, remainder = divmod(elapsed_time.total_seconds(), 3600)
-                minutes, remainder = divmod(remainder, 60)
-                seconds, milliseconds = divmod(remainder * 1000, 1000)
-
-                elapsed_parts: list[str] = []
-                if hours >= 1:
-                    elapsed_parts.append(f"{int(hours):02}h")
-                if elapsed_parts or minutes >= 1:
-                    elapsed_parts.append(f"{int(minutes):02}m")
-                if elapsed_parts or seconds >= 1:
-                    elapsed_parts.append(f"{int(seconds):02}s")
-                if not elapsed_parts and milliseconds > 0:
-                    elapsed_parts.append(f"{int(milliseconds):03}ms")
-
-                formatted_elapsed = " ".join(elapsed_parts)
-
-                if Settings.GUI_DATE_FIELDS_SHOW_DATE is False and Settings.GUI_DATE_FIELDS_SHOW_TIME is False:
-                    return formatted_elapsed
-
-            parts = []
-            if Settings.GUI_DATE_FIELDS_SHOW_DATE:
-                parts.append(datetime_object.strftime("%m/%d/%Y"))
-            if Settings.GUI_DATE_FIELDS_SHOW_TIME:
-                parts.append(datetime_object.strftime("%H:%M:%S.%f")[:-3])
-
-            formatted_datetime = " ".join(parts)
-            if not formatted_datetime:
-                raise ValueError("Invalid settings: Both date and time are disabled.")
-
-            if formatted_elapsed:
-                formatted_datetime += f" ({formatted_elapsed})"
-
-            return formatted_datetime
-
-        def format_player_usernames(player_usernames: list[str]):
-            return f"{player_color}{', '.join(player_usernames) if player_usernames else 'N/A'}{player_reset}"
-
-        def format_player_pps(player_color: str, is_pps_first_calculation: bool, pps_rate: int):
-            if pps_rate == 0:
-                if is_pps_first_calculation:
-                    pps_color = player_color
-                else:
-                    pps_color = Fore.RED
-            elif pps_rate == 1:
-                pps_color = Fore.YELLOW
-            else:
-                pps_color = player_color
-
-            return f"{pps_color}{pps_rate}{Fore.RESET}"
-
-        def format_player_ip(player_ip: str):
-            if SessionHost.player and SessionHost.player.ip == player_ip:
-                return f"{player_ip} 👑"
-            return player_ip
-
-        def format_player_intermediate_ports(player_ports: Player_Ports):
-            player_ports.intermediate = [port for port in reversed(player_ports.list) if port not in {player_ports.first, player_ports.last}]
-            if player_ports.intermediate:
-                return ", ".join(map(str, player_ports.intermediate))
-            else:
-                return ""
-
-        while not gui_closed__event.is_set():
-            start_time = time.time()
-
-            session_connected_sorted_column_name, session_connected_sort_order = get_table_sorted_column(self.main_window.session_connected)
-            session_disconnected_sorted_column_name, session_disconnected_sort_order = get_table_sorted_column(self.main_window.session_disconnected)
-
-            session_connected_sorted = sort_session_table(
-                GUIrenderingData.session_connected,
-                session_connected_sorted_column_name,
-                session_connected_sort_order
-            )
-            session_disconnected_sorted = sort_session_table(
-                GUIrenderingData.session_disconnected,
-                session_disconnected_sorted_column_name,
-                session_disconnected_sort_order
-            )
-
-            updated_session_connected_table: list[list[str]] = []
-            updated_session_disconnected_table: list[list[str]] = []
-
-            for player in session_connected_sorted:
-                if (
-                    Settings.USERIP_ENABLED
-                    and player.userip.usernames
-                ):
-                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
-                    player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
-                else:
-                    player_color = Fore.GREEN
-                    player_reset = Fore.RESET
-
-                row = []
-                if Settings.USERIP_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
-                row.append(f"{player_color}{player.rejoins}{player_reset}")
-                row.append(f"{player_color}{player.total_packets}{player_reset}")
-                row.append(f"{player_color}{player.packets}{player_reset}")
-                row.append(f"{format_player_pps(player_color, player.pps.is_first_calculation, player.pps.rate)}")
-                row.append(f"{player_color}{format_player_ip(player.ip)}{player_reset}")
-                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region}{player_reset}")
-                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city}{player_reset}")
-                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.org}{player_reset}")
-                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp}{player_reset}")
-                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn}{player_reset}")
-                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled._as}{player_reset}")
-                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name}{player_reset}")
-                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
-
-                updated_session_connected_table.append(row)
-
-            for player in session_disconnected_sorted:
-                if (
-                    Settings.USERIP_ENABLED
-                    and player.userip.usernames
-                ):
-                    player_color = Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT
-                    player_reset = Fore.RESET + Back.RESET + Style.RESET_ALL
-                else:
-                    player_color = Fore.RED
-                    player_reset = Fore.RESET
-
-                row = []
-                if Settings.USERIP_ENABLED:
-                    row.append(f"{player_color}{format_player_usernames(player.usernames)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.first_seen)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_rejoin)}{player_reset}")
-                row.append(f"{player_color}{format_player_datetime(player.datetime.last_seen)}{player_reset}")
-                row.append(f"{player_color}{player.rejoins}{player_reset}")
-                row.append(f"{player_color}{player.total_packets}{player_reset}")
-                row.append(f"{player_color}{player.packets}{player_reset}")
-                row.append(f"{player_color}{player.ip}{player_reset}")
-                if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.ports.last}{player_reset}")
-                if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{format_player_intermediate_ports(player.ports)}{player_reset}")
-                if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.ports.first}{player_reset}")
-                if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.ipapi.compiled.continent}{player_reset}")
-                if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code}){player_reset}")
-                    else:
-                        row.append(f"{player_color}{player.iplookup.maxmind.compiled.country}{player_reset}")
-                if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region}{player_reset}")
-                if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.region_code}{player_reset}")
-                if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.city}{player_reset}")
-                if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.district}{player_reset}")
-                if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.zip_code}{player_reset}")
-                if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lat}{player_reset}")
-                if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.lon}{player_reset}")
-                if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.time_zone}{player_reset}")
-                if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.offset}{player_reset}")
-                if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.currency}{player_reset}")
-                if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.org}{player_reset}")
-                if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.isp}{player_reset}")
-                if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.maxmind.compiled.asn}{player_reset}")
-                if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled._as}{player_reset}")
-                if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.as_name}{player_reset}")
-                if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.mobile}{player_reset}")
-                if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.proxy}{player_reset}")
-                if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player_color}{player.iplookup.ipapi.compiled.hosting}{player_reset}")
-
-                updated_session_disconnected_table.append(row)
-
-            header_text = generate_header_text()
-            self.update_signal.emit(header_text, updated_session_connected_table, updated_session_disconnected_table)
-
-            while time.time() - start_time < 3:
-                self.msleep(100)
-
-                if self.main_window.user_requested_sorting_by_field:
-                    self.main_window.user_requested_sorting_by_field = False
-                    break
 
 if __name__ == "__main__":
     app = QApplication([])
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
-
-    while not GUIrenderingData.is_rendering_core_ready:
-        time.sleep(0.1)
 
     window = MainWindow()
     window.show()
