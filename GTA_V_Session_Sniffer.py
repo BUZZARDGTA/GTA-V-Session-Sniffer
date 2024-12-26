@@ -3828,10 +3828,11 @@ def rendering_core():
                 if last_userip_parse_time is None or time.perf_counter() - last_userip_parse_time >= 1.0:
                     last_userip_parse_time = update_userip_databases(last_userip_parse_time)
 
-            session_connected__padding_country_name = 0
-            session_connected__padding_continent_name = 0
-            session_disconnected__padding_country_name = 0
-            session_disconnected__padding_continent_name = 0
+            if Settings.GUI_SESSIONS_LOGGING:
+                session_connected__padding_country_name = 0
+                session_connected__padding_continent_name = 0
+                session_disconnected__padding_country_name = 0
+                session_disconnected__padding_continent_name = 0
 
             for player in PlayersRegistry.iterate_players_from_registry():
                 if Settings.USERIP_ENABLED:
@@ -3868,13 +3869,15 @@ def rendering_core():
                 if player.datetime.left:
                     session_disconnected.append(player)
 
-                    session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
-                    session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
+                    if Settings.GUI_SESSIONS_LOGGING:
+                        session_disconnected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_disconnected__padding_country_name, 27)
+                        session_disconnected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_disconnected__padding_continent_name, 13)
                 else:
                     session_connected.append(player)
 
-                    session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
-                    session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
+                    if Settings.GUI_SESSIONS_LOGGING:
+                        session_connected__padding_country_name = get_minimum_padding(player.iplookup.maxmind.compiled.country, session_connected__padding_country_name, 27)
+                        session_connected__padding_continent_name = get_minimum_padding(player.iplookup.ipapi.compiled.continent, session_connected__padding_continent_name, 13)
 
                     if (player_timedelta := (datetime.now() - player.pps.t1)).total_seconds() >= 1.0:
                         player.pps.rate = round(player.pps.counter / player_timedelta.total_seconds())
@@ -3932,6 +3935,7 @@ def rendering_core():
             ) = process_gui_session_tables_rendering()
             GUIrenderingData.is_gui_rendering_ready = True
 
+            # TODO: Uses a threading.Event() to signal the GUI that the data is ready to be displayed, and uses sort() method for best performances
             time.sleep(1)
 
 cls()
