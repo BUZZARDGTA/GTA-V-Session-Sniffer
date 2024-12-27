@@ -2761,11 +2761,6 @@ class GUIrenderingData:
     GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str]
     GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES: list[str]
 
-    session_connected_sorted_column_name: str
-    session_connected_sort_order: Qt.SortOrder
-    session_disconnected_sorted_column_name: str
-    session_disconnected_sort_order: Qt.SortOrder
-
     header_text: str
     SESSION_CONNECTED_TABLE__NUM_COLS: int
     session_connected_table__num_rows: int
@@ -2776,7 +2771,12 @@ class GUIrenderingData:
     session_disconnected_table__processed_data: list[list[str]]
     session_disconnected_table__compiled_colors: list[list[QColor]]
 
-    is_gui_rendering_ready: bool = False
+    session_connected_sorted_column_name: Optional[str] = None
+    session_connected_sort_order: Optional[Qt.SortOrder] = None
+    session_disconnected_sorted_column_name: Optional[str] = None
+    session_disconnected_sort_order: Optional[Qt.SortOrder] = None
+
+    gui_rendering_ready_event: threading.Event = threading.Event()
 
 def rendering_core():
     with Threads_ExceptionHandler():
@@ -3795,7 +3795,10 @@ def rendering_core():
                 return
 
             # Wait for sorting fields to be initialized from the GUI
-            while GUIrenderingData.session_connected_sorted_column_name is None or GUIrenderingData.session_connected_sort_order is None:
+            while GUIrenderingData.session_connected_sorted_column_name is None or \
+                GUIrenderingData.session_disconnected_sorted_column_name is None or \
+                GUIrenderingData.session_disconnected_sort_order is None or \
+                GUIrenderingData.session_connected_sort_order is None:
                 time.sleep(0.1)
                 continue
 
@@ -3933,9 +3936,8 @@ def rendering_core():
                 GUIrenderingData.session_disconnected_table__processed_data,
                 GUIrenderingData.session_disconnected_table__compiled_colors
             ) = process_gui_session_tables_rendering()
-            GUIrenderingData.is_gui_rendering_ready = True
+            GUIrenderingData.gui_rendering_ready_event.set()
 
-            # TODO: Uses a threading.Event() to signal the GUI that the data is ready to be displayed, and uses sort() method for best performances
             time.sleep(1)
 
 cls()
@@ -4069,6 +4071,8 @@ class GUIWorkerThread(QThread):
 
             # Get the name of the sorted column
             sorted_column_name = table.model().headerData(sorted_column_index, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+            if not isinstance(sorted_column_name, str):
+                raise TypeError(f'Expected "str", got "{type(sorted_column_name)}"')
 
             return sorted_column_name, sort_order
 
@@ -4076,7 +4080,23 @@ class GUIWorkerThread(QThread):
             GUIrenderingData.session_connected_sorted_column_name, GUIrenderingData.session_connected_sort_order = get_table_sorted_column(self.connected_table_view)
             GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
 
-            if GUIrenderingData.is_gui_rendering_ready:
+            # I can do much simpler by just using wait() instead of using a loop with sleep() and a timeout.
+            # Then I can use sort() function to set next:
+            # GUIrenderingData.session_connected_sorted_column_name, GUIrenderingData.session_connected_sort_order = get_table_sorted_column(self.connected_table_view)
+            # GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
+            start_time = time.time()
+            while not GUIrenderingData.gui_rendering_ready_event.is_set():
+                if time.time() - start_time >= 1:
+                    break
+
+                if self.user_requested_sorting_by_field.is_set():
+                    self.user_requested_sorting_by_field.clear()
+                    break
+
+                self.msleep(100)
+
+            if GUIrenderingData.gui_rendering_ready_event.is_set():
+                GUIrenderingData.gui_rendering_ready_event.clear()
                 self.update_signal.emit(
                     GUIrenderingData.header_text,
                     GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS,
@@ -4088,14 +4108,6 @@ class GUIWorkerThread(QThread):
                     GUIrenderingData.session_disconnected_table__processed_data,
                     GUIrenderingData.session_disconnected_table__compiled_colors
                 )
-
-            start_time = time.time()
-            while time.time() - start_time < 1:
-                self.msleep(100)
-
-                if self.user_requested_sorting_by_field.is_set():
-                    self.user_requested_sorting_by_field.clear()
-                    break
 
 class MainWindow(QWidget):
     def __init__(self):
