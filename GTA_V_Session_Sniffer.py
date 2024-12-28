@@ -4132,8 +4132,17 @@ class SessionTableView(QTableView):
                         else QItemSelectionModel.SelectionFlag.Select
                     )
                 else:
-                    # Clear existing selections and select the clicked cell
-                    selection_flag = QItemSelectionModel.SelectionFlag.ClearAndSelect
+                    was_selection_index_selected = selection_model.isSelected(index)
+
+                    # Clear existing selections
+                    selection_model.clearSelection()
+
+                    # Select or Deselect the clicked cell
+                    selection_flag = (
+                        QItemSelectionModel.SelectionFlag.Deselect
+                        if was_selection_index_selected
+                        else QItemSelectionModel.SelectionFlag.Select
+                    )
 
                 # Apply the determined selection flag
                 selection_model.select(index, selection_flag)
