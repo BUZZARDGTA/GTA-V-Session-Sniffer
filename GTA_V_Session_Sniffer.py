@@ -3720,7 +3720,7 @@ def rendering_core():
             displayed_capture_ip_address = Settings.CAPTURE_IP_ADDRESS if Settings.CAPTURE_IP_ADDRESS else "N/A"
             color_tshark_restarted_time = '<span style="color: green;">' if tshark_restarted_times == 0 else '<span style="color: red;">'
             if Settings.DISCORD_PRESENCE:
-                rpc_message = f' RPC: <span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC: <span style="color: yellow;">Waiting for Discord</span>'
+                rpc_message = f' RPC:<span style="color: green;">Connected</span>' if discord_rpc_manager.is_connected else f' RPC:<span style="color: yellow;">Waiting for Discord</span>'
             else:
                 rpc_message = ""
 
@@ -4044,23 +4044,28 @@ class SessionTableModel(QAbstractTableModel):
 
     def copy_to_clipboard(self, selected_indexes: list[QModelIndex]):
         """
-        Collect selected data and copy it to the clipboard.
+        Collect selected data from the model and copy it to the clipboard.
         """
-        # Get the clipboard object
+        # Access the system clipboard
         clipboard = QApplication.clipboard()
         if not isinstance(clipboard, QClipboard):
             raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
 
-        # Collect the selected data
-        for index in selected_indexes:
-            row = index.row()
-            col = index.column()
-            data = self.data(index, Qt.ItemDataRole.DisplayRole)
-            if not isinstance(data, str):
-                raise TypeError(f'Expected "str", got "{type(data)}"')
+        # Prepare a list to store text data from selected cells
+        selected_texts: list[str] = []
 
-            # Set the selected text to clipboard
-            clipboard.setText(data)
+        # Iterate over each selected index and retrieve its display data
+        for index in selected_indexes:
+            cell_text = self.data(index, Qt.ItemDataRole.DisplayRole)
+            if not isinstance(cell_text, str):
+                raise TypeError(f'Expected "str", got "{type(cell_text)}"')
+            selected_texts.append(cell_text)
+
+        # Join all selected text entries with a newline to format for copying
+        clipboard_content = "\n".join(selected_texts)
+
+        # Set the formatted text in the system clipboard
+        clipboard.setText(clipboard_content)
 
 class SessionTableView(QTableView):
     def __init__(self, model: SessionTableModel):
@@ -4101,12 +4106,12 @@ class SessionTableView(QTableView):
                 copy_selection()
                 return
 
-        # Handle any other types of events
+        # Fall back to default behavior
         super().keyPressEvent(event)
 
     def mousePressEvent(self, event):
         """
-        Handle mouse press events for selecting a single item and deselecting all others.
+        Handle mouse press events for selecting multiple items with Ctrl or single items otherwise.
         Fall back to default behavior for non-cell areas (e.g., headers).
         """
         if isinstance(event, QMouseEvent):
@@ -4114,25 +4119,27 @@ class SessionTableView(QTableView):
             index = self.indexAt(event.pos())
 
             if index.isValid():
-                # Handle cell selection toggle
                 selection_model = self.selectionModel()
                 if not isinstance(selection_model, QItemSelectionModel):
                     raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
 
-                is_currently_selected = selection_model.isSelected(index)
-
-                # Deselect all previously selected items
-                selection_model.clearSelection()
-
-                if is_currently_selected:
-                    # Deselect the item if it is already selected
-                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Deselect)
+                # Determine selection flag based on modifier keys
+                if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    # Toggle selection while keeping other selections
+                    selection_flag = (
+                        QItemSelectionModel.SelectionFlag.Deselect
+                        if selection_model.isSelected(index)
+                        else QItemSelectionModel.SelectionFlag.Select
+                    )
                 else:
-                    # Select the item if it is not already selected
-                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Select)
+                    # Clear existing selections and select the clicked cell
+                    selection_flag = QItemSelectionModel.SelectionFlag.ClearAndSelect
+
+                # Apply the determined selection flag
+                selection_model.select(index, selection_flag)
                 return
 
-        # Handle any other types of events
+        # Fall back to default behavior
         super().mousePressEvent(event)
 
 class GUIWorkerThread(QThread):
