@@ -42,9 +42,9 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel
-from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QAbstractItemView
-from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QAbstractItemModel
+from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView
+from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent
 
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
@@ -4008,18 +4008,6 @@ class SessionTableModel(QAbstractTableModel):
             return True
         return False
 
-    # TODO: ABSOLUTELY NEED TO IMPLEMENT SORTING for best performances !!!
-    #def sort(self, column, order):
-    #    """Override sort method to sort data based on column and order."""
-    #    column_key = self._headers[column]  # Get the column key (e.g., 'Name', 'Age')
-    #    reverse = (order == Qt.SortOrder.DescendingOrder)  # Reverse for descending order
-    #    try:
-    #        # Sort the data in place
-    #        self._data.sort(key=lambda x: x[column_key], reverse=reverse)
-    #        self.layoutChanged.emit()  # Notify view about data change
-    #    except Exception as e:
-    #        print(f"Error sorting column {column}: {e}")
-
     def flags(self, index):
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
@@ -4047,10 +4035,89 @@ class SessionTableModel(QAbstractTableModel):
                 bottom_right = self.index(self._num_rows - 1, self._num_cols - 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
 
+class SessionTableView(QTableView):
+    def __init__(self, model):
+        super().__init__()
+        self.setModel(model)
+
+        # Configure table view settings
+        self.verticalHeader().setVisible(False)  # Hide row index
+        self.setAlternatingRowColors(True)
+        self.setSortingEnabled(False)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.horizontalHeader().setSectionsClickable(True)
+        self.horizontalHeader().setSectionsMovable(True)
+        self.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
+        self.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+    def keyPressEvent(self, event):
+        """
+        Handle key press events to capture Ctrl+C for copying selected data to the clipboard.
+        Fall back to default behavior for other key presses.
+        """
+        def copy_selection():
+            """
+            Copy the selected data in the table to the clipboard.
+            Constructs a tab-separated string of the selected cell data.
+            """
+            selected_indexes = self.selectionModel().selectedIndexes()
+            clipboard = QApplication.clipboard()
+
+            if not isinstance(clipboard, QClipboard):
+                raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
+
+            text = ""
+            model = selected_indexes[0].model()  # Get the model from the first selected index
+            if not isinstance(model, QAbstractItemModel):
+                raise TypeError(f'Expected "QAbstractItemModel", got "{type(model)}"')
+
+            # Iterate over all selected indexes and gather the text data
+            for index in selected_indexes:
+                row = index.row()
+                col = index.column()
+                text += str(model.data(model.index(row, col), Qt.ItemDataRole.DisplayRole)) + "\t"
+                if col == model.columnCount() - 1:
+                    text += "\n"
+
+            clipboard.setText(text)  # Set the constructed text to clipboard
+            print(f"Copied to clipboard:\n{text}")
+
+        if isinstance(event, QKeyEvent):
+            # Check for Ctrl+C key combination and copy selection
+            if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_C:
+                copy_selection()
+            else:
+                # Fall back to default event handler for other keys
+                super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        """
+        Handle mouse press events for toggle selection of cells.
+        Fall back to default behavior for non-cell areas (e.g., headers).
+        """
+        if isinstance(event, QMouseEvent):
+            # Determine the index of the clicked item
+            index = self.indexAt(event.pos())
+
+            if index.isValid():
+                # Handle cell selection toggle
+                selection_model = self.selectionModel()
+                if selection_model.isSelected(index):
+                    # Deselect the item if it is already selected
+                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Deselect)
+                else:
+                    # Select the item if it is not already selected
+                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Select)
+            else:
+                # Use default behavior for non-cell clicks (e.g., headers, empty areas)
+                super().mousePressEvent(event)
+
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
 
-    def __init__(self, gui_closed_event: threading.Event, user_requested_sorting_by_field: threading.Event, connected_table_view: QTableView, disconnected_table_view: QTableView):
+    def __init__(self, gui_closed_event: threading.Event, user_requested_sorting_by_field: threading.Event, connected_table_view: SessionTableView, disconnected_table_view: SessionTableView):
         super().__init__()
         self.gui_closed_event = gui_closed_event
         self.user_requested_sorting_by_field = user_requested_sorting_by_field
@@ -4058,10 +4125,12 @@ class GUIWorkerThread(QThread):
         self.disconnected_table_view = disconnected_table_view
 
     def run(self):
-        def get_table_sorted_column(table: QTableView):
-            """Get the currently sorted column and its order from a specific QTableView."""
+        def get_table_sorted_column(table: SessionTableView):
+            """Get the currently sorted column and its order from a specific SessionTableView."""
             # Ensure we are fetching from the correct header of the provided table
             header = table.horizontalHeader()
+            if header is None:
+                raise TypeError(f'Expected "QHeaderView", got "{type(header)}"')
 
             # Get the index of the currently sorted column
             sorted_column_index = header.sortIndicatorSection()
@@ -4081,9 +4150,6 @@ class GUIWorkerThread(QThread):
             GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
 
             # I can do much simpler by just using wait() instead of using a loop with sleep() and a timeout.
-            # Then I can use sort() function to set next:
-            # GUIrenderingData.session_connected_sorted_column_name, GUIrenderingData.session_connected_sort_order = get_table_sorted_column(self.connected_table_view)
-            # GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
             start_time = time.time()
             while not GUIrenderingData.gui_rendering_ready_event.is_set():
                 if time.time() - start_time >= 1:
@@ -4176,17 +4242,7 @@ class MainWindow(QWidget):
 
         # Create the table model and view
         self.connected_table_model = SessionTableModel(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
-        self.connected_table_view = QTableView(self)
-        self.connected_table_view.setModel(self.connected_table_model)
-
-        # Apply the necessary settings to the view
-        self.connected_table_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.connected_table_view.verticalHeader().setVisible(False)  # Hide row index
-        self.connected_table_view.setAlternatingRowColors(True)
-        self.connected_table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.connected_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        #self.connected_table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.connected_table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.connected_table_view = SessionTableView(self.connected_table_model)
         self.connected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
         self.connected_table_view.horizontalHeader().setSectionsMovable(True)
 
@@ -4207,17 +4263,7 @@ class MainWindow(QWidget):
 
         # Create the table model and view
         self.disconnected_table_model = SessionTableModel(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
-        self.disconnected_table_view = QTableView(self)
-        self.disconnected_table_view.setModel(self.disconnected_table_model)
-
-        # Apply the necessary settings to the view
-        self.disconnected_table_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.disconnected_table_view.verticalHeader().setVisible(False)  # Hide row index
-        self.disconnected_table_view.setAlternatingRowColors(True)
-        self.disconnected_table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.disconnected_table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        #self.disconnected_table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.disconnected_table_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.disconnected_table_view = SessionTableView(self.disconnected_table_model)
         self.disconnected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
         self.disconnected_table_view.horizontalHeader().setSectionsMovable(True)
 
@@ -4288,6 +4334,18 @@ class MainWindow(QWidget):
         self.disconnected_table_model.update_table(session_disconnected_table__num_cols, session_disconnected_table__num_rows, session_disconnected_table__processed_data, session_disconnected_table__compiled_colors)
         adjust_table_column_widths(self.disconnected_table_view)
 
+    def closeEvent(self, event: QCloseEvent):
+        self.gui_closed_event.set()  # Signal the thread to stop
+        self.worker_thread.quit()  # Stop the QThread
+        self.worker_thread.wait()  # Wait for the thread to finish
+        event.accept()  # Accept the close event
+
+        time.sleep(1) # Gives a second for Windows processes to closes properly
+        terminate_script("EXIT")
+
+    def on_header_click(self):
+        self.user_requested_sorting_by_field.set()
+
     def adjust_gui_size(self):
         def get_screen_size():
             screen = app.primaryScreen()
@@ -4306,18 +4364,6 @@ class MainWindow(QWidget):
             self.resize(1200, 720)
         elif screen_width >= 1024 and screen_height >= 768:
             self.resize(940, 680)
-
-    def on_header_click(self):
-        self.user_requested_sorting_by_field.set()
-
-    def closeEvent(self, event: QCloseEvent):
-        self.gui_closed_event.set()  # Signal the thread to stop
-        self.worker_thread.quit()  # Stop the QThread
-        self.worker_thread.wait()  # Wait for the thread to finish
-        event.accept()  # Accept the close event
-
-        time.sleep(1) # Gives a second for Windows processes to closes properly
-        terminate_script("EXIT")
 
 
 if __name__ == "__main__":
