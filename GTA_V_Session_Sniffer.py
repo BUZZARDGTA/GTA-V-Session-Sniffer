@@ -42,7 +42,7 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex, QItemSelection
 from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent
 
@@ -4003,9 +4003,15 @@ class SessionTableModel(QAbstractTableModel):
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Horizontal:
-                return self._headers[section]  # Return the header for the column
+        if orientation == Qt.Orientation.Horizontal:
+            if role == Qt.ItemDataRole.DisplayRole:
+                return self._headers[section]  # Display the header name
+            elif role == Qt.ItemDataRole.ToolTipRole:
+                from Modules.consts import GUI_COLUMN_HEADERS_TOOLTIP_MAPPING
+                # Fetch the header name and return the corresponding tooltip
+                header_name = self._headers[section]
+                return GUI_COLUMN_HEADERS_TOOLTIP_MAPPING.get(header_name, None)
+
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
@@ -4042,6 +4048,20 @@ class SessionTableModel(QAbstractTableModel):
                 bottom_right = self.index(self._num_rows - 1, self._num_cols - 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
 
+    def select_all(self, selection_model: QItemSelectionModel):
+        """
+        Select all rows and columns in the table using the selection model.
+        """
+        # Get the top-left and bottom-right QModelIndex for the entire table
+        top_left = self.createIndex(0, 0)  # Top-left item (first row, first column)
+        bottom_right = self.createIndex(self.rowCount() - 1, self.columnCount() - 1)  # Bottom-right item (last row, last column)
+
+        # Create a selection range from top-left to bottom-right
+        selection = QItemSelection(top_left, bottom_right)
+
+        # Select all items in the table using the selection model
+        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Select)
+
     def copy_to_clipboard(self, selected_indexes: list[QModelIndex]):
         """
         Collect selected data from the model and copy it to the clipboard.
@@ -4071,6 +4091,7 @@ class SessionTableView(QTableView):
     def __init__(self, model: SessionTableModel):
         super().__init__()
         self.setModel(model)
+        self._is_dragging = False  # Track if the mouse is being dragged with Ctrl key
 
         # Configure table view settings
         self.verticalHeader().setVisible(False)  # Hide row index
@@ -4079,16 +4100,30 @@ class SessionTableView(QTableView):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.horizontalHeader().setSectionsClickable(True)
         self.horizontalHeader().setSectionsMovable(True)
-        self.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QTableView.SelectionMode.NoSelection)
         self.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
     def keyPressEvent(self, event):
         """
-        Handle key press events to capture Ctrl+C for copying selected data to the clipboard.
+        Handle key press events to capture Ctrl+A for selecting all and Ctrl+C for copying selected data to the clipboard.
         Fall back to default behavior for other key presses.
         """
+        def select_all():
+            """
+            Select all the data in the table using the model's selection model.
+            """
+            selected_model = self.model()
+            if not isinstance(selected_model, SessionTableModel):
+                raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+            selection_model = self.selectionModel()
+            if not isinstance(selection_model, QItemSelectionModel):
+                raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+            selected_model.select_all(selection_model) # Delegate the task to the model
+
         def copy_selection():
             """
             Copy the selected data in the table to the clipboard using the model's method.
@@ -4098,12 +4133,15 @@ class SessionTableView(QTableView):
                 raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
 
             selected_indexes = self.selectionModel().selectedIndexes()
-            selected_model.copy_to_clipboard(selected_indexes) # Delegate the clipboard copying to the model
+            selected_model.copy_to_clipboard(selected_indexes) # Delegate the task to the model
 
         if isinstance(event, QKeyEvent):
             # Check for Ctrl+C key combination and copy selection
-            if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_C:
-                copy_selection()
+            if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                if event.key() == Qt.Key.Key_A:
+                    select_all()
+                elif event.key() == Qt.Key.Key_C:
+                    copy_selection()
                 return
 
         # Fall back to default behavior
@@ -4112,7 +4150,7 @@ class SessionTableView(QTableView):
     def mousePressEvent(self, event):
         """
         Handle mouse press events for selecting multiple items with Ctrl or single items otherwise.
-        Fall back to default behavior for non-cell areas (e.g., headers).
+        Fall back to default behavior for non-cell areas.
         """
         if isinstance(event, QMouseEvent):
             # Determine the index of the clicked item
@@ -4131,6 +4169,7 @@ class SessionTableView(QTableView):
                         if selection_model.isSelected(index)
                         else QItemSelectionModel.SelectionFlag.Select
                     )
+                    self._is_dragging = True  # Start tracking dragging
                 else:
                     was_selection_index_selected = selection_model.isSelected(index)
 
@@ -4150,6 +4189,33 @@ class SessionTableView(QTableView):
 
         # Fall back to default behavior
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """
+        Handle mouse move events for selecting multiple items while holding the Ctrl key.
+        """
+        if isinstance(event, QMouseEvent):
+            if self._is_dragging and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                # Get the index under the cursor
+                index = self.indexAt(event.pos())
+
+                if index.isValid():
+                    selection_model = self.selectionModel()
+                    if not isinstance(selection_model, QItemSelectionModel):
+                        raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+                    # Select the current cell
+                    selection_model.select(index, QItemSelectionModel.SelectionFlag.Select)
+                    return
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """
+        Reset dragging state when the mouse button is released.
+        """
+        self._is_dragging = False
+        super().mouseReleaseEvent(event)
 
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
