@@ -42,7 +42,7 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QAbstractItemModel
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex
 from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent
 
@@ -4035,8 +4035,28 @@ class SessionTableModel(QAbstractTableModel):
                 bottom_right = self.index(self._num_rows - 1, self._num_cols - 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
 
+    def copy_to_clipboard(self, selected_indexes: list[QModelIndex]):
+        """
+        Collect selected data and copy it to the clipboard.
+        """
+        # Get the clipboard object
+        clipboard = QApplication.clipboard()
+        if not isinstance(clipboard, QClipboard):
+            raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
+
+        # Collect the selected data
+        for index in selected_indexes:
+            row = index.row()
+            col = index.column()
+            data = self.data(index, Qt.ItemDataRole.DisplayRole)
+            if not isinstance(data, str):
+                raise TypeError(f'Expected "str", got "{type(data)}"')
+
+            # Set the selected text to clipboard
+            clipboard.setText(data)
+
 class SessionTableView(QTableView):
-    def __init__(self, model):
+    def __init__(self, model: SessionTableModel):
         super().__init__()
         self.setModel(model)
 
@@ -4059,42 +4079,27 @@ class SessionTableView(QTableView):
         """
         def copy_selection():
             """
-            Copy the selected data in the table to the clipboard.
-            Constructs a tab-separated string of the selected cell data.
+            Copy the selected data in the table to the clipboard using the model's method.
             """
+            selected_model = self.model()
+            if not isinstance(selected_model, SessionTableModel):
+                raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
             selected_indexes = self.selectionModel().selectedIndexes()
-            clipboard = QApplication.clipboard()
-
-            if not isinstance(clipboard, QClipboard):
-                raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
-
-            text = ""
-            model = selected_indexes[0].model()  # Get the model from the first selected index
-            if not isinstance(model, QAbstractItemModel):
-                raise TypeError(f'Expected "QAbstractItemModel", got "{type(model)}"')
-
-            # Iterate over all selected indexes and gather the text data
-            for index in selected_indexes:
-                row = index.row()
-                col = index.column()
-                text += str(model.data(model.index(row, col), Qt.ItemDataRole.DisplayRole)) + "\t"
-                if col == model.columnCount() - 1:
-                    text += "\n"
-
-            clipboard.setText(text)  # Set the constructed text to clipboard
-            print(f"Copied to clipboard:\n{text}")
+            selected_model.copy_to_clipboard(selected_indexes) # Delegate the clipboard copying to the model
 
         if isinstance(event, QKeyEvent):
             # Check for Ctrl+C key combination and copy selection
             if event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_C:
                 copy_selection()
-            else:
-                # Fall back to default event handler for other keys
-                super().keyPressEvent(event)
+                return
+
+        # Handle any other types of events
+        super().keyPressEvent(event)
 
     def mousePressEvent(self, event):
         """
-        Handle mouse press events for toggle selection of cells.
+        Handle mouse press events for selecting a single item and deselecting all others.
         Fall back to default behavior for non-cell areas (e.g., headers).
         """
         if isinstance(event, QMouseEvent):
@@ -4104,15 +4109,24 @@ class SessionTableView(QTableView):
             if index.isValid():
                 # Handle cell selection toggle
                 selection_model = self.selectionModel()
-                if selection_model.isSelected(index):
+                if not isinstance(selection_model, QItemSelectionModel):
+                    raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+                is_currently_selected = selection_model.isSelected(index)
+
+                # Deselect all previously selected items
+                selection_model.clearSelection()
+
+                if is_currently_selected:
                     # Deselect the item if it is already selected
                     selection_model.select(index, QItemSelectionModel.SelectionFlag.Deselect)
                 else:
                     # Select the item if it is not already selected
                     selection_model.select(index, QItemSelectionModel.SelectionFlag.Select)
-            else:
-                # Use default behavior for non-cell clicks (e.g., headers, empty areas)
-                super().mousePressEvent(event)
+                return
+
+        # Handle any other types of events
+        super().mousePressEvent(event)
 
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
@@ -4244,7 +4258,6 @@ class MainWindow(QWidget):
         self.connected_table_model = SessionTableModel(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.connected_table_view = SessionTableView(self.connected_table_model)
         self.connected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
-        self.connected_table_view.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
         initialize_table_sort_indicator_by_field("connected_table", self.connected_table_view, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
@@ -4265,7 +4278,6 @@ class MainWindow(QWidget):
         self.disconnected_table_model = SessionTableModel(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.disconnected_table_view = SessionTableView(self.disconnected_table_model)
         self.disconnected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
-        self.disconnected_table_view.horizontalHeader().setSectionsMovable(True)
 
         # Set default sort column and order
         initialize_table_sort_indicator_by_field("disconnected_table", self.disconnected_table_view, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
