@@ -2780,6 +2780,35 @@ class GUIrenderingData:
 
 def rendering_core():
     with Threads_ExceptionHandler():
+        def compile_tables_header_field_names():
+            gui_connected_players_table__field_names = [
+                field_name
+                for field_name in Settings.gui_all_connected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
+            ]
+            gui_disconnected_players_table__field_names = [
+                field_name
+                for field_name in Settings.gui_all_disconnected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
+            ]
+            logging_connected_players_table__field_names = [
+                field_name
+                for field_name in Settings.gui_all_connected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames")
+            ]
+            logging_disconnected_players_table__field_names = [
+                field_name
+                for field_name in Settings.gui_all_disconnected_fields
+                if (Settings.USERIP_ENABLED or field_name != "Usernames")
+            ]
+
+            return (
+                gui_connected_players_table__field_names,
+                gui_disconnected_players_table__field_names,
+                logging_connected_players_table__field_names,
+                logging_disconnected_players_table__field_names
+            )
+
         def sort_session_table(session_list: list[Player], sorted_column_name: str, sort_order: Qt.SortOrder) -> list[Player]:
             """
             Sorts a list of players based on the given column name and sort order.
@@ -2823,43 +2852,6 @@ def rendering_core():
                     key=attrgetter(Settings.gui_fields_mapping[sorted_column_name]),
                     reverse=sort_order_to_reverse(sort_order)
                 )
-
-        def generate_field_names():
-            # TODO: I need to put this somewhere in the loop so it's actually keep synced with the GUI cuz now it's an init
-            def add_down_arrow_char_to_sorted_logging_table_field(field_names: list[str], target_field: str):
-                updated_field_names = [
-                    field + " \u2193" if field == target_field else field
-                    for field in field_names
-                ]
-                return updated_field_names
-
-            gui_connected_players_table__field_names = [
-                field_name
-                for field_name in Settings.gui_all_connected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
-            ]
-            gui_disconnected_players_table__field_names = [
-                field_name
-                for field_name in Settings.gui_all_disconnected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames") and field_name not in GUIrenderingData.FIELDS_TO_HIDE
-            ]
-            logging_connected_players_table__field_names = [
-                field_name
-                for field_name in Settings.gui_all_connected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames")
-            ]
-            logging_disconnected_players_table__field_names = [
-                field_name
-                for field_name in Settings.gui_all_disconnected_fields
-                if (Settings.USERIP_ENABLED or field_name != "Usernames")
-            ]
-
-            return (
-                add_down_arrow_char_to_sorted_logging_table_field(logging_connected_players_table__field_names, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY),
-                add_down_arrow_char_to_sorted_logging_table_field(logging_disconnected_players_table__field_names, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY),
-                gui_connected_players_table__field_names,
-                gui_disconnected_players_table__field_names
-            )
 
         def parse_userip_ini_file(ini_path: Path, unresolved_ip_invalid: set[str]):
             def process_ini_line_output(line: str):
@@ -3335,10 +3327,25 @@ def rendering_core():
                 else:
                     return ""
 
+            def add_sort_arrow_char_to_sorted_logging_table_field(field_names: list[str], sorted_field: str, sort_order: Qt.SortOrder):
+                arrow = " \u2193" if sort_order == Qt.SortOrder.DescendingOrder else " \u2191"  # Down arrow for descending, up arrow for ascending
+                return [
+                    field + arrow if field == sorted_field else field
+                    for field in field_names
+                ]
+
+            # TODO:
+            # When I have copilot again, ask it how can I manage to remove VSCode type hinting:
+            # `(variable) session_connected_sorted_column_name: str | None` and `(variable) session_connected_sort_order: SortOrder | None`
+            # `(variable) session_disconnected_sorted_column_name: str | None` and `(variable) session_disconnected_sort_order: SortOrder | None`
+            # Specifically, at this point of the code they just cannot be None anymore, because we checked them to NOT be None earlier..
+            logging_connected_players__field_names__with_down_arrow = add_sort_arrow_char_to_sorted_logging_table_field(LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES, GUIrenderingData.session_connected_sorted_column_name, GUIrenderingData.session_connected_sort_order)
+            logging_disconnected_players__field_names__with_down_arrow = add_sort_arrow_char_to_sorted_logging_table_field(LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES, GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order)
+
             logging_connected_players_table = PrettyTable()
             logging_connected_players_table.set_style(TableStyle.SINGLE_BORDER)
             logging_connected_players_table.title = f"Player{plural(len(session_connected_sorted))} connected in your session ({len(session_connected_sorted)}):"
-            logging_connected_players_table.field_names = LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES
+            logging_connected_players_table.field_names = logging_connected_players__field_names__with_down_arrow
             logging_connected_players_table.align = "l"
             for player in session_connected_sorted:
                 row: list[str] = []
@@ -3378,7 +3385,7 @@ def rendering_core():
             logging_disconnected_players_table = PrettyTable()
             logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
             logging_disconnected_players_table.title = f"Player{plural(len(session_disconnected_sorted))} who've left your session ({len(session_disconnected_sorted)}):"
-            logging_disconnected_players_table.field_names = LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
+            logging_disconnected_players_table.field_names = logging_disconnected_players__field_names__with_down_arrow
             logging_disconnected_players_table.align = "l"
             for player in session_disconnected_sorted:
                 row: list[str] = []
@@ -3748,11 +3755,11 @@ def rendering_core():
 
         GUIrenderingData.FIELDS_TO_HIDE = set(Settings.GUI_FIELDS_TO_HIDE)
         (
-            LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
-            LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
             GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES,
-        ) = generate_field_names()
+            LOGGING_CONNECTED_PLAYERS_TABLE__FIELD_NAMES,
+            LOGGING_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES
+        ) = compile_tables_header_field_names()
         GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS = len(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         # Define the column name to index mapping for connected and disconnected players
