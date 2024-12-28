@@ -51,7 +51,7 @@ GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
     "Rejoins": "The number of times the player has left and rejoined later.",
     "T. Packets": "The total number of packets exchanged by the player across all sessions.",
     "Packets": "The number of packets exchanged by the player during the current session.",
-    "PPS": "The rate of packets per second (PPS) for the player.",
+    "PPS": "The number of Packets Per Second exchanged by the player.",
     "IP Address": "The IP address of the player.",
     "Last Port": "The port used by the player's last captured packet.",
     "Intermediate Ports": "The ports used by the player between the first and last captured packets.",
