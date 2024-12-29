@@ -4024,6 +4024,13 @@ class SessionTableModel(QAbstractTableModel):
             if self._view is None:
                 return None
 
+            # Get the column resize mode
+            resize_mode = self._view.horizontalHeader().sectionResizeMode(index.column())
+
+            # Return None if the column resize mode isn't set to Stretch, as it shouldn't be truncated
+            if resize_mode != QHeaderView.ResizeMode.Stretch:
+                return None
+
             cell_text = self._data[row_idx][col_idx]
 
             font_metrics = self._view.fontMetrics()
