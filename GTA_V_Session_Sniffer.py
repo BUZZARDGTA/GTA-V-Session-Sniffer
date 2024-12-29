@@ -4056,13 +4056,20 @@ class SessionTableModel(QAbstractTableModel):
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+        if not index.isValid():
+            return False
+
         if role == Qt.ItemDataRole.EditRole:
             self._data[index.row()][index.column()] = value  # Set the data at the specified index
             self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole])  # Notify the view of data change
             return True
+
         return False
 
     def flags(self, index):
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
     # Custom Methods:
