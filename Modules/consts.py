@@ -47,7 +47,7 @@ GITHUB_RELEASE_API__GEOLITE2 = "https://api.github.com/repos/P3TERX/GeoLite.mmdb
 GITHUB_RELEASE_API__GEOLITE2__BACKUP = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"
 GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
     "Usernames": "Displays the username(s) of players from your UserIP database files.\n\nFor GTA V PC users who have used the Session Sniffer mod menu plugin,\nit automatically resolves usernames while the plugin is running,\nor shows previously resolved players that were seen by the plugin.",
-    "First Seen": "The very first time the player was observed since you started Session Sniffer.",
+    "First Seen": "The very first time the player was observed across all sessions.",
     "Last Rejoin": "The most recent time the player rejoined your session.",
     "Last Seen": "The most recent time the player was active in your session.",
     "Rejoins": "The number of times the player has left and joined your session later.",
