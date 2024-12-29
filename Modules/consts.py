@@ -50,7 +50,7 @@ GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
     "First Seen": "The very first time the player was observed across all sessions.",
     "Last Rejoin": "The most recent time the player rejoined your session.",
     "Last Seen": "The most recent time the player was active in your session.",
-    "Rejoins": "The number of times the player has left and joined your session later.",
+    "Rejoins": "The number of times the player has left and joined again your session across all sessions.",
     "T. Packets": "The total number of packets exchanged by the player across all sessions.",
     "Packets": "The number of packets exchanged by the player during the current session.",
     "PPS": "The number of Packets Per Second exchanged by the player.",
