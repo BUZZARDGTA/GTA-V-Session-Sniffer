@@ -3984,6 +3984,9 @@ class SessionTableModel(QAbstractTableModel):
         super().__init__()
         self._headers = headers  # The column headers
         self._data: list[list[str]] = []  # The data to be displayed in the table
+
+        # Custom Variables
+        self._view: Optional[SessionTableView] = None  # Initially, no view is attached
         self._compiled_colors: list[list[QColor]] = []  # The compiled colors for the table
         self._num_rows = 0  # Default number of rows, initially 0
         self._num_cols = 0  # Default number of columns, initially 0
@@ -4016,6 +4019,20 @@ class SessionTableModel(QAbstractTableModel):
                 # Handle the error, for example, return a default color
                 return QBrush(QColor(0, 0, 255))  # Example: return white if out of range
 
+        if role == Qt.ItemDataRole.ToolTipRole:
+            # Ensure the view is attached
+            if self._view is None:
+                return None
+
+            cell_text = self._data[row_idx][col_idx]
+
+            font_metrics = self._view.fontMetrics()
+            text_width = font_metrics.horizontalAdvance(cell_text)
+            column_width = self._view.columnWidth(index.column())
+
+            TEXT_TRUNCATION_MARGIN = 8
+            if text_width > column_width - TEXT_TRUNCATION_MARGIN:
+                return cell_text
 
         return None
 
@@ -4042,6 +4059,9 @@ class SessionTableModel(QAbstractTableModel):
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
     # Custom Methods:
+
+    def set_view(self, view: "SessionTableView"):
+        self._view = view
 
     def update_table(self, num_cols: int, num_rows: int, new_data: list[list[str]], compiled_colors: list[list[QColor]]):
         """Update the table size, data, and colors in one operation to avoid flickers."""
@@ -4364,6 +4384,7 @@ class MainWindow(QWidget):
         self.connected_table_model = SessionTableModel(GUIrenderingData.GUI_CONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.connected_table_view = SessionTableView(self.connected_table_model)
         self.connected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.connected_table_model.set_view(self.connected_table_view)
 
         # Set default sort column and order
         initialize_table_sort_indicator_by_field("connected_table", self.connected_table_view, Settings.GUI_FIELD_CONNECTED_PLAYERS_SORTED_BY)
@@ -4384,6 +4405,7 @@ class MainWindow(QWidget):
         self.disconnected_table_model = SessionTableModel(GUIrenderingData.GUI_DISCONNECTED_PLAYERS_TABLE__FIELD_NAMES)
         self.disconnected_table_view = SessionTableView(self.disconnected_table_model)
         self.disconnected_table_view.horizontalHeader().sectionClicked.connect(self.on_header_click)
+        self.disconnected_table_model.set_view(self.disconnected_table_view)
 
         # Set default sort column and order
         initialize_table_sort_indicator_by_field("disconnected_table", self.disconnected_table_view, Settings.GUI_FIELD_DISCONNECTED_PLAYERS_SORTED_BY)
