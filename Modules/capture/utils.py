@@ -1,14 +1,15 @@
 # Standard Python Libraries
 from pathlib import Path
+from typing import NamedTuple, Optional
 
 
 class TSharkNotFoundException(Exception):
     pass
 
 class InvalidTSharkVersionException(Exception):
-    def __init__(self, version: str, tshark_path: Path):
+    def __init__(self, path: Path, version: str):
+        self.path = path
         self.version = version
-        self.path = tshark_path
         self.message = f"Invalid TShark version: {version}"
         super().__init__(self.message)
 
@@ -23,6 +24,7 @@ def get_tshark_path(tshark_path: Path = None):
         tshark_path (optional): If provided, the path of the tshark executable.
     Raises:
         TSharkNotFoundException: When TShark could not be found in any location.
+        InvalidTSharkVersionException: When TShark found version is unsupported.
     """
 
     import os
@@ -110,28 +112,35 @@ def get_tshark_path(tshark_path: Path = None):
         """Validates if a given path points to a valid `tshark.exe` executable and matches the required version."""
 
         import subprocess
-        from Modules.consts import WIRESHARK_REQUIRED_VERSION
+        from Modules.consts import WIRESHARK_RECOMMENDED_FULL_VERSION
+
+        class TSharkValidationResult(NamedTuple):
+            path: Optional[Path]
+            version: Optional[str]
+            is_valid: bool
 
         def get_tshark_version(tshark_path: Path):
             try:
-                result = subprocess.check_output([tshark_path, '--version'], text=True)
-                return result.splitlines()[0]
+                if result := subprocess.check_output([tshark_path, '--version'], text=True):
+                    if version := result.splitlines()[0]:
+                        return version
             except (subprocess.CalledProcessError, FileNotFoundError):
-                pass
-
-            return None
-
-        if not possible_tshark_path.exists() or not possible_tshark_path.is_file():
-            return None
-
-        if tshark_version := get_tshark_version(possible_tshark_path):
-            if tshark_version is None:
                 return None
 
-            if tshark_version != WIRESHARK_REQUIRED_VERSION:
-                raise InvalidTSharkVersionException(tshark_version, possible_tshark_path)
+        tshark_version = None
+        is_valid = False
 
-        return possible_tshark_path
+        if possible_tshark_path.exists() and possible_tshark_path.is_file():
+            if (tshark_version := get_tshark_version(possible_tshark_path)) is not None:
+                if tshark_version != WIRESHARK_RECOMMENDED_FULL_VERSION:
+                    raise InvalidTSharkVersionException(possible_tshark_path, tshark_version)
+                is_valid = True
+
+        return TSharkValidationResult(
+            path = possible_tshark_path,
+            version = tshark_version,
+            is_valid = is_valid
+        )
 
     possible_tshark_paths: list[Path] = []
     possible_tshark_paths = find_tshark_by_argument_path(possible_tshark_paths)
@@ -142,11 +151,14 @@ def get_tshark_path(tshark_path: Path = None):
 
     for possible_tshark_path in possible_tshark_paths:
         try:
-            if tshark_path := validate_tshark_path(possible_tshark_path):
-                return tshark_path
+            if (tshark_validation_result := validate_tshark_path(possible_tshark_path)).is_valid:
+                if not isinstance(tshark_validation_result.path, Path):
+                    raise TypeError(f'Expected "Path", got "{type(tshark_validation_result.path)}"')
+                if not isinstance(tshark_validation_result.version, str):
+                    raise TypeError(f'Expected "str", got "{type(tshark_validation_result.version)}"')
+                return tshark_validation_result.path, tshark_validation_result.version
         except InvalidTSharkVersionException as invalid_tshark_version:
             invalid_tshark_version_exception = invalid_tshark_version
-
     if invalid_tshark_version_exception:
         raise invalid_tshark_version_exception
 

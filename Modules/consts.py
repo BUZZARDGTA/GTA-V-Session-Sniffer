@@ -39,7 +39,9 @@ TTS_PATH = resource_path(Path("TTS/"))
 RE_SETTINGS_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<key>[^=]+)=(?P<value>[^;#]+)")
 RE_USERIP_INI_PARSER_PATTERN = re.compile(r"^(?![;#])(?P<username>[^=]+)=(?P<ip>[^;#]+)")
 RE_MODMENU_LOGS_USER_PATTERN = re.compile(r"^user:(?P<username>[\w._-]{1,16}), scid:\d{1,9}, ip:(?P<ip>[\d.]+), timestamp:\d{10}$")
-WIRESHARK_REQUIRED_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaabc9099c)."
+WIRESHARK_VERSION_PATTERN = re.compile(r"\b(?P<version>\d+\.\d+\.\d+)\b")
+WIRESHARK_RECOMMENDED_FULL_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaabc9099c)."
+WIRESHARK_RECOMMENDED_VERSION_NUMBER = "4.2.9"
 WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 GITHUB_RELEASE_API__GEOLITE2 = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"
 GITHUB_RELEASE_API__GEOLITE2__BACKUP = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"

@@ -37,12 +37,19 @@ class PacketCapture:
         interface: str,
         capture_filter: Optional[str] = None,
         display_filter: Optional[str] = None,
-        tshark_path: Path = None
+        tshark_path: Optional[Path] = None,
+        tshark_version: Optional[str] = None
     ):
         self.interface = interface
         self.capture_filter = capture_filter
         self.display_filter = display_filter
-        self.tshark_path = get_tshark_path(tshark_path)
+
+        # Resolve the TShark path and version
+        if isinstance(tshark_path, Path) and isinstance(tshark_version, str):
+            self.tshark_path = tshark_path
+            self.tshark_version = tshark_version
+        else:
+            self.tshark_path, self.tshark_version = get_tshark_path(tshark_path)
 
         self._tshark_command  = [
             self.tshark_path,

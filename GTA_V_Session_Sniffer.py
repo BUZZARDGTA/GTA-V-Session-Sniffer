@@ -1908,11 +1908,11 @@ Settings.load_from_settings_file(SETTINGS_PATH)
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
 print("\nChecking that \"Tshark (Wireshark) v4.2.9\" is installed on your system ...\n")
-from Modules.consts import WIRESHARK_REQUIRED_DL, WIRESHARK_REQUIRED_VERSION
+from Modules.consts import WIRESHARK_REQUIRED_DL, WIRESHARK_RECOMMENDED_FULL_VERSION
 
 while True:
     try:
-        tshark_path = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
+        tshark_path, tshark_version = get_tshark_path(Settings.CAPTURE_TSHARK_PATH)
         if Settings.CAPTURE_TSHARK_PATH is None:
             Settings.CAPTURE_TSHARK_PATH = tshark_path
             Settings.reconstruct_settings()
@@ -1921,14 +1921,14 @@ while True:
         errorlevel = show_error__tshark_not_detected()
         if errorlevel == MsgBox.ReturnValues.IDCANCEL:
             terminate_script("EXIT")
-    except InvalidTSharkVersionException as invalid_tshark_version:
+    except InvalidTSharkVersionException as unsupported_tshark:
         webbrowser.open(WIRESHARK_REQUIRED_DL)
         msgbox_title = TITLE
         msgbox_message = textwrap.dedent(f"""
             ERROR: Detected an unsupported \"Tshark (Wireshark)\" version installed on your system.
 
-            Installed version: {invalid_tshark_version.version}
-            Required version: {WIRESHARK_REQUIRED_VERSION}
+            Installed version: {unsupported_tshark.version}
+            Required version: {WIRESHARK_RECOMMENDED_FULL_VERSION}
 
             Opening the \"Wireshark\" project download page for you.
             You can then download and install it from there and press \"Retry\".
@@ -1938,8 +1938,11 @@ while True:
         if errorlevel == MsgBox.ReturnValues.IDABORT:
             terminate_script("EXIT")
         elif errorlevel == MsgBox.ReturnValues.IDIGNORE:
+            tshark_path = unsupported_tshark.path
+            tshark_version = unsupported_tshark.version
+
             if Settings.CAPTURE_TSHARK_PATH is None:
-                Settings.CAPTURE_TSHARK_PATH = invalid_tshark_version.path
+                Settings.CAPTURE_TSHARK_PATH = unsupported_tshark.path
                 Settings.reconstruct_settings()
             break
 
@@ -2278,14 +2281,14 @@ while True:
             interface = Settings.CAPTURE_INTERFACE_NAME,
             capture_filter = CAPTURE_FILTER,
             display_filter = DISPLAY_FILTER,
-            tshark_path = Settings.CAPTURE_TSHARK_PATH
+            tshark_path = Settings.CAPTURE_TSHARK_PATH,
+            tshark_version = tshark_version
         )
+        break
     except TSharkNotFoundException:
         errorlevel = show_error__tshark_not_detected()
         if errorlevel == 2:
             terminate_script("EXIT")
-    else:
-        break
 
 if not capture.tshark_path == Settings.CAPTURE_TSHARK_PATH:
     Settings.CAPTURE_TSHARK_PATH = capture.tshark_path
@@ -3673,7 +3676,21 @@ def rendering_core():
             )
 
         def generate_gui_header_text(global_pps_t1: float, global_pps_rate: int):
+            from Modules.consts import WIRESHARK_VERSION_PATTERN, WIRESHARK_RECOMMENDED_VERSION_NUMBER
+
             global global_pps_counter, tshark_packets_latencies
+
+            # Search for the version in the string
+            extracted_tshark_version = None
+            if match := WIRESHARK_VERSION_PATTERN.search(capture.tshark_version):
+                extracted_tshark_version = match.group("version")
+            if not isinstance(extracted_tshark_version, str):
+                raise TypeError(f'Expected "str", got "{type(extracted_tshark_version)}"')
+
+            if extracted_tshark_version == WIRESHARK_RECOMMENDED_VERSION_NUMBER:
+                tshark_version_color = '<span style="color: green;">'
+            else:
+                tshark_version_color = '<span style="color: yellow;">'
 
             one_second_ago = datetime.now() - timedelta(seconds=1)
 
@@ -3734,7 +3751,7 @@ def rendering_core():
                 Welcome in {TITLE} {VERSION}<br>
                 The best FREE and Open─Source packet sniffer aka IP grabber, works WITHOUT mods.<br>
                 ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─   ─<br>
-                Scanning on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
+                Scanning using Tshark {tshark_version_color}v{extracted_tshark_version}</span> on interface:<span style="color: yellow;">{capture.interface}</span> at IP:<span style="color: yellow;">{displayed_capture_ip_address}</span> (ARP:<span style="color: yellow;">{is_arp_enabled}</span>)<br>
                 Packets latency per sec:{latency_color}{avg_latency_rounded}</span>/<span style="color: green;">{Settings.CAPTURE_OVERFLOW_TIMER}</span> (tshark restart{plural(tshark_restarted_times)}:{color_tshark_restarted_time}{tshark_restarted_times}</span>) PPS:{pps_color}{global_pps_rate}</span>{rpc_message}<br>
                 ─────────────────────────────────────────────────────────────────────────────────────────────────
             """.removeprefix("\n").removesuffix("\n"))
