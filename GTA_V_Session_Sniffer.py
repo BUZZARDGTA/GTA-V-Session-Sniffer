@@ -42,9 +42,9 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex, QItemSelection
-from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView
-from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex, QItemSelection, QPoint
+from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QMenu
+from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent, QAction
 
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
@@ -4134,6 +4134,10 @@ class SessionTableModel(QAbstractTableModel):
                 raise TypeError(f'Expected "str", got "{type(cell_text)}"')
             selected_texts.append(cell_text)
 
+        # Return if no text was selected
+        if not selected_texts:
+            return
+
         # Join all selected text entries with a newline to format for copying
         clipboard_content = "\n".join(selected_texts)
 
@@ -4158,43 +4162,21 @@ class SessionTableView(QTableView):
         self.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
     def keyPressEvent(self, event):
         """
         Handle key press events to capture Ctrl+A for selecting all and Ctrl+C for copying selected data to the clipboard.
         Fall back to default behavior for other key presses.
         """
-        def select_all():
-            """
-            Select all the data in the table using the model's selection model.
-            """
-            selected_model = self.model()
-            if not isinstance(selected_model, SessionTableModel):
-                raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
-
-            selection_model = self.selectionModel()
-            if not isinstance(selection_model, QItemSelectionModel):
-                raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
-
-            selected_model.select_all(selection_model) # Delegate the task to the model
-
-        def copy_selection():
-            """
-            Copy the selected data in the table to the clipboard using the model's method.
-            """
-            selected_model = self.model()
-            if not isinstance(selected_model, SessionTableModel):
-                raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
-
-            selected_indexes = self.selectionModel().selectedIndexes()
-            selected_model.copy_to_clipboard(selected_indexes) # Delegate the task to the model
-
         if isinstance(event, QKeyEvent):
             # Check for Ctrl+C key combination and copy selection
             if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 if event.key() == Qt.Key.Key_A:
-                    select_all()
+                    self.select_all_cells()
                 elif event.key() == Qt.Key.Key_C:
-                    copy_selection()
+                    self.copy_selected_cells()
                 return
 
         # Fall back to default behavior
@@ -4209,36 +4191,43 @@ class SessionTableView(QTableView):
             # Determine the index of the clicked item
             index = self.indexAt(event.pos())
 
+            # Check if the index is valid
             if index.isValid():
                 selection_model = self.selectionModel()
                 if not isinstance(selection_model, QItemSelectionModel):
                     raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
 
-                # Determine selection flag based on modifier keys
-                if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                    # Toggle selection while keeping other selections
-                    selection_flag = (
-                        QItemSelectionModel.SelectionFlag.Deselect
-                        if selection_model.isSelected(index)
-                        else QItemSelectionModel.SelectionFlag.Select
-                    )
-                    self._is_dragging = True  # Start tracking dragging
-                else:
-                    was_selection_index_selected = selection_model.isSelected(index)
+                if event.button() == Qt.MouseButton.RightButton:
+                    if not selection_model.isSelected(index):
+                        selection_model.select(index, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+                        return
 
-                    # Clear existing selections
-                    selection_model.clearSelection()
+                elif event.button() == Qt.MouseButton.LeftButton:
+                    # Determine selection flag based on modifier keys
+                    if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                        # Toggle selection while keeping other selections
+                        selection_flag = (
+                            QItemSelectionModel.SelectionFlag.Deselect
+                            if selection_model.isSelected(index)
+                            else QItemSelectionModel.SelectionFlag.Select
+                        )
+                        self._is_dragging = True  # Start tracking dragging
+                    elif event.modifiers() == Qt.KeyboardModifier.NoModifier:
+                        was_selection_index_selected = selection_model.isSelected(index)
 
-                    # Select or Deselect the clicked cell
-                    selection_flag = (
-                        QItemSelectionModel.SelectionFlag.Deselect
-                        if was_selection_index_selected
-                        else QItemSelectionModel.SelectionFlag.Select
-                    )
+                        # Clear existing selections
+                        selection_model.clearSelection()
 
-                # Apply the determined selection flag
-                selection_model.select(index, selection_flag)
-                return
+                        # Select or Deselect the clicked cell
+                        selection_flag = (
+                            QItemSelectionModel.SelectionFlag.Deselect
+                            if was_selection_index_selected
+                            else QItemSelectionModel.SelectionFlag.Select
+                        )
+
+                    # Apply the determined selection flag
+                    selection_model.select(index, selection_flag)
+                    return
 
         # Fall back to default behavior
         super().mousePressEvent(event)
@@ -4269,6 +4258,55 @@ class SessionTableView(QTableView):
         """
         self._is_dragging = False
         super().mouseReleaseEvent(event)
+
+    # Custom Methods:
+
+    def show_context_menu(self, pos: QPoint):
+        """
+        Show the context menu at the specified position with options to interact with the selected content.
+        """
+        # Create the context menu
+        context_menu = QMenu(self)
+
+        select_all_action = QAction("Select All content", self)
+        select_all_action.triggered.connect(self.select_all_cells)
+
+        copy_action = QAction("Copy selected content", self)
+        copy_action.triggered.connect(self.copy_selected_cells)
+
+        # Add actions to the context menu
+        context_menu.addAction(copy_action)
+        context_menu.addSeparator()
+        context_menu.addAction(select_all_action)
+
+        # Execute the menu at the right-click position
+        context_menu.exec(self.mapToGlobal(pos))
+
+    def copy_selected_cells(self):
+        """
+        Copy the selected data in the table to the clipboard using the model's method.
+        """
+        selected_model = self.model()
+        if not isinstance(selected_model, SessionTableModel):
+            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+        selected_indexes = self.selectionModel().selectedIndexes()
+        if selected_indexes:
+            selected_model.copy_to_clipboard(selected_indexes) # Delegate the task to the model
+
+    def select_all_cells(self):
+        """
+        Select all cells in the table using the model's selection model.
+        """
+        selected_model = self.model()
+        if not isinstance(selected_model, SessionTableModel):
+            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+        selection_model = self.selectionModel()
+        if not isinstance(selection_model, QItemSelectionModel):
+            raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+        selected_model.select_all(selection_model) # Delegate the task to the model
 
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
