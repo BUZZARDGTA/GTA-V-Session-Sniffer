@@ -2947,13 +2947,10 @@ def rendering_core():
                             except InvalidBooleanValueError:
                                 is_setting_corrupted = True
                         elif setting == "COLOR":
-                            try:
-                                settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
-                            except InvalidNoneTypeValueError:
-                                if (q_color := QColor(value)).isValid():
-                                    settings[setting] = q_color
-                                else:
-                                    is_setting_corrupted = True
+                            if (q_color := QColor(value)).isValid():
+                                settings[setting] = q_color
+                            else:
+                                is_setting_corrupted = True
                         elif setting == "LOG":
                             try:
                                 settings[setting], need_rewrite_current_setting = custom_str_to_bool(value)
