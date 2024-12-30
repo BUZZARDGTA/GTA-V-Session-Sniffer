@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from traceback import TracebackException
 from json.decoder import JSONDecodeError
 from types import FrameType, TracebackType
-from typing import TypedDict, Optional, Literal, Union, Type, Any
+from typing import TypedDict, Optional, Literal, Union, Type, NamedTuple, Any
 from ipaddress import IPv4Address, AddressValueError
 from dataclasses import dataclass
 
@@ -1073,7 +1073,7 @@ class UserIP_Settings:
     """
     def __init__(self,
         ENABLED: bool,
-        COLOR: Literal["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"],
+        COLOR: QColor,
         LOG: bool,
         NOTIFICATIONS: bool,
         VOICE_NOTIFICATIONS: Union[str | Literal[False]],
@@ -2758,6 +2758,10 @@ def capture_core():
 
 tshark_packets_latencies: list[tuple[datetime, timedelta]] = []
 
+class CellColor(NamedTuple):
+    foreground: QColor
+    background: QColor
+
 @dataclass
 class GUIrenderingData:
     FIELDS_TO_HIDE: list[str]
@@ -2768,11 +2772,11 @@ class GUIrenderingData:
     SESSION_CONNECTED_TABLE__NUM_COLS: int
     session_connected_table__num_rows: int
     session_connected_table__processed_data: list[list[str]]
-    session_connected_table__compiled_colors: list[list[QColor]]
+    session_connected_table__compiled_colors: list[list[CellColor]]
     SESSION_DISCONNECTED_TABLE__NUM_COLS: int
     session_disconnected_table__num_rows: int
     session_disconnected_table__processed_data: list[list[str]]
-    session_disconnected_table__compiled_colors: list[list[QColor]]
+    session_disconnected_table__compiled_colors: list[list[CellColor]]
 
     session_connected_sorted_column_name: Optional[str] = None
     session_connected_sort_order: Optional[Qt.SortOrder] = None
@@ -2946,11 +2950,8 @@ def rendering_core():
                             try:
                                 settings[setting], need_rewrite_current_setting = custom_str_to_nonetype(value)
                             except InvalidNoneTypeValueError:
-                                case_insensitive_match, case_sensitive_match, normalized_match = check_case_insensitive_and_exact_match(value, ["BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE"])
-                                if case_insensitive_match:
-                                    settings[setting] = normalized_match
-                                    if not case_sensitive_match:
-                                        need_rewrite_current_setting = True
+                                if (q_color := QColor(value)).isValid():
+                                    settings[setting] = q_color
                                 else:
                                     is_setting_corrupted = True
                         elif setting == "LOG":
@@ -3351,39 +3352,39 @@ def rendering_core():
             logging_connected_players_table.field_names = logging_connected_players__field_names__with_down_arrow
             logging_connected_players_table.align = "l"
             for player in session_connected_sorted:
-                row: list[str] = []
-                row.append(f"{format_player_logging_usernames(player.usernames)}")
-                row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
-                row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                row.append(f"{player.rejoins}")
-                row.append(f"{player.total_packets}")
-                row.append(f"{player.packets}")
-                row.append(f"{player.pps.rate}")
-                row.append(f"{format_player_logging_ip(player.ip)}")
-                row.append(f"{player.ports.last}")
-                row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
-                row.append(f"{player.ports.first}")
-                row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
-                row.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                row.append(f"{player.iplookup.ipapi.compiled.region}")
-                row.append(f"{player.iplookup.ipapi.compiled.region_code}")
-                row.append(f"{player.iplookup.maxmind.compiled.city}")
-                row.append(f"{player.iplookup.ipapi.compiled.district}")
-                row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
-                row.append(f"{player.iplookup.ipapi.compiled.lat}")
-                row.append(f"{player.iplookup.ipapi.compiled.lon}")
-                row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
-                row.append(f"{player.iplookup.ipapi.compiled.offset}")
-                row.append(f"{player.iplookup.ipapi.compiled.currency}")
-                row.append(f"{player.iplookup.ipapi.compiled.org}")
-                row.append(f"{player.iplookup.ipapi.compiled.isp}")
-                row.append(f"{player.iplookup.maxmind.compiled.asn}")
-                row.append(f"{player.iplookup.ipapi.compiled._as}")
-                row.append(f"{player.iplookup.ipapi.compiled.as_name}")
-                row.append(f"{player.iplookup.ipapi.compiled.mobile}")
-                row.append(f"{player.iplookup.ipapi.compiled.proxy}")
-                row.append(f"{player.iplookup.ipapi.compiled.hosting}")
-                logging_connected_players_table.add_row(row)
+                row_texts: list[str] = []
+                row_texts.append(f"{format_player_logging_usernames(player.usernames)}")
+                row_texts.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                row_texts.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
+                row_texts.append(f"{player.rejoins}")
+                row_texts.append(f"{player.total_packets}")
+                row_texts.append(f"{player.packets}")
+                row_texts.append(f"{player.pps.rate}")
+                row_texts.append(f"{format_player_logging_ip(player.ip)}")
+                row_texts.append(f"{player.ports.last}")
+                row_texts.append(f"{format_player_logging_intermediate_ports(player.ports)}")
+                row_texts.append(f"{player.ports.first}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.continent:<{session_connected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.country:<{session_connected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.region}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.city}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.district}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.lat}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.lon}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.offset}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.currency}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.org}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.isp}")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.asn}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled._as}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                logging_connected_players_table.add_row(row_texts)
 
             logging_disconnected_players_table = PrettyTable()
             logging_disconnected_players_table.set_style(TableStyle.SINGLE_BORDER)
@@ -3391,39 +3392,39 @@ def rendering_core():
             logging_disconnected_players_table.field_names = logging_disconnected_players__field_names__with_down_arrow
             logging_disconnected_players_table.align = "l"
             for player in session_disconnected_sorted:
-                row: list[str] = []
-                row.append(f"{format_player_logging_usernames(player.usernames)}")
-                row.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
-                row.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
-                row.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
-                row.append(f"{player.rejoins}")
-                row.append(f"{player.total_packets}")
-                row.append(f"{player.packets}")
-                row.append(f"{player.ip}")
-                row.append(f"{player.ports.last}")
-                row.append(f"{format_player_logging_intermediate_ports(player.ports)}")
-                row.append(f"{player.ports.first}")
-                row.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
-                row.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
-                row.append(f"{player.iplookup.ipapi.compiled.region}")
-                row.append(f"{player.iplookup.ipapi.compiled.region_code}")
-                row.append(f"{player.iplookup.maxmind.compiled.city}")
-                row.append(f"{player.iplookup.ipapi.compiled.district}")
-                row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
-                row.append(f"{player.iplookup.ipapi.compiled.lat}")
-                row.append(f"{player.iplookup.ipapi.compiled.lon}")
-                row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
-                row.append(f"{player.iplookup.ipapi.compiled.offset}")
-                row.append(f"{player.iplookup.ipapi.compiled.currency}")
-                row.append(f"{player.iplookup.ipapi.compiled.org}")
-                row.append(f"{player.iplookup.ipapi.compiled.isp}")
-                row.append(f"{player.iplookup.maxmind.compiled.asn}")
-                row.append(f"{player.iplookup.ipapi.compiled._as}")
-                row.append(f"{player.iplookup.ipapi.compiled.as_name}")
-                row.append(f"{player.iplookup.ipapi.compiled.mobile}")
-                row.append(f"{player.iplookup.ipapi.compiled.proxy}")
-                row.append(f"{player.iplookup.ipapi.compiled.hosting}")
-                logging_disconnected_players_table.add_row(row)
+                row_texts: list[str] = []
+                row_texts.append(f"{format_player_logging_usernames(player.usernames)}")
+                row_texts.append(f"{format_player_logging_datetime(player.datetime.first_seen)}")
+                row_texts.append(f"{format_player_logging_datetime(player.datetime.last_rejoin)}")
+                row_texts.append(f"{format_player_logging_datetime(player.datetime.last_seen)}")
+                row_texts.append(f"{player.rejoins}")
+                row_texts.append(f"{player.total_packets}")
+                row_texts.append(f"{player.packets}")
+                row_texts.append(f"{player.ip}")
+                row_texts.append(f"{player.ports.last}")
+                row_texts.append(f"{format_player_logging_intermediate_ports(player.ports)}")
+                row_texts.append(f"{player.ports.first}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.continent:<{session_disconnected__padding_continent_name}} ({player.iplookup.ipapi.compiled.continent_code})")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.country:<{session_disconnected__padding_country_name}} ({player.iplookup.maxmind.compiled.country_code})")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.region}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.city}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.district}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.lat}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.lon}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.offset}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.currency}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.org}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.isp}")
+                row_texts.append(f"{player.iplookup.maxmind.compiled.asn}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled._as}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                row_texts.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                logging_disconnected_players_table.add_row(row_texts)
 
             from Modules.consts import SESSIONS_LOGGING_PATH
 
@@ -3483,13 +3484,11 @@ def rendering_core():
                 return ", ".join(player_usernames) if player_usernames else "N/A"
 
             def format_player_gui_pps(pps_color: QColor, is_pps_first_calculation: bool, pps_rate: int):
-                from Modules.consts import QColorPalette
-
                 if not is_pps_first_calculation:
                     if pps_rate == 0:
-                        pps_color = QColorPalette.RED
+                        pps_color = QColor("red")
                     elif pps_rate >= 1 and pps_rate <= 3:
-                        pps_color = QColorPalette.YELLOW
+                        pps_color = QColor("yellow")
 
                 return pps_color, f"{pps_rate}"
 
@@ -3505,166 +3504,172 @@ def rendering_core():
                 else:
                     return ""
 
-            from Modules.consts import QColorPalette
+
+            from Modules.consts import HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR
 
             session_connected_table__processed_data: list[list[str]] = []
-            session_connected_table__compiled_colors: list[list[QColor]] = []
+            session_connected_table__compiled_colors: list[list[CellColor]] = []
             session_disconnected_table__processed_data: list[list[str]] = []
-            session_disconnected_table__compiled_colors: list[list[QColor]] = []
+            session_disconnected_table__compiled_colors: list[list[CellColor]] = []
 
             for player in session_connected_sorted:
                 if Settings.USERIP_ENABLED and player.userip.usernames:
-                    row_color = QColorPalette.WHITE # TODO: Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT (set the background color)
+                    row_fg_color = QColor("white")
+                    row_bg_color = player.userip.settings.COLOR
                 else:
-                    row_color = QColorPalette.GREEN
-                cell_color = row_color
+                    row_fg_color = QColor("lime")
+                    row_bg_color = HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR
 
-                # Initialize a list for cell colors for the current row
-                cell_colors = [row_color] * GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS
+                # Initialize a list for cell colors for the current row, creating a new CellColor object for each column
+                row_colors = [
+                    CellColor(foreground=row_fg_color, background=row_bg_color)
+                    for _ in range(GUIrenderingData.SESSION_CONNECTED_TABLE__NUM_COLS)
+                ]
 
-                row: list[str] = []
+                row_texts: list[str] = []
                 if Settings.USERIP_ENABLED:
-                    row.append(f"{format_player_gui_usernames(player.usernames)}")
-                row.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
-                row.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
-                row.append(f"{player.rejoins}")
-                row.append(f"{player.total_packets}")
-                row.append(f"{player.packets}")
-                cell_color, player_pps = format_player_gui_pps(row_color, player.pps.is_first_calculation, player.pps.rate)
-                cell_colors[CONNECTED_COLUMN_MAPPING["PPS"]] = cell_color
-                row.append(f"{player_pps}")
-                row.append(f"{format_player_gui_ip(player.ip)}")
+                    row_texts.append(f"{format_player_gui_usernames(player.usernames)}")
+                row_texts.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
+                row_texts.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
+                row_texts.append(f"{player.rejoins}")
+                row_texts.append(f"{player.total_packets}")
+                row_texts.append(f"{player.packets}")
+                cell_fg_color, player_pps = format_player_gui_pps(row_fg_color, player.pps.is_first_calculation, player.pps.rate)
+                row_colors[CONNECTED_COLUMN_MAPPING["PPS"]] = row_colors[CONNECTED_COLUMN_MAPPING["PPS"]]._replace(foreground=cell_fg_color) # Update the foreground color for the "PPS" column
+                row_texts.append(f"{player_pps}")
+                row_texts.append(f"{format_player_gui_ip(player.ip)}")
                 if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.ports.last}")
+                    row_texts.append(f"{player.ports.last}")
                 if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{format_player_gui_intermediate_ports(player.ports)}")
+                    row_texts.append(f"{format_player_gui_intermediate_ports(player.ports)}")
                 if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.ports.first}")
+                    row_texts.append(f"{player.ports.first}")
                 if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
+                        row_texts.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
                     else:
-                        row.append(f"{player.iplookup.ipapi.compiled.continent}")
+                        row_texts.append(f"{player.iplookup.ipapi.compiled.continent}")
                 if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
+                        row_texts.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
                     else:
-                        row.append(f"{player.iplookup.maxmind.compiled.country}")
+                        row_texts.append(f"{player.iplookup.maxmind.compiled.country}")
                 if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.region}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.region}")
                 if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.region_code}")
                 if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
+                    row_texts.append(f"{player.iplookup.maxmind.compiled.city}")
                 if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.district}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.district}")
                 if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.zip_code}")
                 if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.lat}")
                 if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.lon}")
                 if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.time_zone}")
                 if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.offset}")
                 if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.currency}")
                 if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.org}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.org}")
                 if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.isp}")
                 if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                    row_texts.append(f"{player.iplookup.maxmind.compiled.asn}")
                 if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled._as}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled._as}")
                 if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.as_name}")
                 if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.mobile}")
                 if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.proxy}")
                 if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.hosting}")
 
-                session_connected_table__processed_data.append(row)
-                session_connected_table__compiled_colors.append(cell_colors)
+                session_connected_table__processed_data.append(row_texts)
+                session_connected_table__compiled_colors.append(row_colors)
 
             for player in session_disconnected_sorted:
                 if Settings.USERIP_ENABLED and player.userip.usernames:
-                    row_color = QColorPalette.WHITE # TODO: Fore.WHITE + getattr(Back, player.userip.settings.COLOR) + Style.BRIGHT (set the background color)
+                    row_fg_color = QColor("white")
+                    row_bg_color = player.userip.settings.COLOR
                 else:
-                    row_color = QColorPalette.RED
-                cell_color = row_color
+                    row_fg_color = QColor("red")
+                    row_bg_color = HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR
 
-                # Initialize a list for cell colors for the current row
-                cell_colors = [row_color] * GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS
+                # Initialize a list for cell colors for the current row, creating a new CellColor object for each column
+                row_colors = [CellColor(foreground=row_fg_color, background=row_bg_color) for _ in range(GUIrenderingData.SESSION_DISCONNECTED_TABLE__NUM_COLS)]
 
-                row: list[str] = []
+                row_texts: list[str] = []
                 if Settings.USERIP_ENABLED:
-                    row.append(f"{format_player_gui_usernames(player.usernames)}")
-                row.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
-                row.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
-                row.append(f"{format_player_gui_datetime(player.datetime.last_seen)}")
-                row.append(f"{player.rejoins}")
-                row.append(f"{player.total_packets}")
-                row.append(f"{player.packets}")
-                row.append(f"{player.ip}")
+                    row_texts.append(f"{format_player_gui_usernames(player.usernames)}")
+                row_texts.append(f"{format_player_gui_datetime(player.datetime.first_seen)}")
+                row_texts.append(f"{format_player_gui_datetime(player.datetime.last_rejoin)}")
+                row_texts.append(f"{format_player_gui_datetime(player.datetime.last_seen)}")
+                row_texts.append(f"{player.rejoins}")
+                row_texts.append(f"{player.total_packets}")
+                row_texts.append(f"{player.packets}")
+                row_texts.append(f"{player.ip}")
                 if "Last Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.ports.last}")
+                    row_texts.append(f"{player.ports.last}")
                 if "Intermediate Ports" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{format_player_gui_intermediate_ports(player.ports)}")
+                    row_texts.append(f"{format_player_gui_intermediate_ports(player.ports)}")
                 if "First Port" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.ports.first}")
+                    row_texts.append(f"{player.ports.first}")
                 if "Continent" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.GUI_FIELD_SHOW_CONTINENT_CODE:
-                        row.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
+                        row_texts.append(f"{player.iplookup.ipapi.compiled.continent} ({player.iplookup.ipapi.compiled.continent_code})")
                     else:
-                        row.append(f"{player.iplookup.ipapi.compiled.continent}")
+                        row_texts.append(f"{player.iplookup.ipapi.compiled.continent}")
                 if "Country" not in GUIrenderingData.FIELDS_TO_HIDE:
                     if Settings.GUI_FIELD_SHOW_COUNTRY_CODE:
-                        row.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
+                        row_texts.append(f"{player.iplookup.maxmind.compiled.country} ({player.iplookup.maxmind.compiled.country_code})")
                     else:
-                        row.append(f"{player.iplookup.maxmind.compiled.country}")
+                        row_texts.append(f"{player.iplookup.maxmind.compiled.country}")
                 if "Region" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.region}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.region}")
                 if "R. Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.region_code}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.region_code}")
                 if "City" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.maxmind.compiled.city}")
+                    row_texts.append(f"{player.iplookup.maxmind.compiled.city}")
                 if "District" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.district}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.district}")
                 if "ZIP Code" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.zip_code}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.zip_code}")
                 if "Lat" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.lat}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.lat}")
                 if "Lon" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.lon}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.lon}")
                 if "Time Zone" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.time_zone}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.time_zone}")
                 if "Offset" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.offset}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.offset}")
                 if "Currency" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.currency}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.currency}")
                 if "Organization" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.org}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.org}")
                 if "ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.isp}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.isp}")
                 if "ASN / ISP" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.maxmind.compiled.asn}")
+                    row_texts.append(f"{player.iplookup.maxmind.compiled.asn}")
                 if "AS" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled._as}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled._as}")
                 if "ASN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.as_name}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.as_name}")
                 if "Mobile" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.mobile}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.mobile}")
                 if "VPN" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.proxy}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.proxy}")
                 if "Hosting" not in GUIrenderingData.FIELDS_TO_HIDE:
-                    row.append(f"{player.iplookup.ipapi.compiled.hosting}")
+                    row_texts.append(f"{player.iplookup.ipapi.compiled.hosting}")
 
-                session_disconnected_table__processed_data.append(row)
-                session_disconnected_table__compiled_colors.append(cell_colors)
+                session_disconnected_table__processed_data.append(row_texts)
+                session_disconnected_table__compiled_colors.append(row_colors)
 
             return (
                 len(session_connected_table__processed_data),
@@ -3987,7 +3992,7 @@ class SessionTableModel(QAbstractTableModel):
 
         # Custom Variables
         self._view: Optional[SessionTableView] = None  # Initially, no view is attached
-        self._compiled_colors: list[list[QColor]] = []  # The compiled colors for the table
+        self._compiled_colors: list[list[CellColor]] = []  # The compiled colors for the table
         self._num_rows = 0  # Default number of rows, initially 0
         self._num_cols = 0  # Default number of columns, initially 0
 
@@ -4010,14 +4015,14 @@ class SessionTableModel(QAbstractTableModel):
             return self._data[row_idx][col_idx]
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            ## Return the color for the cell
-            #return QBrush(self._compiled_colors[row_idx][col_idx])
-
+            # Return the cell's foreground color
             if row_idx < len(self._compiled_colors) and col_idx < len(self._compiled_colors[row_idx]):
-                return QBrush(self._compiled_colors[row_idx][col_idx])
-            else:
-                # Handle the error, for example, return a default color
-                return QBrush(QColor(0, 0, 255))  # Example: return white if out of range
+                return QBrush(self._compiled_colors[row_idx][col_idx].foreground)
+
+        if role == Qt.ItemDataRole.BackgroundRole:
+            # Return the cell's background color
+            if row_idx < len(self._compiled_colors) and col_idx < len(self._compiled_colors[row_idx]):
+                return QBrush(self._compiled_colors[row_idx][col_idx].background)
 
         if role == Qt.ItemDataRole.ToolTipRole:
             # Ensure the view is attached
@@ -4077,7 +4082,7 @@ class SessionTableModel(QAbstractTableModel):
     def set_view(self, view: "SessionTableView"):
         self._view = view
 
-    def update_table(self, num_cols: int, num_rows: int, new_data: list[list[str]], compiled_colors: list[list[QColor]]):
+    def update_table(self, num_cols: int, num_rows: int, new_data: list[list[str]], compiled_colors: list[list[CellColor]]):
         """Update the table size, data, and colors in one operation to avoid flickers."""
         # Check if the data, layout, or colors have actually changed
         if num_rows != self._num_rows or num_cols != self._num_cols or new_data != self._data or compiled_colors != self._compiled_colors:
@@ -4446,11 +4451,11 @@ class MainWindow(QWidget):
         session_connected_table__num_cols: int,
         session_connected_table__num_rows: int,
         session_connected_table__processed_data: list[list[str]],
-        session_connected_table__compiled_colors: list[list[QColor]],
+        session_connected_table__compiled_colors: list[list[CellColor]],
         session_disconnected_table__num_cols: int,
         session_disconnected_table__num_rows: int,
         session_disconnected_table__processed_data: list[list[str]],
-        session_disconnected_table__compiled_colors: list[list[QColor]]
+        session_disconnected_table__compiled_colors: list[list[CellColor]]
     ):
         """This method updates the header text and calls update_table for both tables, along with their respective header texts."""
         def adjust_table_column_widths(view: QTableView):

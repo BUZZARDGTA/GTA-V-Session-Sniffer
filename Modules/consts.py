@@ -1,27 +1,14 @@
-from Modules.utils import get_documents_folder, resource_path
-
+# Standard Python Libraries
 import re
 from pathlib import Path
-from colorama import Fore
 from datetime import datetime
+
+# External/Third-party Python Libraries
+from qdarkstyle.colorsystem import Gray
 from PyQt6.QtGui import QColor
 
-
-class QColorPalette:
-    RED = QColor(255, 0, 0)
-    GREEN = QColor(0, 255, 0)
-    #BLUE = QColor(0, 0, 255)
-    YELLOW = QColor(255, 255, 0)
-    #CYAN = QColor(0, 255, 255)
-    #MAGENTA = QColor(255, 0, 255)
-    WHITE = QColor(255, 255, 255)
-    #BLACK = QColor(0, 0, 0)
-    #LIGHTRED_EX = QColor(255, 102, 102)
-    #LIGHTGREEN_EX = QColor(102, 255, 102)
-    #LIGHTBLUE_EX = QColor(102, 102, 255)
-    #LIGHTYELLOW_EX = QColor(255, 255, 153)
-    #LIGHTCYAN_EX = QColor(153, 255, 255)
-    #LIGHTMAGENTA_EX = QColor(255, 153, 255)
+# Local Python Libraries (Included with Project)
+from Modules.utils import get_documents_folder, resource_path
 
 
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
@@ -79,3 +66,6 @@ GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
     "VPN": "Indicates if the player is using a VPN, Proxy, or Tor relay.",
     "Hosting": "Indicates if the player is using a hosting provider (similar to VPN).",
 }
+# TODO: Implement a better way to retrieve the default background color for table cells.
+# Currently hardcoded to Gray.B10, which should be the same color for everyone.
+HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR = QColor(Gray.B10)
