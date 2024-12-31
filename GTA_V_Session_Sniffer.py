@@ -42,7 +42,7 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QItemSelection, QPoint
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QItemSelection, QPoint, QModelIndex
 from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QMenu
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent, QAction
 
@@ -4229,14 +4229,19 @@ class SessionTableView(QTableView):
         """
         Show the context menu at the specified position with options to interact with the table's content.
         """
+        from Modules.consts import CUSTOM_CONTEXT_MENU_STYLESHEET
+
         # Determine the index at the clicked position
         index = self.indexAt(pos)
 
         if not index.isValid():
             return  # Do nothing if the click is outside valid cells
 
+        selected_indexes = self.selectionModel().selectedIndexes()
+
         # Create the main context menu
         context_menu = QMenu(self)
+        context_menu.setStyleSheet(CUSTOM_CONTEXT_MENU_STYLESHEET)
         context_menu.setToolTipsVisible(True)
         context_menu.hovered.connect(self.handleMenuHovered)
 
@@ -4244,10 +4249,32 @@ class SessionTableView(QTableView):
         copy_action = context_menu.addAction("Copy Selection")
         copy_action.setShortcut("Ctrl+C")
         copy_action.setToolTip("Copy selected cells to your clipboard.")
-        copy_action.triggered.connect(self.copy_selected_cells)
+        copy_action.triggered.connect(lambda: self.copy_selected_cells(selected_indexes))
         context_menu.addAction(copy_action)
 
         context_menu.addSeparator()
+
+        # IP Lookup action
+        # Ensure only one cell is selected and the selected column is "IP Address"
+        if len(selected_indexes) == 1:
+            selected_column = selected_indexes[0].column()
+            column_name = self.model().headerData(selected_column, Qt.Orientation.Horizontal)
+            if not isinstance(column_name, str):
+                raise TypeError(f'Expected "str", got "{type(column_name)}"')
+
+            if column_name == "IP Address":
+                # Get the IP address from the selected cell
+                ip_address = self.model().data(selected_indexes[0], Qt.ItemDataRole.DisplayRole)
+                if not isinstance(ip_address, str):
+                    raise TypeError(f'Expected "str", got "{type(ip_address)}"')
+                if ip_address.endswith(" 👑"):
+                    ip_address = ip_address.removesuffix(" 👑")
+
+                # Enable the action if the conditions are met
+                ip_lookup_action = context_menu.addAction("IP Lookup Player")
+                ip_lookup_action.setToolTip("Displays a notification with a detailed IP lookup report for this player.")
+                ip_lookup_action.triggered.connect(lambda: self.show_detailed_ip_lookup_player_cell(ip_address))
+                context_menu.addAction(ip_lookup_action)
 
         # "Select" submenu
         select_menu = context_menu.addMenu("Select")
@@ -4289,7 +4316,7 @@ class SessionTableView(QTableView):
         # Execute the context menu at the right-click position
         context_menu.exec(self.mapToGlobal(pos))
 
-    def copy_selected_cells(self):
+    def copy_selected_cells(self, selected_indexes: Optional[list[QModelIndex]] = None):
         """
         Copy the selected cells data from the table to the clipboard.
         """
@@ -4306,7 +4333,8 @@ class SessionTableView(QTableView):
         selected_texts: list[str] = []
 
         # Iterate over each selected index and retrieve its display data
-        selected_indexes = self.selectionModel().selectedIndexes()
+        if selected_indexes is None:
+            selected_indexes = self.selectionModel().selectedIndexes()
         for index in selected_indexes:
             cell_text = selected_model.data(index, Qt.ItemDataRole.DisplayRole)
             if not isinstance(cell_text, str):
@@ -4322,6 +4350,48 @@ class SessionTableView(QTableView):
 
         # Set the formatted text in the system clipboard
         clipboard.setText(clipboard_content)
+
+    def show_detailed_ip_lookup_player_cell(self, ip_address: str):
+        player = PlayersRegistry.get_player(ip_address)
+        if player is None:
+            return
+
+        msgbox_title = TITLE
+        msgbox_message = textwrap.indent(textwrap.dedent(f"""
+            ############# Player Infos ##############
+            Username{plural(len(player.userip.usernames))}: {', '.join(player.userip.usernames) or "N/A"}
+            IP: {player.ip}
+            Is in UserIP database: {player.userip.detection.as_processed_userip_task and f'Yes: \"{player.userip.database_name}.ini\"' or "No"}
+
+            ############# IP Lookup ##############
+            IP Address: {player.ip}
+            Last Port: {player.ports.last}
+            Intermediate Port{plural(len(player.ports.intermediate))}: {', '.join(player.ports.intermediate)}
+            First Port: {player.ports.first}
+            Continent: {player.iplookup.ipapi.compiled.continent}
+            Country: {player.iplookup.maxmind.compiled.country}
+            Country Code: {player.iplookup.maxmind.compiled.country_code}
+            Region: {player.iplookup.ipapi.compiled.region}
+            Region Code: {player.iplookup.ipapi.compiled.region_code}
+            City: {player.iplookup.maxmind.compiled.city}
+            District: {player.iplookup.ipapi.compiled.district}
+            ZIP Code: {player.iplookup.ipapi.compiled.zip_code}
+            Lat: {player.iplookup.ipapi.compiled.lat}
+            Lon: {player.iplookup.ipapi.compiled.lon}
+            Time Zone: {player.iplookup.ipapi.compiled.time_zone}
+            Offset: {player.iplookup.ipapi.compiled.offset}
+            Currency: {player.iplookup.ipapi.compiled.currency}
+            Organization: {player.iplookup.ipapi.compiled.org}
+            ISP: {player.iplookup.ipapi.compiled.isp}
+            ASN / ISP: {player.iplookup.maxmind.compiled.asn}
+            AS: {player.iplookup.ipapi.compiled._as}
+            ASN: {player.iplookup.ipapi.compiled.as_name}
+            Mobile (cellular) connection: {player.iplookup.ipapi.compiled.mobile}
+            Proxy, VPN or Tor exit address: {player.iplookup.ipapi.compiled.proxy}
+            Hosting, colocated or data center: {player.iplookup.ipapi.compiled.hosting}
+        """.removeprefix("\n").removesuffix("\n")), "    ")
+        msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Information | MsgBox.Style.MsgBoxSetForeground
+        threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
 
     def select_all_cells(self, unselect: bool = False):
         """

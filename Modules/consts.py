@@ -1,5 +1,6 @@
 # Standard Python Libraries
 import re
+import textwrap
 from pathlib import Path
 from datetime import datetime
 
@@ -69,3 +70,40 @@ GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
 # TODO: Implement a better way to retrieve the default background color for table cells.
 # Currently hardcoded to Gray.B10, which should be the same color for everyone.
 HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR = QColor(Gray.B10)
+CUSTOM_CONTEXT_MENU_STYLESHEET = textwrap.dedent("""
+    QMenu {
+        background-color: #1e1e1e;     /* Dark background */
+        border: 1px solid #2d2d2d;     /* Subtle border */
+        border-radius: 8px;            /* Rounded corners */
+        padding: 4px;                  /* Space inside the menu */
+    }
+    QMenu::item {
+        color: #d4d4d4;                /* Light gray text color */
+        padding: 6px 12px;             /* Padding for each item */
+        background-color: transparent; /* Default background */
+    }
+    QMenu::item:selected {
+        background: qlineargradient(
+            x1: 0, y1: 0, x2: 1, y2: 1,
+            stop: 0 #4a90e2,           /* Soft blue gradient start */
+            stop: 1 #3c5a9a            /* Muted navy blue gradient end */
+        );
+        color: #ffffff;                /* White text for better contrast */
+        border: 1px solid #5a5a5a;     /* Subtle border for selection */
+        border-radius: 6px;            /* Rounded corners for selection */
+        margin: 2px;                   /* Spacing around the item */
+    }
+    QMenu::item:pressed {
+        background-color: #36547c;     /* Slightly darker blue when pressed */
+        color: #e0e0e0;                /* Slightly muted text color */
+    }
+    QMenu::separator {
+        height: 1px;
+        background: #2d2d2d;           /* Separator color */
+        margin: 4px 0;
+    }
+    QMenu::indicator {
+        width: 12px;
+        height: 12px;
+    }
+""".removeprefix("\n").removesuffix("\n"))
