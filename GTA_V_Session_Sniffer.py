@@ -42,7 +42,7 @@ from colorama import Fore
 from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QModelIndex, QItemSelection, QPoint
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QItemSelection, QPoint
 from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QMenu
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent, QAction
 
@@ -4216,38 +4216,82 @@ class SessionTableView(QTableView):
         self._is_dragging = False
         super().mouseReleaseEvent(event)
 
+    def handleMenuHovered(self, action):
+        # Fixes: https://stackoverflow.com/questions/21725119/why-wont-qtooltips-appear-on-qactions-within-a-qmenu
+        if isinstance(action, QAction):
+            action_parent = action.parent()
+            if isinstance(action_parent, QMenu):
+                action_parent.setToolTip(action.toolTip())
+
     # Custom Methods:
 
     def show_context_menu(self, pos: QPoint):
         """
-        Show the context menu at the specified position with options to interact with the selected content.
+        Show the context menu at the specified position with options to interact with the table's content.
         """
-        # Create the context menu
+        # Determine the index at the clicked position
+        index = self.indexAt(pos)
+
+        if not index.isValid():
+            return  # Do nothing if the click is outside valid cells
+
+        # Create the main context menu
         context_menu = QMenu(self)
+        context_menu.setToolTipsVisible(True)
+        context_menu.hovered.connect(self.handleMenuHovered)
 
-        copy_action = QAction("Copy selected content", self)
+        # Copy action
+        copy_action = context_menu.addAction("Copy Selection")
         copy_action.setShortcut("Ctrl+C")
+        copy_action.setToolTip("Copy selected cells to your clipboard.")
         copy_action.triggered.connect(self.copy_selected_cells)
-
-        select_all_action = QAction("Select All content", self)
-        select_all_action.setShortcut("Ctrl+A")
-        select_all_action.triggered.connect(self.select_all_cells)
-
-        unselect_all_action = QAction("Unselect All content", self)
-        unselect_all_action.triggered.connect(self.unselect_all_cells)
-
-        # Add actions to the context menu
         context_menu.addAction(copy_action)
-        context_menu.addSeparator()
-        context_menu.addAction(select_all_action)
-        context_menu.addAction(unselect_all_action)
 
-        # Execute the menu at the right-click position
+        context_menu.addSeparator()
+
+        # "Select" submenu
+        select_menu = context_menu.addMenu("Select")
+
+        select_all_action = select_menu.addAction("Select All")
+        select_all_action.setShortcut("Ctrl+A")
+        select_all_action.setToolTip("Select all cells in the table.")
+        select_all_action.triggered.connect(self.select_all_cells)
+        select_menu.addAction(select_all_action)
+
+        select_row_action = select_menu.addAction("Select Row")
+        select_row_action.setToolTip("Select all cells in this row.")
+        select_row_action.triggered.connect(lambda: self.select_row_cells(index.row()))
+        select_menu.addAction(select_row_action)
+
+        select_column_action = select_menu.addAction("Select Column")
+        select_column_action.setToolTip("Select all cells in this column.")
+        select_column_action.triggered.connect(lambda: self.select_column_cells(index.column()))
+        select_menu.addAction(select_column_action)
+
+        # "Unselect" submenu
+        unselect_menu = context_menu.addMenu("Unselect")
+
+        unselect_all_action = unselect_menu.addAction("Unselect All")
+        unselect_all_action.setToolTip("Unselect all cells in the table.")
+        unselect_all_action.triggered.connect(lambda: self.select_all_cells(unselect=True))
+        unselect_menu.addAction(unselect_all_action)
+
+        unselect_row_action = unselect_menu.addAction("Unselect Row")
+        unselect_row_action.setToolTip("Unselect all cells in this row.")
+        unselect_row_action.triggered.connect(lambda: self.select_row_cells(index.row(), unselect=True))
+        unselect_menu.addAction(unselect_row_action)
+
+        unselect_column_action = unselect_menu.addAction("Unselect Column")
+        unselect_column_action.setToolTip("Unselect all cells in this column.")
+        unselect_column_action.triggered.connect(lambda: self.select_column_cells(index.column(), unselect=True))
+        unselect_menu.addAction(unselect_column_action)
+
+        # Execute the context menu at the right-click position
         context_menu.exec(self.mapToGlobal(pos))
 
-    def copy_selected_cells(self, selected_indexes: list[QModelIndex]):
+    def copy_selected_cells(self):
         """
-        Copy the selected cells data in the table to the clipboard.
+        Copy the selected cells data from the table to the clipboard.
         """
         selected_model = self.model()
         if not isinstance(selected_model, SessionTableModel):
@@ -4279,31 +4323,12 @@ class SessionTableView(QTableView):
         # Set the formatted text in the system clipboard
         clipboard.setText(clipboard_content)
 
-    def select_all_cells(self):
+    def select_all_cells(self, unselect: bool = False):
         """
-        Select all rows and columns in the table.
-        """
-        selected_model = self.model()
-        if not isinstance(selected_model, SessionTableModel):
-            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+        Select or unselect all rows and columns from the table.
 
-        selection_model = self.selectionModel()
-        if not isinstance(selection_model, QItemSelectionModel):
-            raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
-
-        # Get the top-left and bottom-right QModelIndex for the entire table
-        top_left = selected_model.createIndex(0, 0)  # Top-left item (first row, first column)
-        bottom_right = selected_model.createIndex(selected_model.rowCount() - 1, selected_model.columnCount() - 1)  # Bottom-right item (last row, last column)
-
-        # Create a selection range from top-left to bottom-right
-        selection = QItemSelection(top_left, bottom_right)
-
-        # Select all items in the table using the selection model
-        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Select)
-
-    def unselect_all_cells(self):
-        """
-        Unselect all rows and columns in the table.
+        Args:
+            unselect: If True, unselect all cells. If False, select all cells.
         """
         selected_model = self.model()
         if not isinstance(selected_model, SessionTableModel):
@@ -4315,13 +4340,74 @@ class SessionTableView(QTableView):
 
         # Get the top-left and bottom-right QModelIndex for the entire table
         top_left = selected_model.createIndex(0, 0)  # Top-left item (first row, first column)
-        bottom_right = selected_model.createIndex(selected_model.rowCount() - 1, selected_model.columnCount() - 1)  # Bottom-right item (last row, last column)
+        bottom_right = selected_model.createIndex(
+            selected_model.rowCount() - 1, selected_model.columnCount() - 1
+        )  # Bottom-right item (last row, last column)
 
         # Create a selection range from top-left to bottom-right
         selection = QItemSelection(top_left, bottom_right)
 
-        # Select all items in the table using the selection model
-        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Deselect)
+        # Determine selection flag based on the unselect argument
+        flag = (
+            QItemSelectionModel.SelectionFlag.Deselect
+            if unselect
+            else QItemSelectionModel.SelectionFlag.Select
+        )
+
+        # Apply the selection or deselection
+        selection_model.select(selection, flag)
+
+    def select_row_cells(self, row: int, unselect: bool = False):
+        """
+        Select or unselect all cells in the specified row from the table.
+
+        Args:
+            row: The row index to modify selection for.
+            unselect: If True, unselect the row. If False, select the row.
+        """
+        selected_model = self.model()
+        if not isinstance(selected_model, SessionTableModel):
+            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+        selection_model = self.selectionModel()
+        if not isinstance(selection_model, QItemSelectionModel):
+            raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+        top_index = selected_model.createIndex(row, 0)  # First column of the specified row
+        bottom_index = selected_model.createIndex(row, selected_model.columnCount() - 1)  # Last column of the specified row
+
+        # Create a selection range for the entire row
+        selection = QItemSelection(top_index, bottom_index)
+
+        # Determine selection flag based on the argument
+        flag = QItemSelectionModel.SelectionFlag.Deselect if unselect else QItemSelectionModel.SelectionFlag.Select
+        selection_model.select(selection, flag)
+
+    def select_column_cells(self, column: int, unselect: bool = False):
+        """
+        Select or unselect all cells in the specified column from the table.
+
+        Args:
+            column: The column index to modify selection for.
+            unselect: If True, unselect the column. If False, select the column.
+        """
+        selected_model = self.model()
+        if not isinstance(selected_model, SessionTableModel):
+            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+        selection_model = self.selectionModel()
+        if not isinstance(selection_model, QItemSelectionModel):
+            raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+        top_index = selected_model.createIndex(0, column)  # First row of the specified column
+        bottom_index = selected_model.createIndex(selected_model.rowCount() - 1, column)  # Last row of the specified column
+
+        # Create a selection range for the entire column
+        selection = QItemSelection(top_index, bottom_index)
+
+        # Determine selection flag based on the argument
+        flag = QItemSelectionModel.SelectionFlag.Deselect if unselect else QItemSelectionModel.SelectionFlag.Select
+        selection_model.select(selection, flag)
 
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
