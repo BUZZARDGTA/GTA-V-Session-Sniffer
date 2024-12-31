@@ -4101,49 +4101,6 @@ class SessionTableModel(QAbstractTableModel):
                 bottom_right = self.index(self._num_rows - 1, self._num_cols - 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ForegroundRole])
 
-    def select_all(self, selection_model: QItemSelectionModel):
-        """
-        Select all rows and columns in the table using the selection model.
-        """
-        # Get the top-left and bottom-right QModelIndex for the entire table
-        top_left = self.createIndex(0, 0)  # Top-left item (first row, first column)
-        bottom_right = self.createIndex(self.rowCount() - 1, self.columnCount() - 1)  # Bottom-right item (last row, last column)
-
-        # Create a selection range from top-left to bottom-right
-        selection = QItemSelection(top_left, bottom_right)
-
-        # Select all items in the table using the selection model
-        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Select)
-
-    def copy_to_clipboard(self, selected_indexes: list[QModelIndex]):
-        """
-        Collect selected data from the model and copy it to the clipboard.
-        """
-        # Access the system clipboard
-        clipboard = QApplication.clipboard()
-        if not isinstance(clipboard, QClipboard):
-            raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
-
-        # Prepare a list to store text data from selected cells
-        selected_texts: list[str] = []
-
-        # Iterate over each selected index and retrieve its display data
-        for index in selected_indexes:
-            cell_text = self.data(index, Qt.ItemDataRole.DisplayRole)
-            if not isinstance(cell_text, str):
-                raise TypeError(f'Expected "str", got "{type(cell_text)}"')
-            selected_texts.append(cell_text)
-
-        # Return if no text was selected
-        if not selected_texts:
-            return
-
-        # Join all selected text entries with a newline to format for copying
-        clipboard_content = "\n".join(selected_texts)
-
-        # Set the formatted text in the system clipboard
-        clipboard.setText(clipboard_content)
-
 class SessionTableView(QTableView):
     def __init__(self, model: SessionTableModel):
         super().__init__()
@@ -4268,35 +4225,63 @@ class SessionTableView(QTableView):
         # Create the context menu
         context_menu = QMenu(self)
 
+        copy_action = QAction("Copy selected content", self)
+        copy_action.setShortcut("Ctrl+C")
+        copy_action.triggered.connect(self.copy_selected_cells)
+
         select_all_action = QAction("Select All content", self)
+        select_all_action.setShortcut("Ctrl+A")
         select_all_action.triggered.connect(self.select_all_cells)
 
-        copy_action = QAction("Copy selected content", self)
-        copy_action.triggered.connect(self.copy_selected_cells)
+        unselect_all_action = QAction("Unselect All content", self)
+        unselect_all_action.triggered.connect(self.unselect_all_cells)
 
         # Add actions to the context menu
         context_menu.addAction(copy_action)
         context_menu.addSeparator()
         context_menu.addAction(select_all_action)
+        context_menu.addAction(unselect_all_action)
 
         # Execute the menu at the right-click position
         context_menu.exec(self.mapToGlobal(pos))
 
-    def copy_selected_cells(self):
+    def copy_selected_cells(self, selected_indexes: list[QModelIndex]):
         """
-        Copy the selected data in the table to the clipboard using the model's method.
+        Copy the selected cells data in the table to the clipboard.
         """
         selected_model = self.model()
         if not isinstance(selected_model, SessionTableModel):
             raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
 
+        # Access the system clipboard
+        clipboard = QApplication.clipboard()
+        if not isinstance(clipboard, QClipboard):
+            raise TypeError(f'Expected "QClipboard", got "{type(clipboard)}"')
+
+        # Prepare a list to store text data from selected cells
+        selected_texts: list[str] = []
+
+        # Iterate over each selected index and retrieve its display data
         selected_indexes = self.selectionModel().selectedIndexes()
-        if selected_indexes:
-            selected_model.copy_to_clipboard(selected_indexes) # Delegate the task to the model
+        for index in selected_indexes:
+            cell_text = selected_model.data(index, Qt.ItemDataRole.DisplayRole)
+            if not isinstance(cell_text, str):
+                raise TypeError(f'Expected "str", got "{type(cell_text)}"')
+            selected_texts.append(cell_text)
+
+        # Return if no text was selected
+        if not selected_texts:
+            return
+
+        # Join all selected text entries with a newline to format for copying
+        clipboard_content = "\n".join(selected_texts)
+
+        # Set the formatted text in the system clipboard
+        clipboard.setText(clipboard_content)
 
     def select_all_cells(self):
         """
-        Select all cells in the table using the model's selection model.
+        Select all rows and columns in the table.
         """
         selected_model = self.model()
         if not isinstance(selected_model, SessionTableModel):
@@ -4306,7 +4291,37 @@ class SessionTableView(QTableView):
         if not isinstance(selection_model, QItemSelectionModel):
             raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
 
-        selected_model.select_all(selection_model) # Delegate the task to the model
+        # Get the top-left and bottom-right QModelIndex for the entire table
+        top_left = selected_model.createIndex(0, 0)  # Top-left item (first row, first column)
+        bottom_right = selected_model.createIndex(selected_model.rowCount() - 1, selected_model.columnCount() - 1)  # Bottom-right item (last row, last column)
+
+        # Create a selection range from top-left to bottom-right
+        selection = QItemSelection(top_left, bottom_right)
+
+        # Select all items in the table using the selection model
+        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Select)
+
+    def unselect_all_cells(self):
+        """
+        Unselect all rows and columns in the table.
+        """
+        selected_model = self.model()
+        if not isinstance(selected_model, SessionTableModel):
+            raise TypeError(f'Expected "SessionTableModel", got "{type(selected_model)}"')
+
+        selection_model = self.selectionModel()
+        if not isinstance(selection_model, QItemSelectionModel):
+            raise TypeError(f'Expected "QItemSelectionModel", got "{type(selection_model)}"')
+
+        # Get the top-left and bottom-right QModelIndex for the entire table
+        top_left = selected_model.createIndex(0, 0)  # Top-left item (first row, first column)
+        bottom_right = selected_model.createIndex(selected_model.rowCount() - 1, selected_model.columnCount() - 1)  # Bottom-right item (last row, last column)
+
+        # Create a selection range from top-left to bottom-right
+        selection = QItemSelection(top_left, bottom_right)
+
+        # Select all items in the table using the selection model
+        selection_model.select(selection, QItemSelectionModel.SelectionFlag.Deselect)
 
 class GUIWorkerThread(QThread):
     update_signal = pyqtSignal(str, int, int, list, list, int, int, list, list)  # Signal to send updated table data and new size
