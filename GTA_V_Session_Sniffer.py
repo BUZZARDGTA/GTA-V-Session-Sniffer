@@ -43,7 +43,7 @@ from rich.text import Text
 from rich.console import Console
 from rich.traceback import Traceback
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QItemSelectionModel, QItemSelection, QPoint, QModelIndex
-from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QMenu
+from PyQt6.QtWidgets import QApplication, QTableView, QVBoxLayout, QWidget, QSizePolicy, QLabel, QFrame, QHeaderView, QMenu, QInputDialog, QMessageBox
 from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboard, QMouseEvent, QAction
 
 # -----------------------------------------------------
@@ -1665,9 +1665,13 @@ def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "l
 
     return ini_db, need_rewrite_ini
 
-def is_file_need_newline_ending(file):
-    file = Path(file)
-    if file.stat().st_size == 0:
+def is_file_need_newline_ending(file: Union[str, Path]):
+    if isinstance(file, Path):
+        file_path = file
+    else:
+        file_path = Path(file)
+
+    if file_path.stat().st_size == 0:
         return False
 
     return not file.read_bytes().endswith(b"\n")
@@ -4254,28 +4258,6 @@ class SessionTableView(QTableView):
 
         context_menu.addSeparator()
 
-        # IP Lookup action
-        # Ensure only one cell is selected and the selected column is "IP Address"
-        if len(selected_indexes) == 1:
-            selected_column = selected_indexes[0].column()
-            column_name = self.model().headerData(selected_column, Qt.Orientation.Horizontal)
-            if not isinstance(column_name, str):
-                raise TypeError(f'Expected "str", got "{type(column_name)}"')
-
-            if column_name == "IP Address":
-                # Get the IP address from the selected cell
-                ip_address = self.model().data(selected_indexes[0], Qt.ItemDataRole.DisplayRole)
-                if not isinstance(ip_address, str):
-                    raise TypeError(f'Expected "str", got "{type(ip_address)}"')
-                if ip_address.endswith(" 👑"):
-                    ip_address = ip_address.removesuffix(" 👑")
-
-                # Enable the action if the conditions are met
-                ip_lookup_action = context_menu.addAction("IP Lookup Player")
-                ip_lookup_action.setToolTip("Displays a notification with a detailed IP lookup report for this player.")
-                ip_lookup_action.triggered.connect(lambda: self.show_detailed_ip_lookup_player_cell(ip_address))
-                context_menu.addAction(ip_lookup_action)
-
         # "Select" submenu
         select_menu = context_menu.addMenu("Select")
 
@@ -4312,6 +4294,64 @@ class SessionTableView(QTableView):
         unselect_column_action.setToolTip("Unselect all cells in this column.")
         unselect_column_action.triggered.connect(lambda: self.select_column_cells(index.column(), unselect=True))
         unselect_menu.addAction(unselect_column_action)
+
+        context_menu.addSeparator()
+
+        # Ensure only one cell is selected
+        if len(selected_indexes) == 1:
+            selected_column = selected_indexes[0].column()
+            column_name = self.model().headerData(selected_column, Qt.Orientation.Horizontal)
+            if not isinstance(column_name, str):
+                raise TypeError(f'Expected "str", got "{type(column_name)}"')
+
+            if column_name == "IP Address":
+                # Get the IP address from the selected cell
+                ip_address = self.model().data(selected_indexes[0], Qt.ItemDataRole.DisplayRole)
+                if not isinstance(ip_address, str):
+                    raise TypeError(f'Expected "str", got "{type(ip_address)}"')
+                if ip_address.endswith(" 👑"):
+                    ip_address = ip_address.removesuffix(" 👑")
+
+                userip_databases = [f"{db_name}.ini" for db_name, _, _ in UserIP_Databases.userip_databases]
+                userip_data = UserIP_Databases.get_userip_info(ip_address)
+
+                # IP Lookup action
+                ip_lookup_action = context_menu.addAction("IP Lookup Details")
+                ip_lookup_action.setToolTip("Displays a notification with a detailed IP lookup report for this player.")
+                ip_lookup_action.triggered.connect(lambda: self.show_detailed_ip_lookup_player_cell(ip_address))
+                context_menu.addAction(ip_lookup_action)
+
+                # "UserIP" submenu
+                userip_menu = context_menu.addMenu("UserIP")
+
+                if ip_address not in UserIP_Databases.ips_set:
+                    # "Add" submenu
+                    add_userip_menu = userip_menu.addMenu("Add    ") # Extra spaces for alignment
+                    add_userip_menu.setToolTip("Add this IP address to UserIP database (you will be prompted to associate it with a username).")
+
+                    # Add a button for each database in the "Add" menu
+                    for db_name in userip_databases:
+                        add_action = add_userip_menu.addAction(db_name)
+                        add_action.setToolTip(f'Add this IP address to the "{db_name}" UserIP database.')
+                        add_action.triggered.connect(lambda _, db_name=db_name: self.userip_manager(ip_address, "ADD", db_name))
+                else:
+                    # "Move" submenu
+                    move_userip_menu = userip_menu.addMenu("Move    ") # Extra spaces for alignment
+                    move_userip_menu.setToolTip("Move this IP address and its associated username(s) to another UserIP database.")
+
+                    # Add a button for each database in the "Move" menu
+                    for db_name in userip_databases:
+                        move_action = move_userip_menu.addAction(db_name)
+                        move_action.setToolTip(f'Move this IP address and its associated username(s) to the "{db_name}" UserIP database.')
+                        if userip_data.database_name == db_name.removesuffix(".ini"):
+                            move_action.setEnabled(False)
+                        else:
+                            move_action.triggered.connect(lambda _, db_name=db_name: self.userip_manager(ip_address, "MOVE", db_name))
+
+                    # "Delete" action
+                    del_userip_action = userip_menu.addAction("Delete")
+                    del_userip_action.setToolTip("Delete this IP address and its associated username(s) from UserIP database.")
+                    del_userip_action.triggered.connect(lambda: self.userip_manager(ip_address, "DEL"))
 
         # Execute the context menu at the right-click position
         context_menu.exec(self.mapToGlobal(pos))
@@ -4353,21 +4393,19 @@ class SessionTableView(QTableView):
 
     def show_detailed_ip_lookup_player_cell(self, ip_address: str):
         player = PlayersRegistry.get_player(ip_address)
-        if player is None:
-            return
+        if not isinstance(player, Player):
+            raise TypeError(f'Expected "Player", got "{type(player)}"')
 
-        msgbox_title = TITLE
-        msgbox_message = textwrap.indent(textwrap.dedent(f"""
+        msgbox_message = textwrap.dedent(f"""
             ############# Player Infos ##############
-            Username{plural(len(player.userip.usernames))}: {', '.join(player.userip.usernames) or "N/A"}
-            IP: {player.ip}
-            Is in UserIP database: {player.userip.detection.as_processed_userip_task and f'Yes: \"{player.userip.database_name}.ini\"' or "No"}
-
-            ############# IP Lookup ##############
             IP Address: {player.ip}
+            Username{plural(len(player.usernames))}: {', '.join(player.usernames) or "N/A"}
+            Is in UserIP database: {player.userip.detection.as_processed_userip_task and f'Yes: \"{player.userip.database_name}.ini\"' or "No"}
             Last Port: {player.ports.last}
-            Intermediate Port{plural(len(player.ports.intermediate))}: {', '.join(player.ports.intermediate)}
+            Intermediate Port{plural(len(player.ports.intermediate))}: {', '.join(map(str, player.ports.intermediate))}
             First Port: {player.ports.first}
+
+            ########### IP Lookup Details ###########
             Continent: {player.iplookup.ipapi.compiled.continent}
             Country: {player.iplookup.maxmind.compiled.country}
             Country Code: {player.iplookup.maxmind.compiled.country_code}
@@ -4389,9 +4427,212 @@ class SessionTableView(QTableView):
             Mobile (cellular) connection: {player.iplookup.ipapi.compiled.mobile}
             Proxy, VPN or Tor exit address: {player.iplookup.ipapi.compiled.proxy}
             Hosting, colocated or data center: {player.iplookup.ipapi.compiled.hosting}
-        """.removeprefix("\n").removesuffix("\n")), "    ")
-        msgbox_style = MsgBox.Style.OKOnly | MsgBox.Style.Information | MsgBox.Style.MsgBoxSetForeground
-        threading.Thread(target=MsgBox.show, args=(msgbox_title, msgbox_message, msgbox_style), daemon=True).start()
+        """).removeprefix("\n").removesuffix("\n")
+        QMessageBox.information(self, TITLE, msgbox_message)
+
+    def userip_manager(self, ip_address: str, action: Literal["ADD", "MOVE", "DEL"], selected_db_name: Optional[str] = None):
+        def show_error__player_is_already_in_userip_database(userip_data: UserIP):
+            msgbox_message = textwrap.dedent(f"""
+                ########## Player Infos ##########
+                Username{plural(len(userip_data.usernames))}: {', '.join(userip_data.usernames)}
+                IP: {userip_data.ip}
+                UserIP database: {f"{userip_data.database_name}.ini"}
+
+                ERROR:
+                This IP address is already in an UserIP database.
+                Perhaps maybe you want to [Move] this UserIP
+                to another database instead?
+            """).removeprefix("\n").removesuffix("\n")
+
+            QMessageBox.warning(self, TITLE, msgbox_message)
+
+        def show_error__player_is_not_in_any_userip_database(ip_address: str):
+            msgbox_message = textwrap.dedent(f"""
+                ########## Player Infos ##########
+                IP: {ip_address}
+
+                ERROR:
+                This player is not in any UserIP database.
+            """).removeprefix("\n").removesuffix("\n")
+
+            QMessageBox.warning(self, TITLE, msgbox_message)
+
+        userip_data = UserIP_Databases.get_userip_info(ip_address)
+
+        if action == "ADD":
+            if ip_address in UserIP_Databases.ips_set:
+                show_error__player_is_already_in_userip_database(userip_data)
+                return
+
+            if not selected_db_name:
+                return
+
+            # If not, prompt the user for a username
+            username, ok = QInputDialog.getText(self, "Input Username", "Please enter the username to associate with the IP address:")
+
+            if ok and username:  # Only proceed if the user clicked 'OK' and provided a username
+                db_path = Path("UserIP Databases") / selected_db_name
+                newline = "\n" if is_file_need_newline_ending(db_path) else ""
+
+                # Append the IP and username to the corresponding database file
+                with db_path.open("a", encoding="utf-8") as f:
+                    f.write(f"{newline}{username}={ip_address}\n")
+
+                QMessageBox.information(self, TITLE, f"IP address {ip_address} has been added with username {username}.")
+            else:
+                # If the user canceled or left the input empty, show an error
+                QMessageBox.warning(self, TITLE, "ERROR:\nNo username was provided.")
+
+        elif action == "MOVE":
+            from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
+
+            if ip_address not in UserIP_Databases.ips_set:
+                show_error__player_is_not_in_any_userip_database(ip_address)
+                return
+
+            if not selected_db_name:
+                return
+
+            # Dictionary to store removed entries by database
+            deleted_entries_by_db: dict[str, list[str]] = {}
+
+            # Path to the target database where entries should be moved
+            target_db_path = Path("UserIP Databases") / selected_db_name
+
+            # Iterate over each UserIP database
+            for db_name, _, _ in UserIP_Databases.userip_databases:
+                db_name = f"{db_name}.ini"
+                db_path = Path("UserIP Databases") / db_name
+
+                # Read the database file
+                try:
+                    with db_path.open("r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                except FileNotFoundError:
+                    continue
+
+                if not lines:
+                    continue
+
+                # List to store deleted entries in this particular database
+                deleted_entries_in_this_db: list[str] = []
+
+                # Remove any lines containing the IP address
+                lines_to_keep: list[str] = []
+                for line in lines:
+                    match = RE_USERIP_INI_PARSER_PATTERN.search(line)
+                    if match:
+                        # Extract username and ip using named groups
+                        username, ip = match.group("username").strip(), match.group("ip").strip()
+
+                        # Ensure both username and ip are non-empty strings
+                        if isinstance(username, str) and isinstance(ip, str) and ip == ip_address:
+                            deleted_entries_in_this_db.append(line.strip())  # Store the deleted entry
+                            continue
+
+                    lines_to_keep.append(line)
+
+                # Only update the database file if there were any deletions
+                if deleted_entries_in_this_db:
+                    # Ensure the last character is a newline
+                    if lines_to_keep and not lines_to_keep[-1].endswith("\n"):
+                        lines_to_keep.append("\n")
+
+                    with db_path.open("w", encoding="utf-8") as f:
+                        f.writelines(lines_to_keep)
+
+                    # Store the deleted entries for this database
+                    deleted_entries_by_db[db_name] = deleted_entries_in_this_db
+
+                    # Move the deleted entries to the target database
+                    with target_db_path.open("a", encoding="utf-8") as target_db_file:
+                        for entry in deleted_entries_in_this_db:
+                            target_db_file.write(f"{entry}\n")
+
+            # After processing all databases, show a detailed report
+            if deleted_entries_by_db:
+                report = f"<b>IP address {ip_address} moved from the following UserIP databases:</b><br><br><br>"
+                for db_name, deleted_entries in deleted_entries_by_db.items():
+                    report += f"<b>{db_name}:</b><br>"
+                    report += "<ul>"
+                    for entry in deleted_entries:
+                        report += f"<li>{entry}</li>"
+                    report += "</ul><br>"
+                report = report.removesuffix("<br>")
+
+                QMessageBox.information(self, TITLE, report)
+            else:
+                show_error__player_is_not_in_any_userip_database(ip_address)
+
+        elif action == "DEL":
+            from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
+
+            if ip_address not in UserIP_Databases.ips_set:
+                show_error__player_is_not_in_any_userip_database(ip_address)
+                return
+
+            # Dictionary to store removed entries by database
+            deleted_entries_by_db: dict[str, list[str]] = {}
+
+            # Iterate over each UserIP database
+            for db_name, _, _ in UserIP_Databases.userip_databases:
+                db_name = f"{db_name}.ini"
+                db_path = Path("UserIP Databases") / db_name
+
+                # Read the database file
+                try:
+                    with db_path.open("r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                except FileNotFoundError:
+                    continue
+
+                if not lines:
+                    continue
+
+                # List to store deleted entries in this particular database
+                deleted_entries_in_this_db: list[str] = []
+
+                # Remove any lines containing the IP address
+                lines_to_keep: list[str] = []
+                for line in lines:
+                    match = RE_USERIP_INI_PARSER_PATTERN.search(line)
+                    if match:
+                        # Extract username and ip using named groups
+                        username, ip = match.group("username").strip(), match.group("ip").strip()
+
+                        # Ensure both username and ip are non-empty strings
+                        if isinstance(username, str) and isinstance(ip, str) and ip == ip_address:
+                            deleted_entries_in_this_db.append(line.strip())  # Store the deleted entry
+                            continue
+
+                    lines_to_keep.append(line)
+
+                # Only update the database file if there were any deletions
+                if deleted_entries_in_this_db:
+                    # Ensure the last character is a newline
+                    if lines_to_keep and not lines_to_keep[-1].endswith("\n"):
+                        lines_to_keep.append("\n")
+
+                    with db_path.open("w", encoding="utf-8") as f:
+                        f.writelines(lines_to_keep)
+
+                    # Store the deleted entries for this database
+                    deleted_entries_by_db[db_name] = deleted_entries_in_this_db
+
+            # After processing all databases, show a detailed report
+            if deleted_entries_by_db:
+                report = f"<b>IP address {ip_address} removed from the following UserIP databases:</b><br><br><br>"
+                for db_name, deleted_entries in deleted_entries_by_db.items():
+                    report += f"<b>{db_name}:</b><br>"
+                    report += "<ul>"
+                    for entry in deleted_entries:
+                        report += f"<li>{entry}</li>"
+                    report += "</ul><br>"
+                report = report.removesuffix("<br>")
+
+                QMessageBox.information(self, TITLE, report)
+            else:
+                show_error__player_is_not_in_any_userip_database(ip_address)
 
     def select_all_cells(self, unselect: bool = False):
         """

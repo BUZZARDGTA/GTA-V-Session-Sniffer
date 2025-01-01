@@ -32,7 +32,7 @@ WIRESHARK_RECOMMENDED_FULL_VERSION = "TShark (Wireshark) 4.2.9 (v4.2.9-0-g2acaab
 WIRESHARK_RECOMMENDED_VERSION_NUMBER = "4.2.9"
 WIRESHARK_REQUIRED_DL = "https://www.wireshark.org/download/win64/"
 GITHUB_RELEASE_API__GEOLITE2 = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"
-GITHUB_RELEASE_API__GEOLITE2__BACKUP = "https://api.github.com/repos/P3TERX/GeoLite.mmdb/releases/latest"
+GITHUB_RELEASE_API__GEOLITE2__BACKUP = "https://api.github.com/repos/PrxyHunter/GeoLite2/releases/latest"
 GUI_COLUMN_HEADERS_TOOLTIP_MAPPING = {
     "Usernames": "Displays the username(s) of players from your UserIP database files.\n\nFor GTA V PC users who have used the Session Sniffer mod menu plugin,\nit automatically resolves usernames while the plugin is running,\nor shows previously resolved players that were seen by the plugin.",
     "First Seen": "The very first time the player was observed across all sessions.",
@@ -77,11 +77,13 @@ CUSTOM_CONTEXT_MENU_STYLESHEET = textwrap.dedent("""
         border-radius: 8px;            /* Rounded corners */
         padding: 4px;                  /* Space inside the menu */
     }
+
     QMenu::item {
         color: #d4d4d4;                /* Light gray text color */
-        padding: 6px 12px;             /* Padding for each item */
+        padding: 6px 20px;             /* Padding for each item */
         background-color: transparent; /* Default background */
     }
+
     QMenu::item:selected {
         background: qlineargradient(
             x1: 0, y1: 0, x2: 1, y2: 1,
@@ -93,17 +95,27 @@ CUSTOM_CONTEXT_MENU_STYLESHEET = textwrap.dedent("""
         border-radius: 6px;            /* Rounded corners for selection */
         margin: 2px;                   /* Spacing around the item */
     }
+
+    QMenu::item:disabled {
+        color: #7F7F91;                /* Greyed-out text for disabled items */
+        background-color: transparent; /* No background for disabled items */
+    }
+
+    QMenu::item:disabled:hover,
+    QMenu::item:disabled:selected {
+        background-color: transparent; /* Prevent hover or selection color */
+        color: #7F7F91;                /* Ensure text remains greyed-out */
+        border: none;                  /* Remove any border effect */
+    }
+
     QMenu::item:pressed {
         background-color: #36547c;     /* Slightly darker blue when pressed */
         color: #e0e0e0;                /* Slightly muted text color */
     }
+
     QMenu::separator {
         height: 1px;
         background: #2d2d2d;           /* Separator color */
         margin: 4px 0;
-    }
-    QMenu::indicator {
-        width: 12px;
-        height: 12px;
     }
 """.removeprefix("\n").removesuffix("\n"))
