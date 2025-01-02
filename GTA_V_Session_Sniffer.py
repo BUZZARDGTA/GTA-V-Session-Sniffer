@@ -4326,7 +4326,7 @@ class SessionTableView(QTableView):
 
                 if ip_address not in UserIP_Databases.ips_set:
                     # "Add" submenu
-                    add_userip_menu = userip_menu.addMenu("Add    ") # Extra spaces for alignment
+                    add_userip_menu = userip_menu.addMenu("Add     ") # Extra spaces for alignment
                     add_userip_menu.setToolTip("Add this IP address to UserIP database (you will be prompted to associate it with a username).")
 
                     # Add a button for each database in the "Add" menu
@@ -4349,7 +4349,7 @@ class SessionTableView(QTableView):
                             move_action.triggered.connect(lambda _, db_name=db_name: self.userip_manager(ip_address, "MOVE", db_name))
 
                     # "Delete" action
-                    del_userip_action = userip_menu.addAction("Delete")
+                    del_userip_action = userip_menu.addAction("Delete  ") # Extra spaces for alignment
                     del_userip_action.setToolTip("Delete this IP address and its associated username(s) from UserIP database.")
                     del_userip_action.triggered.connect(lambda: self.userip_manager(ip_address, "DEL"))
 
