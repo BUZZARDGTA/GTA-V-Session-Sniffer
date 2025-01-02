@@ -121,7 +121,7 @@ def terminate_script(
                 "[link=https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues]"
                 "https://github.com/BUZZARDGTA/GTA-V-Session-Sniffer/issues[/link].\n\n"
                 "DEBUG:\n"
-                f"VERSION={globals().get("VERSION", "Unknown Version")}" # Define a default value for VERSION if it's not defined
+                f"VERSION={globals().get('VERSION', 'Unknown Version')}"  # Define a default value for VERSION if it's not defined
             ),
             style="white"
         )
