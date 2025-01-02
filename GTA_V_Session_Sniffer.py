@@ -4431,39 +4431,9 @@ class SessionTableView(QTableView):
         QMessageBox.information(self, TITLE, msgbox_message)
 
     def userip_manager(self, ip_address: str, action: Literal["ADD", "MOVE", "DEL"], selected_db_name: Optional[str] = None):
-        def show_error__player_is_already_in_userip_database(userip_data: UserIP):
-            msgbox_message = textwrap.dedent(f"""
-                ########## Player Infos ##########
-                Username{plural(len(userip_data.usernames))}: {', '.join(userip_data.usernames)}
-                IP: {userip_data.ip}
-                UserIP database: {f"{userip_data.database_name}.ini"}
-
-                ERROR:
-                This IP address is already in an UserIP database.
-                Perhaps maybe you want to [Move] this UserIP
-                to another database instead?
-            """).removeprefix("\n").removesuffix("\n")
-
-            QMessageBox.warning(self, TITLE, msgbox_message)
-
-        def show_error__player_is_not_in_any_userip_database(ip_address: str):
-            msgbox_message = textwrap.dedent(f"""
-                ########## Player Infos ##########
-                IP: {ip_address}
-
-                ERROR:
-                This player is not in any UserIP database.
-            """).removeprefix("\n").removesuffix("\n")
-
-            QMessageBox.warning(self, TITLE, msgbox_message)
-
         userip_data = UserIP_Databases.get_userip_info(ip_address)
 
         if action == "ADD":
-            if ip_address in UserIP_Databases.ips_set:
-                show_error__player_is_already_in_userip_database(userip_data)
-                return
-
             if not selected_db_name:
                 return
 
@@ -4485,10 +4455,6 @@ class SessionTableView(QTableView):
 
         elif action == "MOVE":
             from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
-
-            if ip_address not in UserIP_Databases.ips_set:
-                show_error__player_is_not_in_any_userip_database(ip_address)
-                return
 
             if not selected_db_name:
                 return
@@ -4561,15 +4527,9 @@ class SessionTableView(QTableView):
                 report = report.removesuffix("<br>")
 
                 QMessageBox.information(self, TITLE, report)
-            else:
-                show_error__player_is_not_in_any_userip_database(ip_address)
 
         elif action == "DEL":
             from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
-
-            if ip_address not in UserIP_Databases.ips_set:
-                show_error__player_is_not_in_any_userip_database(ip_address)
-                return
 
             # Dictionary to store removed entries by database
             deleted_entries_by_db: dict[str, list[str]] = {}
@@ -4631,8 +4591,6 @@ class SessionTableView(QTableView):
                 report = report.removesuffix("<br>")
 
                 QMessageBox.information(self, TITLE, report)
-            else:
-                show_error__player_is_not_in_any_userip_database(ip_address)
 
     def select_all_cells(self, unselect: bool = False):
         """
