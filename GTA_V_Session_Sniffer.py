@@ -4714,9 +4714,9 @@ class GUIWorkerThread(QThread):
             GUIrenderingData.session_disconnected_sorted_column_name, GUIrenderingData.session_disconnected_sort_order = get_table_sorted_column(self.disconnected_table_view)
 
             # I can do much simpler by just using wait() instead of using a loop with sleep() and a timeout.
-            start_time = time.time()
+            start_time = time.perf_counter()
             while not GUIrenderingData.gui_rendering_ready_event.is_set():
-                if time.time() - start_time >= 1:
+                if time.perf_counter() - start_time >= 1:
                     break
 
                 if self.user_requested_sorting_by_field.is_set():

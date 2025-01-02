@@ -42,6 +42,7 @@ class DiscordRPCManager:
             state_message (optional): If provided, the state message to display in Discord presence.
         """
         if not self.connect():
+            self.last_update_time = time.perf_counter()
             return
 
         if self.start_time is None:
