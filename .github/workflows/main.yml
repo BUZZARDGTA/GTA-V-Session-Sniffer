@@ -73,35 +73,44 @@ jobs:
     runs-on: ubuntu-latest
     name: Create Release
     steps:
-    - name: Download x64 Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: Session_Sniffer-x64
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
 
-    - name: Download x86 Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: Session_Sniffer-x86
+      - name: Generate Tag Using Python Script
+        id: generate_tag
+        run: |
+          # Get the generated tag from the Python script
+          TAG_NAME=$(python .github/workflows/generate_tag.py)
 
-    - name: Set Up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.x
+          # Check if the tag already exists
+          if git tag -l "$TAG_NAME"; then
+            echo "Error: Tag $TAG_NAME already exists."
+            exit 1
+          fi
 
-    - name: Generate Tag Using Python Script
-      id: generate_tag
-      run: |
-        TAG_NAME=$(python .github/workflows/generate_tag.py)
-        echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
+          # If the tag does not exist, continue and set the tag
+          echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
 
-    - name: Create GitHub Release
-      uses: ncipollo/release-action@v1.14.0
-      with:
-        artifacts: |
-          dist/Session_Sniffer-x64.exe
-          dist/Session_Sniffer-x86.exe
-        token: ${{ secrets.GITHUB_TOKEN }}
-        name: Release ${{ env.tag_name }}
-        tag: ${{ env.tag_name }}
-        commit: ${{ github.sha }}
-        prerelease: true
+      - name: Download x64 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Session_Sniffer-x64
+
+      - name: Download x86 Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Session_Sniffer-x86
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          artifacts: |
+            dist/Session_Sniffer-x64.exe
+            dist/Session_Sniffer-x86.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Release ${{ env.tag_name }}
+          tag: ${{ env.tag_name }}
+          commit: ${{ github.sha }}
+          prerelease: true
