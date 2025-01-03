@@ -81,6 +81,12 @@ jobs:
       - name: Generate Tag Using Python Script
         id: generate_tag
         run: |
+          # Debug: Echo the file structure for debugging
+          echo "Displaying the file structure for debugging:"
+          tree "$GITHUB_WORKSPACE"  # Shows the directory structure of the workspace
+          # Or use find if you want a more detailed listing of files
+          # find "$GITHUB_WORKSPACE"
+
           # Get the generated tag from the Python script
           TAG_NAME=$(python "$GITHUB_WORKSPACE/.github/workflows/generate_tag.py")
 
