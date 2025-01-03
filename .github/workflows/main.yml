@@ -82,7 +82,7 @@ jobs:
         id: generate_tag
         run: |
           # Get the generated tag from the Python script
-          TAG_NAME=$(python .github/workflows/generate_tag.py)
+          TAG_NAME=$(python "$GITHUB_WORKSPACE/.github/workflows/generate_tag.py")
 
           # Check if the tag already exists
           if git tag -l "$TAG_NAME"; then
