@@ -9,7 +9,7 @@ on:
 
 jobs:
   generate-tag:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: Generate Tag
     steps:
       - name: Checkout
@@ -104,7 +104,7 @@ jobs:
           path: dist/Session_Sniffer-x86.exe
 
   release:
-    needs: [generate-tag]
+    needs: [generate-tag, build-x64, build-x86]
     runs-on: ubuntu-latest
     name: Create Release
     steps:
