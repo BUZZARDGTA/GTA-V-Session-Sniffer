@@ -94,7 +94,7 @@ jobs:
           TAG_NAME=$(python "$GITHUB_WORKSPACE/.github/workflows/generate_tag.py")
 
           # Check if the tag already exists
-          if git tag -l "$TAG_NAME"; then
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "Error: Tag $TAG_NAME already exists."
             exit 1
           fi
