@@ -123,6 +123,9 @@ jobs:
           path: artifact
           name: Session_Sniffer-x86
 
+      - name: Debug Tag Name
+        run: echo "Tag name: ${{ env.tag_name }}"
+
       - name: Create Release
         uses: ncipollo/release-action@v1.14.0
         with:
@@ -130,7 +133,7 @@ jobs:
             artifact/Session_Sniffer-x64.exe
             artifact/Session_Sniffer-x86.exe
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: Release ${{ env.tag_name }}
+          name: ${{ env.tag_name }} # Format it
           tag: ${{ env.tag_name }}
           commit: ${{ github.sha }}
           prerelease: true
