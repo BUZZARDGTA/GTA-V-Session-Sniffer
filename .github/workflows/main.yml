@@ -124,7 +124,7 @@ jobs:
           name: Session_Sniffer-x86
 
       - name: Debug Tag Name
-        run: echo "Tag name: ${{ env.tag_name }}"
+        run: echo "env.tag_name= ${{ env.tag_name }}"
 
       - name: Create Release
         uses: ncipollo/release-action@v1.14.0
