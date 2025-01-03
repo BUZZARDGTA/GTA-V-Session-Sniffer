@@ -1779,7 +1779,7 @@ else:
 os.chdir(SCRIPT_DIR)
 
 TITLE = "Session Sniffer"
-VERSION = "v1.3.0 - 15/12/2024 (16:26)"
+VERSION = "v1.3.0 - 03/01/2024 (20:30)"
 SETTINGS_PATH = Path("Settings.ini")
 
 cls()
