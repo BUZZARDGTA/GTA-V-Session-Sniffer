@@ -27,7 +27,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --name Session_Sniffer-x64 Session_Sniffer.py
+        pyinstaller Session_Sniffer-x64.spec
       # Output will be in the `dist/` folder
 
     - name: Upload Artifact
@@ -57,7 +57,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --name Session_Sniffer-x86 Session_Sniffer.py
+        pyinstaller Session_Sniffer-x86.spec
       # Output will be in the `dist/` folder
 
     - name: Upload Artifact
@@ -82,7 +82,7 @@ jobs:
         name: Session_Sniffer-x86
 
     - name: Create GitHub Release
-      uses: ncipollo/release-action@v2
+      uses: ncipollo/release-action@v1.14.0
       with:
         artifacts: |
           dist/Session_Sniffer-x64.exe
@@ -91,4 +91,4 @@ jobs:
         name: Release ${{ github.sha }}
         tag: ${{ github.sha }}
         commit: ${{ github.sha }}
-        prerelease: false
+        prerelease: true
