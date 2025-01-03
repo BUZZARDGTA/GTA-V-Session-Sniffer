@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'Session_Sniffer/py'  # Trigger only when changes are made to this file
+      - 'Session_Sniffer.py'  # Trigger only when changes are made to this file
 
 jobs:
   build-x64:
