@@ -42,6 +42,7 @@ jobs:
           echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
 
   build-x64:
+    needs: [generate-tag]
     runs-on: windows-latest
     name: Build Windows x64 Executable
     steps:
@@ -72,6 +73,7 @@ jobs:
           path: dist/Session_Sniffer-x64.exe
 
   build-x86:
+    needs: [generate-tag]
     runs-on: windows-latest
     name: Build Windows x86 Executable
     steps:
