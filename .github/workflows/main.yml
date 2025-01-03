@@ -81,17 +81,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Debug File Structure for Parent Directory
+      - name: Debug Parent Directory Structure for for Troubleshooting
         run: |
           echo "Displaying the file structure for debugging in the parent directory:"
           ls -la "$(dirname "$GITHUB_WORKSPACE")"
           tree "$(dirname "$GITHUB_WORKSPACE")"
-
-      - name: Debug File Structure for Troubleshooting
-        run: |
-          echo "Displaying the file structure for debugging after checkout:"
-          ls -la "$GITHUB_WORKSPACE"
-          tree "$GITHUB_WORKSPACE"
 
       - name: Generate Tag Using Python Script
         id: generate_tag
