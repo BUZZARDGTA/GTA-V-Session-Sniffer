@@ -112,7 +112,7 @@ def get_tshark_path(tshark_path: Path = None):
         """Validates if a given path points to a valid `tshark.exe` executable and matches the required version."""
 
         import subprocess
-        from Modules.consts import WIRESHARK_RECOMMENDED_FULL_VERSION
+        from Modules.constants.standalone import WIRESHARK_RECOMMENDED_FULL_VERSION
 
         class TSharkValidationResult(NamedTuple):
             path: Optional[Path]

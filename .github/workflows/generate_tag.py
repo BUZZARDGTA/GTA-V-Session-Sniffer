@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Local Python Libraries (Included with Project)
 from Modules.utils import Version
-from Modules.consts import VERSION
+from Modules.constants.standalone import VERSION
 
 
 def generate_tag(current_version: Version):

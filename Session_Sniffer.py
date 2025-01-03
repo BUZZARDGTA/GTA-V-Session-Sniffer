@@ -49,7 +49,8 @@ from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboar
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
-from Modules.consts import TITLE, VERSION, SETTINGS_PATH
+from Modules.constants.standalone import TITLE, VERSION
+from Modules.constants.standard import SETTINGS_PATH
 from Modules.utils import Version
 from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet, TSharkCrashException
@@ -1100,7 +1101,7 @@ class UserIP_Databases:
 
     @staticmethod
     def _notify_conflict(initial_userip_entry: UserIP, conflicting_database_name: str, conflicting_username: str, conflicting_ip: str):
-        from Modules.consts import USERIP_DATABASES_PATH
+        from Modules.constants.standard import USERIP_DATABASES_PATH
 
         msgbox_title = TITLE
         msgbox_message = textwrap.indent(textwrap.dedent(f"""
@@ -1257,7 +1258,7 @@ def is_ipv4_address(ip_address: str):
         return False
 
 def is_mac_address(mac_address: str):
-    from Modules.consts import RE_MAC_ADDRESS_PATTERN
+    from Modules.constants.standard import RE_MAC_ADDRESS_PATTERN
     return bool(RE_MAC_ADDRESS_PATTERN.match(mac_address))
 
 def is_private_device_ipv4(ip_address: str):
@@ -1414,7 +1415,7 @@ def format_mac_address(mac_address: str):
     return mac_address.replace("-", ":").upper()
 
 def show_error__tshark_not_detected():
-    from Modules.consts import WIRESHARK_REQUIRED_DL
+    from Modules.constants.standalone import WIRESHARK_REQUIRED_DL
 
     webbrowser.open(WIRESHARK_REQUIRED_DL)
 
@@ -1431,7 +1432,8 @@ def show_error__tshark_not_detected():
 
 def update_and_initialize_geolite2_readers():
     def update_geolite2_databases():
-        from Modules.consts import GEOLITE2_DATABASES_FOLDER_PATH, GITHUB_RELEASE_API__GEOLITE2 # TODO: Implement adding: `, GITHUB_RELEASE_API__GEOLITE2__BACKUP` in case the first one fails.
+        from Modules.constants.standalone import GITHUB_RELEASE_API__GEOLITE2 # TODO: Implement adding: `, GITHUB_RELEASE_API__GEOLITE2__BACKUP` in case the first one fails.
+        from Modules.constants.standard import GEOLITE2_DATABASES_FOLDER_PATH
 
         geolite2_version_file_path = GEOLITE2_DATABASES_FOLDER_PATH / "version.json"
         geolite2_databases: dict[str, dict[str, None | str]] = {
@@ -1537,7 +1539,7 @@ def update_and_initialize_geolite2_readers():
         }
 
     def initialize_geolite2_readers():
-        from Modules.consts import GEOLITE2_DATABASES_FOLDER_PATH
+        from Modules.constants.standard import GEOLITE2_DATABASES_FOLDER_PATH
 
         try:
             geolite2_asn_reader = geoip2.database.Reader(GEOLITE2_DATABASES_FOLDER_PATH / "GeoLite2-ASN.mmdb")
@@ -1592,7 +1594,7 @@ def update_and_initialize_geolite2_readers():
     return geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader
 
 def parse_settings_ini_file(ini_path: Path, values_handling: Literal["first", "last", "all"]):
-    from Modules.consts import RE_SETTINGS_INI_PARSER_PATTERN
+    from Modules.constants.standard import RE_SETTINGS_INI_PARSER_PATTERN
 
     def process_ini_line_output(line: str):
         return line.rstrip("\n")
@@ -1892,7 +1894,7 @@ Settings.load_from_settings_file(SETTINGS_PATH)
 cls()
 title(f"Checking that \"Tshark (Wireshark) v4.2.9\" is installed on your system - {TITLE}")
 print("\nChecking that \"Tshark (Wireshark) v4.2.9\" is installed on your system ...\n")
-from Modules.consts import WIRESHARK_REQUIRED_DL, WIRESHARK_RECOMMENDED_FULL_VERSION
+from Modules.constants.standalone import WIRESHARK_REQUIRED_DL, WIRESHARK_RECOMMENDED_FULL_VERSION
 
 while True:
     try:
@@ -2310,7 +2312,8 @@ def process_userip_task(player: Player, connection_type: Literal["connected", "d
                 process.resume()
                 return
 
-        from Modules.consts import USERIP_LOGGING_PATH, TTS_PATH
+        from Modules.constants.standard import USERIP_LOGGING_PATH
+        from Modules.constants.local import TTS_PATH
 
         # We wants to run this as fast as possible so it's on top of the function.
         if connection_type == "connected":
@@ -2848,7 +2851,8 @@ def rendering_core():
             def process_ini_line_output(line: str):
                 return line.strip()
 
-            from Modules.consts import RE_SETTINGS_INI_PARSER_PATTERN, USERIP_INI_SETTINGS_LIST, RE_USERIP_INI_PARSER_PATTERN
+            from Modules.constants.standalone import USERIP_INI_SETTINGS_LIST
+            from Modules.constants.standard import RE_SETTINGS_INI_PARSER_PATTERN, RE_USERIP_INI_PARSER_PATTERN
 
             if not ini_path.exists():
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT),
@@ -3128,7 +3132,7 @@ def rendering_core():
             ), userip
 
         def update_userip_databases(last_userip_parse_time: Optional[float]):
-            from Modules.consts import USERIP_DATABASES_PATH
+            from Modules.constants.standard import USERIP_DATABASES_PATH
 
             DEFAULT_USERIP_FILE_HEADER = textwrap.dedent("""
                 ;;-----------------------------------------------------------------------------
@@ -3407,7 +3411,7 @@ def rendering_core():
                 row_texts.append(f"{player.iplookup.ipapi.compiled.hosting}")
                 logging_disconnected_players_table.add_row(row_texts)
 
-            from Modules.consts import SESSIONS_LOGGING_PATH
+            from Modules.constants.standard import SESSIONS_LOGGING_PATH
 
             # Check if the directories exist, if not create them
             if not SESSIONS_LOGGING_PATH.parent.exists():
@@ -3486,7 +3490,7 @@ def rendering_core():
                     return ""
 
 
-            from Modules.consts import HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR
+            from Modules.constants.external import HARDCODED_DEFAULT_TABLE_BACKGROUD_CELL_COLOR
 
             session_connected_table__processed_data: list[list[str]] = []
             session_connected_table__compiled_colors: list[list[CellColor]] = []
@@ -3662,7 +3666,8 @@ def rendering_core():
             )
 
         def generate_gui_header_text(global_pps_t1: float, global_pps_rate: int):
-            from Modules.consts import WIRESHARK_VERSION_PATTERN, WIRESHARK_RECOMMENDED_VERSION_NUMBER
+            from Modules.constants.standalone import WIRESHARK_RECOMMENDED_VERSION_NUMBER
+            from Modules.constants.standard import WIRESHARK_VERSION_PATTERN
 
             global global_pps_counter, tshark_packets_latencies
 
@@ -3754,7 +3759,8 @@ def rendering_core():
 
             return header, global_pps_t1, global_pps_rate
 
-        from Modules.consts import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, CHERAX__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
+        from Modules.constants.standard import TWO_TAKE_ONE__PLUGIN__LOG_PATH, STAND__PLUGIN__LOG_PATH, RE_MODMENU_LOGS_USER_PATTERN
+        from Modules.constants.local import CHERAX__PLUGIN__LOG_PATH
 
         GUIrenderingData.FIELDS_TO_HIDE = set(Settings.GUI_FIELDS_TO_HIDE)
         (
@@ -4034,7 +4040,7 @@ class SessionTableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 return self._headers[section]  # Display the header name
             elif role == Qt.ItemDataRole.ToolTipRole:
-                from Modules.consts import GUI_COLUMN_HEADERS_TOOLTIP_MAPPING
+                from Modules.constants.standalone import GUI_COLUMN_HEADERS_TOOLTIP_MAPPING
                 # Fetch the header name and return the corresponding tooltip
                 header_name = self._headers[section]
                 return GUI_COLUMN_HEADERS_TOOLTIP_MAPPING.get(header_name, None)
@@ -4213,7 +4219,7 @@ class SessionTableView(QTableView):
         """
         Show the context menu at the specified position with options to interact with the table's content.
         """
-        from Modules.consts import CUSTOM_CONTEXT_MENU_STYLESHEET
+        from Modules.constants.standard import CUSTOM_CONTEXT_MENU_STYLESHEET
 
         # Determine the index at the clicked position
         index = self.indexAt(pos)
@@ -4434,7 +4440,7 @@ class SessionTableView(QTableView):
                 QMessageBox.warning(self, TITLE, "ERROR:\nNo username was provided.")
 
         elif action == "MOVE":
-            from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
+            from Modules.constants.standard import RE_USERIP_INI_PARSER_PATTERN
 
             if not selected_db_name:
                 return
@@ -4509,7 +4515,7 @@ class SessionTableView(QTableView):
                 QMessageBox.information(self, TITLE, report)
 
         elif action == "DEL":
-            from Modules.consts import RE_USERIP_INI_PARSER_PATTERN
+            from Modules.constants.standard import RE_USERIP_INI_PARSER_PATTERN
 
             # Dictionary to store removed entries by database
             deleted_entries_by_db: dict[str, list[str]] = {}
@@ -4919,4 +4925,4 @@ if __name__ == "__main__":
 
     sys.exit(app.exec())
 
-# Run GitHub Action workflow test commit * * * * * *
+# Run GitHub Action workflow test commit * * * * * * *

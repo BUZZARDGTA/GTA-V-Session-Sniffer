@@ -49,7 +49,7 @@ def get_documents_folder(use_alternative_method = False):
     else:
         # Default method using Windows registry
         import winreg
-        from Modules.consts import USER_SHELL_FOLDERS_REG_KEY
+        from Modules.constants.standalone import USER_SHELL_FOLDERS_REG_KEY
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, USER_SHELL_FOLDERS_REG_KEY) as key:
             documents_path, _ = winreg.QueryValueEx(key, "Personal")
