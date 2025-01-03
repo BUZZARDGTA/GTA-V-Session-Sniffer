@@ -4918,3 +4918,5 @@ if __name__ == "__main__":
     window.show()
 
     sys.exit(app.exec())
+
+# * Run GitHub Action workflow test commit *
