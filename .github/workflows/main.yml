@@ -105,11 +105,13 @@ jobs:
       - name: Download x64 Artifact
         uses: actions/download-artifact@v4
         with:
+          path: artifact
           name: Session_Sniffer-x64
 
       - name: Download x86 Artifact
         uses: actions/download-artifact@v4
         with:
+          path: artifact
           name: Session_Sniffer-x86
 
       - name: Create GitHub Release
