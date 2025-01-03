@@ -1,0 +1,94 @@
+name: Build and Release for Windows
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-x64:
+    runs-on: windows-latest
+    name: Build Windows x64 Executable
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set Up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+        architecture: x64
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --name Session_Sniffer-x64 Session_Sniffer.py
+      # Output will be in the `dist/` folder
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Session_Sniffer-x64
+        path: dist/Session_Sniffer-x64.exe
+
+  build-x86:
+    runs-on: windows-latest
+    name: Build Windows x86 Executable
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set Up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+        architecture: x86
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --name Session_Sniffer-x86 Session_Sniffer.py
+      # Output will be in the `dist/` folder
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Session_Sniffer-x86
+        path: dist/Session_Sniffer-x86.exe
+
+  release:
+    needs: [build-x64, build-x86]
+    runs-on: ubuntu-latest
+    name: Create Release
+    steps:
+    - name: Download x64 Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: Session_Sniffer-x64
+
+    - name: Download x86 Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: Session_Sniffer-x86
+
+    - name: Create GitHub Release
+      uses: ncipollo/release-action@v2
+      with:
+        artifacts: |
+          dist/Session_Sniffer-x64.exe
+          dist/Session_Sniffer-x86.exe
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: Release ${{ github.sha }}
+        tag: ${{ github.sha }}
+        commit: ${{ github.sha }}
+        prerelease: false
