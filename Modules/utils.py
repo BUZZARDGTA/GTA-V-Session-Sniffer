@@ -1,4 +1,27 @@
+# Standard Python Libraries
+import re
 from pathlib import Path
+from datetime import datetime
+
+
+class Version:
+    def __init__(self, version: str):
+        self.major, self.minor, self.patch = map(int, version[1:6:2])
+        self.date = datetime.strptime(version[9:19], "%d/%m/%Y").date().strftime("%d/%m/%Y")
+
+        # Check if the version string contains the time component
+        if (
+            len(version) == 27
+            and re.search(r" \((\d{2}:\d{2})\)$", version)
+        ):
+            self.time = datetime.strptime(version[21:26], "%H:%M").time().strftime("%H:%M")
+            self.date_time = datetime.strptime(version[9:27], "%d/%m/%Y (%H:%M)")
+        else:
+            self.time = None
+            self.date_time = datetime.strptime(version[9:19], "%d/%m/%Y")
+
+    def __str__(self):
+        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f' ({self.time})' if self.time else ''}"
 
 
 def get_documents_folder(use_alternative_method = False):

@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'Session_Sniffer/py'  # Trigger only when changes are made to this file
 
 jobs:
   build-x64:
@@ -81,6 +83,17 @@ jobs:
       with:
         name: Session_Sniffer-x86
 
+    - name: Set Up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.x
+
+    - name: Generate Tag Using Python Script
+      id: generate_tag
+      run: |
+        TAG_NAME=$(python .github/workflows/generate_tag.py)
+        echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
+
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1.14.0
       with:
@@ -88,7 +101,7 @@ jobs:
           dist/Session_Sniffer-x64.exe
           dist/Session_Sniffer-x86.exe
         token: ${{ secrets.GITHUB_TOKEN }}
-        name: Release ${{ github.sha }}
-        tag: ${{ github.sha }}
+        name: Release ${{ env.tag_name }}
+        tag: ${{ env.tag_name }}
         commit: ${{ github.sha }}
         prerelease: true

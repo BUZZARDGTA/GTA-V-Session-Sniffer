@@ -49,11 +49,13 @@ from PyQt6.QtGui import QBrush, QColor, QFont, QCloseEvent, QKeyEvent, QClipboar
 # -----------------------------------------------------
 # 📚 Local Python Libraries (Included with Project) 📚
 # -----------------------------------------------------
+from Modules.consts import TITLE, VERSION, SETTINGS_PATH
+from Modules.utils import Version
 from Modules.oui_lookup.oui_lookup import MacLookup
 from Modules.capture.capture import PacketCapture, Packet, TSharkCrashException
 from Modules.capture.utils import TSharkNotFoundException, InvalidTSharkVersionException, get_tshark_path, is_npcap_or_winpcap_installed
-from Modules.https_utils.unsafe_https import s
 from Modules.msgbox import MsgBox
+from Modules.https_utils.unsafe_https import s
 
 
 if sys.version_info.major <= 3 and sys.version_info.minor < 12:
@@ -207,25 +209,6 @@ class ScriptControl:
         with cls._lock:
             return cls._message
 
-class Version:
-    def __init__(self, version: str):
-        self.major, self.minor, self.patch = map(int, version[1:6:2])
-        self.date = datetime.strptime(version[9:19], "%d/%m/%Y").date().strftime("%d/%m/%Y")
-
-        # Check if the version string contains the time component
-        if (
-            len(version) == 27
-            and re.search(r" \((\d{2}:\d{2})\)$", version)
-        ):
-            self.time = datetime.strptime(version[21:26], "%H:%M").time().strftime("%H:%M")
-            self._date_time = datetime.strptime(version[9:27], "%d/%m/%Y (%H:%M)")
-        else:
-            self.time = None
-            self._date_time = datetime.strptime(version[9:19], "%d/%m/%Y")
-
-    def __str__(self):
-        return f"v{self.major}.{self.minor}.{self.patch} - {self.date}{f' ({self.time})' if self.time else ''}"
-
 class Updater:
     def __init__(self, current_version: Version):
         self.current_version = current_version
@@ -236,7 +219,7 @@ class Updater:
             return True
         elif (latest_version.major, latest_version.minor, latest_version.patch) == (self.current_version.major, self.current_version.minor, self.current_version.patch):
             # Compare date and time if versioning is equal
-            if latest_version._date_time > self.current_version._date_time:
+            if latest_version.date_time > self.current_version.date_time:
                 return True
         return False
 
@@ -1778,9 +1761,6 @@ else:
     SCRIPT_DIR = Path(__file__).resolve().parent
 os.chdir(SCRIPT_DIR)
 
-TITLE = "Session Sniffer"
-VERSION = "v1.3.0 - 03/01/2024 (20:30)"
-SETTINGS_PATH = Path("Settings.ini")
 
 cls()
 title(f"Searching for a new update - {TITLE}")

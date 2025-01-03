@@ -12,6 +12,9 @@ from PyQt6.QtGui import QColor
 from Modules.utils import get_documents_folder, resource_path
 
 
+TITLE = "Session Sniffer"
+VERSION = "v1.3.0 - 03/01/2024 (20:30)"
+SETTINGS_PATH = Path("Settings.ini")
 USERIP_INI_SETTINGS_LIST = ["ENABLED", "COLOR", "NOTIFICATIONS", "VOICE_NOTIFICATIONS", "LOG", "PROTECTION", "PROTECTION_PROCESS_PATH", "PROTECTION_RESTART_PROCESS_PATH", "PROTECTION_SUSPEND_PROCESS_MODE"]
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 RE_MAC_ADDRESS_PATTERN = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})$")
