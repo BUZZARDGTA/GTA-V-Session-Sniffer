@@ -78,15 +78,21 @@ jobs:
         with:
           python-version: 3.x
 
+      - name: Debug File Structure for Parent Directory
+        run: |
+          echo "Displaying the file structure for debugging in the parent directory:"
+          ls -la "$(dirname "$GITHUB_WORKSPACE")"
+          tree "$(dirname "$GITHUB_WORKSPACE")"
+
+      - name: Debug File Structure for Troubleshooting
+        run: |
+          echo "Displaying the file structure for debugging after checkout:"
+          ls -la "$GITHUB_WORKSPACE"
+          tree "$GITHUB_WORKSPACE"
+
       - name: Generate Tag Using Python Script
         id: generate_tag
         run: |
-          # Debug: Echo the file structure for debugging
-          echo "Displaying the file structure for debugging:"
-          tree "$GITHUB_WORKSPACE"  # Shows the directory structure of the workspace
-          # Or use find if you want a more detailed listing of files
-          # find "$GITHUB_WORKSPACE"
-
           # Get the generated tag from the Python script
           TAG_NAME=$(python "$GITHUB_WORKSPACE/.github/workflows/generate_tag.py")
 
