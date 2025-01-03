@@ -8,80 +8,19 @@ on:
       - 'Session_Sniffer.py'  # Trigger only when changes are made to this file
 
 jobs:
-  build-x64:
-    runs-on: windows-latest
-    name: Build Windows x64 Executable
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Set Up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.x
-        architecture: x64
-
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller Session_Sniffer-x64.spec
-      # Output will be in the `dist/` folder
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Session_Sniffer-x64
-        path: dist/Session_Sniffer-x64.exe
-
-  build-x86:
-    runs-on: windows-latest
-    name: Build Windows x86 Executable
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Set Up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.x
-        architecture: x86
-
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
-
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller Session_Sniffer-x86.spec
-      # Output will be in the `dist/` folder
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Session_Sniffer-x86
-        path: dist/Session_Sniffer-x86.exe
-
-  release:
-    needs: [build-x64, build-x86]
+  generate-tag:
     runs-on: ubuntu-latest
-    name: Create Release
+    name: Generate Tag
     steps:
-      - name: Set Up Python
-        uses: actions/setup-python@v4
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.x
 
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Debug Parent Directory Structure for for Troubleshooting
+      - name: Debug Parent Directory Structure for Troubleshooting
         run: |
           echo "Displaying the file structure for debugging in the parent directory:"
           ls -la "$(dirname "$GITHUB_WORKSPACE")"
@@ -102,24 +41,92 @@ jobs:
           # If the tag does not exist, continue and set the tag
           echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
 
-      - name: Download x64 Artifact
-        uses: actions/download-artifact@v4
+  build-x64:
+    runs-on: windows-latest
+    name: Build Windows x64 Executable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: 3.x
+          architecture: x64
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller Session_Sniffer-x64.spec
+        # Output will be in the `dist/` folder
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: Session_Sniffer-x64
+          path: dist/Session_Sniffer-x64.exe
+
+  build-x86:
+    runs-on: windows-latest
+    name: Build Windows x86 Executable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: 3.x
+          architecture: x86
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller Session_Sniffer-x86.spec
+        # Output will be in the `dist/` folder
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.5.0
+        with:
+          name: Session_Sniffer-x86
+          path: dist/Session_Sniffer-x86.exe
+
+  release:
+    needs: [generate-tag]
+    runs-on: ubuntu-latest
+    name: Create Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v4.1.8
         with:
           path: artifact
           name: Session_Sniffer-x64
 
-      - name: Download x86 Artifact
-        uses: actions/download-artifact@v4
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v4.1.8
         with:
           path: artifact
           name: Session_Sniffer-x86
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
-            dist/Session_Sniffer-x64.exe
-            dist/Session_Sniffer-x86.exe
+            artifact/Session_Sniffer-x64.exe
+            artifact/Session_Sniffer-x86.exe
           token: ${{ secrets.GITHUB_TOKEN }}
           name: Release ${{ env.tag_name }}
           tag: ${{ env.tag_name }}
