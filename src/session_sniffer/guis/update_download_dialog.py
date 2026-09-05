@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 import requests
+from packaging.version import Version
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
@@ -35,11 +36,14 @@ from session_sniffer.guis.stylesheets import (
     UPDATE_DOWNLOAD_STATUS_LABEL_STYLESHEET,
     UPDATE_DOWNLOAD_TITLE_LABEL_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_ARROW_STYLESHEET,
+    UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET,
+    UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_CURRENT_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_DATE_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_LABEL_ACCENT_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_LABEL_MUTED_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_NEW_STYLESHEET,
+    UPDATE_DOWNLOAD_VERSION_CARD_SHA_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_VALUE_ACCENT_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_VALUE_MUTED_STYLESHEET,
 )
@@ -109,6 +113,7 @@ class UpdateCandidate:
     version_label: str
     sha256_hash: str
     size_bytes: int | None = None
+    is_prerelease: bool = False
 
 
 class UpdateDownloadDialog(QDialog):
@@ -168,7 +173,7 @@ class UpdateDownloadDialog(QDialog):
         outer.addWidget(frame)
 
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(26, 8, 26, 20)
+        layout.setContentsMargins(20, 8, 20, 20)
         layout.setSpacing(14)
 
         layout.addLayout(self._build_header())
@@ -206,7 +211,7 @@ class UpdateDownloadDialog(QDialog):
     def _build_version_section(self) -> QHBoxLayout:
         """Build the Current → Downloading version comparison row."""
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(4)
         row.setContentsMargins(0, 2, 0, 2)
 
         row.addWidget(
@@ -224,7 +229,7 @@ class UpdateDownloadDialog(QDialog):
         arrow_label.setFont(QFont('Segoe UI', 22, QFont.Weight.Bold))
         arrow_label.setStyleSheet(UPDATE_DOWNLOAD_VERSION_ARROW_STYLESHEET)
         arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        arrow_label.setFixedWidth(28)
+        arrow_label.setFixedWidth(16)
         row.addWidget(arrow_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
         new_size_text = self._format_size_mb(self._candidate.size_bytes) if self._candidate.size_bytes is not None else ''
@@ -255,9 +260,14 @@ class UpdateDownloadDialog(QDialog):
         `accent=True` styles the card as the highlighted "downloading" target.
         """
         version_text, date_text = self._split_version_label(version_label)
+        is_prerelease = (
+            (self._candidate.is_prerelease or Version(version_text).is_prerelease)
+            if accent
+            else CURRENT_VERSION.is_prerelease
+        )
 
         card = QFrame()
-        card.setFixedWidth(252)
+        card.setFixedWidth(270)
         if accent:
             card.setObjectName('updateDownloadVersionCardNew')
             card.setStyleSheet(UPDATE_DOWNLOAD_VERSION_CARD_NEW_STYLESHEET)
@@ -270,19 +280,19 @@ class UpdateDownloadDialog(QDialog):
             value_qss = UPDATE_DOWNLOAD_VERSION_CARD_VALUE_MUTED_STYLESHEET
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 12, 16, 12)
+        card_layout.setContentsMargins(10, 12, 10, 12)
         card_layout.setSpacing(5)
 
-        # Top row: optional accent dot + label
+        # Top row: optional accent dot + label + release badge
         label_row = QHBoxLayout()
-        label_row.setSpacing(8)
+        label_row.setSpacing(6)
         label_row.setContentsMargins(0, 0, 0, 0)
 
         if accent:
             dot = QLabel()
-            dot.setFixedSize(8, 8)
+            dot.setFixedSize(6, 6)
             dot.setStyleSheet(
-                'background-color: #5fb4f5;border-radius: 4px;',
+                'background-color: #5fb4f5;border-radius: 3px;',
             )
             label_row.addWidget(dot, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -291,10 +301,23 @@ class UpdateDownloadDialog(QDialog):
         label_widget.setStyleSheet(label_qss)
         label_row.addWidget(label_widget, 0, Qt.AlignmentFlag.AlignVCenter)
         label_row.addStretch(1)
+
+        badge_text = 'PRE-RELEASE' if is_prerelease else 'STABLE'
+        badge_stylesheet = (
+            UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET
+            if is_prerelease
+            else UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET
+        )
+        badge_widget = QLabel(badge_text)
+        badge_widget.setFont(QFont('Segoe UI', 7, QFont.Weight.Bold))
+        badge_widget.setStyleSheet(badge_stylesheet)
+        badge_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label_row.addWidget(badge_widget, 0, Qt.AlignmentFlag.AlignVCenter)
+
         card_layout.addLayout(label_row)
 
         version_widget = QLabel(version_text)
-        version_widget.setFont(QFont('Segoe UI', 12, QFont.Weight.Bold))
+        version_widget.setFont(QFont('Segoe UI', 13, QFont.Weight.Bold))
         version_widget.setStyleSheet(value_qss)
         version_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(version_widget)
@@ -335,8 +358,8 @@ class UpdateDownloadDialog(QDialog):
         sha_row.addWidget(self._svg_label('info.svg', 16, 16), 0, Qt.AlignmentFlag.AlignTop)
 
         sha_widget = QLabel(self._format_sha_display(sha_hash))
-        sha_widget.setFont(QFont('Consolas', 8))
-        sha_widget.setStyleSheet(UPDATE_DOWNLOAD_VERSION_CARD_DATE_STYLESHEET)
+        sha_widget.setFont(QFont('Consolas', 9))
+        sha_widget.setStyleSheet(UPDATE_DOWNLOAD_VERSION_CARD_SHA_STYLESHEET)
         sha_widget.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         sha_widget.setMinimumHeight(28)
         sha_row.addWidget(sha_widget, 0, Qt.AlignmentFlag.AlignTop)

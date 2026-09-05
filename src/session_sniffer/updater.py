@@ -29,7 +29,7 @@ from session_sniffer.logging_setup import get_logger
 from session_sniffer.models import GithubVersionsResponse, VersionInfo
 from session_sniffer.networking.http_session import session
 from session_sniffer.text_utils import format_triple_quoted_text
-from session_sniffer.utils import format_project_version
+from session_sniffer.utils import format_project_version, is_pyinstaller_compiled
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -54,7 +54,6 @@ def check_for_updates(*, updater_channel: str | None) -> tuple[UpdateCheckOutcom
     callable that must be invoked on the main Qt thread if not None.
     """
     outcome, versions = _fetch_versions_with_retries()
-
     if outcome is UpdateCheckOutcome.PROCEED and versions is not None:
         return _handle_update_decision(updater_channel=updater_channel, versions=versions)
     if outcome is UpdateCheckOutcome.ABORT:
@@ -119,11 +118,6 @@ def _fetch_github_versions() -> GithubVersionsResponse:
     response = session.get(GITHUB_VERSIONS_URL, timeout=10)
     response.raise_for_status()
     return GithubVersionsResponse.model_validate(response.json())
-
-
-def _is_frozen() -> bool:
-    """Return True when running as a PyInstaller-compiled executable."""
-    return bool(getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'))
 
 
 def _remove_file_if_possible(path: Path) -> None:
@@ -228,7 +222,12 @@ def _resolve_candidate_file_size(candidate_info: VersionInfo) -> int | None:
     return None
 
 
-def _download_and_apply(candidate_info: VersionInfo, version_str: str) -> None:
+def _download_and_apply(
+    candidate_info: VersionInfo,
+    version_str: str,
+    *,
+    is_prerelease: bool,
+) -> None:
     """Download the update exe, verify its SHA-256 hash, and apply it."""
     with tempfile.NamedTemporaryFile(suffix='.exe', prefix='Session_Sniffer_', delete=False) as tmp:
         dest = Path(tmp.name)
@@ -238,6 +237,7 @@ def _download_and_apply(candidate_info: VersionInfo, version_str: str) -> None:
         version_label=version_str,
         sha256_hash=candidate_info.sha256,
         size_bytes=_resolve_candidate_file_size(candidate_info),
+        is_prerelease=is_prerelease,
     )
     dialog = UpdateDownloadDialog(candidate, dest)
     dialog.exec()
@@ -266,6 +266,11 @@ def _download_and_apply(candidate_info: VersionInfo, version_str: str) -> None:
         )
         return
 
+    if not is_pyinstaller_compiled():
+        logger.info('Running from source: skipping binary replacement.')
+        _remove_file_if_possible(dest)
+        return
+
     _apply_update(dest)
 
 
@@ -274,45 +279,43 @@ def _handle_update_decision(
     updater_channel: str | None,
     versions: GithubVersionsResponse,
 ) -> tuple[UpdateCheckOutcome, Callable[[], None] | None]:
-    """Compare versions and optionally prompt user to update."""
+    """Compare versions and schedule update download if a newer version is available."""
     if CURRENT_VERSION.is_prerelease:
         return _handle_prerelease_update_decision(
             latest_stable_info=versions.latest_stable,
             latest_prerelease_info=versions.latest_prerelease,
         )
 
-    is_rc_updater_channel = updater_channel == 'RC'
-    candidate_info = versions.latest_prerelease if is_rc_updater_channel else versions.latest_stable
-    candidate = Version(candidate_info.version)
+    is_prerelease_channel = updater_channel == 'Pre-release'
+    if is_prerelease_channel:
+        latest_stable = Version(versions.latest_stable.version)
+        latest_prerelease = Version(versions.latest_prerelease.version)
+        candidate_info = versions.latest_prerelease if latest_prerelease > latest_stable else versions.latest_stable
+    else:
+        candidate_info = versions.latest_stable
 
+    candidate = Version(candidate_info.version)
     if candidate <= CURRENT_VERSION:
         return (UpdateCheckOutcome.PROCEED, None)
 
-    label = 'pre-release' if is_rc_updater_channel else 'stable release'
+    is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
+    logger.info(
+        'Update available (%s): %s -> %s',
+        'pre-release' if is_candidate_prerelease else 'stable release',
+        format_project_version(CURRENT_VERSION),
+        format_project_version(candidate),
+    )
 
     pending: Callable[[], None] | None = None
-    if (
-        msgbox.show(
-            title=TITLE,
-            text=format_triple_quoted_text(f"""
-                New {label} version available. Do you want to update?
+    if is_pyinstaller_compiled():
+        version_str = format_project_version(candidate)
+        pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
+    else:
 
-                Current version: {format_project_version(CURRENT_VERSION)}
-                Latest version: {format_project_version(candidate)}
-            """),
-            style=msgbox.Style.MB_YESNO | msgbox.Style.MB_ICONQUESTION | msgbox.Style.MB_SETFOREGROUND,
-        )
-        == msgbox.ReturnValues.IDYES
-    ):
-        if _is_frozen():
-            version_str = format_project_version(candidate)
-            pending = functools.partial(_download_and_apply, candidate_info, version_str)
-        else:
+        def _open_browser() -> None:
+            webbrowser.open(candidate_info.release_url)
 
-            def _open_browser() -> None:
-                webbrowser.open(candidate_info.release_url)
-
-            pending = _open_browser
+        pending = _open_browser
 
     return (UpdateCheckOutcome.PROCEED, pending)
 
@@ -322,11 +325,10 @@ def _handle_prerelease_update_decision(
     latest_stable_info: VersionInfo,
     latest_prerelease_info: VersionInfo,
 ) -> tuple[UpdateCheckOutcome, Callable[[], None] | None]:
-    """Prompt the user about available updates when running a pre-release build.
+    """Check for available updates when running a pre-release build.
 
     Checks both the latest stable and latest pre-release candidates independently.
-    Any candidate strictly above CURRENT_VERSION is reported, regardless of the
-    user's updater channel setting.
+    Any candidate strictly above CURRENT_VERSION is selected, preferring the higher version.
     """
     latest_stable = Version(latest_stable_info.version)
     latest_prerelease = Version(latest_prerelease_info.version)
@@ -337,51 +339,31 @@ def _handle_prerelease_update_decision(
     if not stable_newer and not prerelease_newer:
         return (UpdateCheckOutcome.PROCEED, None)
 
-    current_str = format_project_version(CURRENT_VERSION)
-
     if stable_newer and prerelease_newer:
-        message = format_triple_quoted_text(f"""
-            You are running a pre-release version. Newer versions are available. Do you want to update?
-
-            Current version: {current_str}
-            Latest stable release: {format_project_version(latest_stable)}
-            Latest pre-release: {format_project_version(latest_prerelease)}
-        """)
-        open_info = latest_prerelease_info if latest_prerelease > latest_stable else latest_stable_info
+        candidate_info = latest_prerelease_info if latest_prerelease > latest_stable else latest_stable_info
     elif stable_newer:
-        message = format_triple_quoted_text(f"""
-            You are running a pre-release version. A newer stable release is available. Do you want to update?
-
-            Current version: {current_str}
-            Latest stable release: {format_project_version(latest_stable)}
-        """)
-        open_info = latest_stable_info
+        candidate_info = latest_stable_info
     else:
-        message = format_triple_quoted_text(f"""
-            You are running a pre-release version. A newer pre-release is available. Do you want to update?
+        candidate_info = latest_prerelease_info
 
-            Current version: {current_str}
-            Latest pre-release: {format_project_version(latest_prerelease)}
-        """)
-        open_info = latest_prerelease_info
+    candidate = Version(candidate_info.version)
+    is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
+    logger.info(
+        'Pre-release build found newer %s: %s -> %s',
+        'pre-release' if is_candidate_prerelease else 'stable release',
+        format_project_version(CURRENT_VERSION),
+        format_project_version(candidate),
+    )
 
     pending: Callable[[], None] | None = None
-    if (
-        msgbox.show(
-            title=TITLE,
-            text=message,
-            style=msgbox.Style.MB_YESNO | msgbox.Style.MB_ICONQUESTION | msgbox.Style.MB_SETFOREGROUND,
-        )
-        == msgbox.ReturnValues.IDYES
-    ):
-        if _is_frozen():
-            version_str = format_project_version(Version(open_info.version))
-            pending = functools.partial(_download_and_apply, open_info, version_str)
-        else:
+    if is_pyinstaller_compiled():
+        version_str = format_project_version(candidate)
+        pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
+    else:
 
-            def _open_browser() -> None:
-                webbrowser.open(open_info.release_url)
+        def _open_browser() -> None:
+            webbrowser.open(candidate_info.release_url)
 
-            pending = _open_browser
+        pending = _open_browser
 
     return (UpdateCheckOutcome.PROCEED, pending)

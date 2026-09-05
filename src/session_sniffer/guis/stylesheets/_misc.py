@@ -156,15 +156,29 @@ UPDATE_DOWNLOAD_VERSION_CARD_NEW_STYLESHEET = (
     '}'
 )
 
-UPDATE_DOWNLOAD_VERSION_CARD_LABEL_MUTED_STYLESHEET = 'color: #7a8a9c;background: transparent;letter-spacing: 1.5px;font-weight: 700;'
+UPDATE_DOWNLOAD_VERSION_CARD_LABEL_MUTED_STYLESHEET = 'color: #7a8a9c;background: transparent;font-size: 12px;letter-spacing: 0.6px;font-weight: 700;'
 
-UPDATE_DOWNLOAD_VERSION_CARD_LABEL_ACCENT_STYLESHEET = 'color: #5fb4f5;background: transparent;letter-spacing: 1.5px;font-weight: 700;'
+UPDATE_DOWNLOAD_VERSION_CARD_LABEL_ACCENT_STYLESHEET = 'color: #5fb4f5;background: transparent;font-size: 12px;letter-spacing: 0.6px;font-weight: 700;'
 
-UPDATE_DOWNLOAD_VERSION_CARD_VALUE_MUTED_STYLESHEET = 'color: #c4ced9;background: transparent;font-weight: 700;'
+UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET = (
+    'color: #3dd68c;background: rgba(61, 214, 140, 0.12);border: 1px solid rgba(61, 214, 140, 0.35);'
+    'border-radius: 4px;padding: 1px 5px;font-size: 9.5px;letter-spacing: 0.4px;font-weight: 700;'
+)
 
-UPDATE_DOWNLOAD_VERSION_CARD_VALUE_ACCENT_STYLESHEET = 'color: #f0f4fa;background: transparent;font-weight: 700;'
+UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET = (
+    'color: #f5a76c;background: rgba(245, 167, 108, 0.12);border: 1px solid rgba(245, 167, 108, 0.35);'
+    'border-radius: 4px;padding: 1px 5px;font-size: 9.5px;letter-spacing: 0.4px;font-weight: 700;'
+)
+
+UPDATE_DOWNLOAD_VERSION_CARD_VALUE_MUTED_STYLESHEET = 'color: #c4ced9;background: transparent;font-size: 17px;font-weight: 700;'
+
+UPDATE_DOWNLOAD_VERSION_CARD_VALUE_ACCENT_STYLESHEET = 'color: #f0f4fa;background: transparent;font-size: 17px;font-weight: 700;'
 
 UPDATE_DOWNLOAD_VERSION_CARD_DATE_STYLESHEET = 'color: #6f7e91;background: transparent;font-family: Consolas, "Courier New", monospace;'
+
+UPDATE_DOWNLOAD_VERSION_CARD_SHA_STYLESHEET = (
+    'color: #6f7e91;background: transparent;font-family: Consolas, "Courier New", monospace;font-size: 11.5px;'
+)
 
 UPDATE_DOWNLOAD_VERSION_ARROW_STYLESHEET = 'color: #4aa3ee;background: transparent;font-weight: 800;'
 
