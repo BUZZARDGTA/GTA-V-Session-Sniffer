@@ -79,7 +79,7 @@ USER_SCRIPTS_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
 
 _PACKET_DROUGHT_THRESHOLD_SECONDS = 8.0
-_MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS = 6
+_MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS = 60
 
 
 def main() -> None:
@@ -581,37 +581,60 @@ def main() -> None:
         adapter_guid = current_selected.interface.identity.adapter_guid
 
         if not current_selected.is_neighbour and adapter_guid is not None:
-            matching_adapter = None
-            for adapter in get_adapters_info():
-                if adapter.identity.adapter_guid == adapter_guid:
-                    matching_adapter = adapter
-                    break
+            _adapter_lost_attempts += 1
+            if _adapter_lost_attempts <= _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS:
+                matching_adapter = None
+                for adapter in get_adapters_info():
+                    if adapter.identity.adapter_guid == adapter_guid:
+                        matching_adapter = adapter
+                        break
 
-            if matching_adapter is not None:
-                if matching_adapter.ipv4_addresses:
-                    target_ip = matching_adapter.ipv4_addresses[0]
-                    _adapter_lost_attempts += 1
-                    if _adapter_lost_attempts <= _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS:
-                        _adapter_lost_event.clear()
-                        logger.info(
-                            'Capture adapter "%s" still available with IP %s — silently recovering capture (attempt %d/%d).',
-                            matching_adapter.identity.friendly_name,
-                            target_ip,
-                            _adapter_lost_attempts,
-                            _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
-                        )
-                        _restart_capture_with_ip(target_ip)
-                        return
+                if matching_adapter is None:
+                    logger.debug(
+                        'Capture adapter "%s" (GUID: %s) temporarily absent — waiting to recover (attempt %d/%d).',
+                        current_selected.name,
+                        adapter_guid,
+                        _adapter_lost_attempts,
+                        _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
+                    )
+                    return
+
+                if not matching_adapter.ipv4_addresses:
+                    logger.debug(
+                        'Capture adapter "%s" present but waiting for IPv4 assignment (attempt %d/%d).',
+                        matching_adapter.identity.friendly_name,
+                        _adapter_lost_attempts,
+                        _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
+                    )
+                    return
+
+                target_ip_address = matching_adapter.ipv4_addresses[0]
+                previous_ip_address = current_selected.ip_address
+                _adapter_lost_event.clear()
+
+                if previous_ip_address != target_ip_address:
+                    logger.info(
+                        'Capture interface "%s" IP changed from %s to %s — resuming capture.',
+                        matching_adapter.identity.friendly_name,
+                        previous_ip_address,
+                        target_ip_address,
+                    )
                 else:
-                    _adapter_lost_attempts += 1
-                    if _adapter_lost_attempts <= _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS:
-                        logger.debug(
-                            'Capture adapter "%s" present but waiting for IPv4 assignment (attempt %d/%d).',
-                            matching_adapter.identity.friendly_name,
-                            _adapter_lost_attempts,
-                            _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
-                        )
-                        return
+                    logger.info(
+                        'Capture interface "%s" reconnected (IP unchanged: %s) — resuming capture.',
+                        matching_adapter.identity.friendly_name,
+                        target_ip_address,
+                    )
+
+                if matching_adapter.identity.friendly_name:
+                    current_selected.interface.identity.name = matching_adapter.identity.friendly_name
+                    Settings.capture_interface_name = matching_adapter.identity.friendly_name
+                if matching_adapter.identity.mac_address:
+                    current_selected.interface.identity.mac_address = matching_adapter.identity.mac_address
+                    Settings.capture_mac_address = matching_adapter.identity.mac_address
+
+                _restart_capture_with_ip(target_ip_address)
+                return
 
         _adapter_lost_attempts = 0
         _adapter_lost_event.clear()
@@ -711,7 +734,7 @@ def main() -> None:
                 adapter_has_ip = True
                 new_ip = adapter.ipv4_addresses[0]
                 if new_ip != capture_holder.config.interface.ip_address:
-                    logger.warning(
+                    logger.info(
                         'Capture interface IP changed from %s to %s — restarting capture.',
                         capture_holder.config.interface.ip_address,
                         new_ip,

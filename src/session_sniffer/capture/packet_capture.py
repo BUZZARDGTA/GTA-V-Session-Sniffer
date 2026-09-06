@@ -26,6 +26,7 @@ from session_sniffer.capture.exceptions import (
     MissingPortError,
     MissingRequiredPacketFieldError,
     PcapError,
+    PcapOpenError,
 )
 from session_sniffer.capture.pcap import DLT_EN10MB, DLT_NULL, DLT_RAW, PcapHandle
 from session_sniffer.constants.standalone import MAX_PORT, MIN_PORT
@@ -341,7 +342,23 @@ class PacketCapture:
             try:
                 self._capture_and_process()
             except (CaptureExitError, PcapError) as e:
-                logger.warning('Packet capture stopped unexpectedly: %s', e.cause if isinstance(e, CaptureExitError) and e.cause is not None else e)
+                error_detail = e.cause if isinstance(e, CaptureExitError) and e.cause is not None else e
+                error_string = str(error_detail)
+                has_monitored_adapter_guid = (
+                    not self.config.interface.is_neighbour
+                    and self.config.interface.interface.identity.adapter_guid is not None
+                )
+                is_device_removed = (
+                    'ERROR_DEVICE_REMOVED' in error_string
+                    or 'STATUS_DEVICE_REMOVED' in error_string
+                    or 'interface disappeared' in error_string.lower()
+                )
+                is_open_error = isinstance(error_detail, PcapOpenError) or 'failed to open pcap adapter' in error_string.lower()
+                if has_monitored_adapter_guid and (is_device_removed or is_open_error):
+                    logger.info('Capture interface "%s" temporarily disconnected: %s — pausing capture.', self.config.interface.name, error_detail)
+                else:
+                    logger.warning('Packet capture stopped unexpectedly: %s', error_detail)
+
                 with self._state.control_lock:
                     self._state.running_event.clear()
                 if self.config.on_capture_lost is not None:
