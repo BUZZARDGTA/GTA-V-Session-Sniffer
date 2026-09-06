@@ -122,7 +122,6 @@ SETTING_METADATA: dict[str, SettingMeta] = {
             'None',
             'GTA V',
             'RDR2',
-            'Toxic Commando',
         ),
     ),
     'capture_filter_process_pid': SettingMeta(

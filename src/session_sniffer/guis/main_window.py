@@ -25,7 +25,6 @@ from session_sniffer.guis._main_window_gta5_mixin import GTA5_SOLO_TOOLTIP, GTA5
 from session_sniffer.guis._main_window_looky_mixin import LookyMixin
 from session_sniffer.guis._main_window_rdr2_mixin import RDR2Mixin
 from session_sniffer.guis._main_window_stats_mixin import StatsMixin
-from session_sniffer.guis._main_window_toxic_commando_mixin import ToxicCommandoMixin
 from session_sniffer.guis._session_table_section import SessionStatusBar, SessionTableSection
 from session_sniffer.guis.detections_manager import DetectionsManagerDialog
 from session_sniffer.guis.discord_intro import DiscordIntro
@@ -67,7 +66,7 @@ class _WindowState:
     min_accepted_snapshot_version: int
 
 
-class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixin, FilesMixin, QMainWindow):  # pylint: disable=too-many-ancestors
+class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMainWindow):
     """Main Qt window that hosts session tables and control UI."""
 
     _actions: _MenuActions
@@ -243,7 +242,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
         self._last_gta5_status_key: tuple[bool, bool, bool, bool, bool] = (False, False, False, False, False)
 
         self._build_rdr2_menu(menu_bar)
-        self._build_toxic_commando_menu(menu_bar)
 
         if Settings.is_gta5_feature_set():
             self._sync_gta5_process_button()
@@ -257,9 +255,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
             self._update_rdr2_status_label()
             self._rdr2_session_host_submenu.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
             self._rdr2_player_resolver_action.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
-
-        if Settings.is_toxic_commando_feature_set():
-            self._update_toxic_commando_status_label()
 
         self._update_gta5_toolbar_visibility()
 
@@ -746,7 +741,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
             self._sync_gta5_process_button()
 
         self._sync_rdr2_status()
-        self._sync_toxic_commando_status()
 
         if self._capture_statistics_window is not None:
             self._capture_statistics_window.refresh()

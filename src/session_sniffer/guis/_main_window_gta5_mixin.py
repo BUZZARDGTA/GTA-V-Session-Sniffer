@@ -55,8 +55,6 @@ class GTA5Mixin(QMainWindow):
     _rdr2_player_resolver_action: QAction
     _rdr2_menu_process_separator: QAction
     _rdr2_process_submenu: QMenu
-    _toxic_commando_menu: QMenu
-    _toxic_commando_status_widget_action: QAction
     _player_resolver_action: QAction
     _looky_submenu: QMenu
     _gta5_suspend_resume_action: QAction
@@ -283,13 +281,5 @@ class GTA5Mixin(QMainWindow):
 
         self._rdr2_session_host_submenu.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
         self._rdr2_player_resolver_action.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
-
-        toxic_commando_feature_set = Settings.is_toxic_commando_feature_set()
-        toxic_commando_menu_action = self._toxic_commando_menu.menuAction()
-        if toxic_commando_menu_action:
-            toxic_commando_menu_action.setVisible(toxic_commando_feature_set)
-
-        toxic_commando_local_only = toxic_commando_feature_set and CaptureState.is_local_capture()
-        self._toxic_commando_status_widget_action.setVisible(toxic_commando_local_only)
 
         self._refresh_runtime_capability_windows()

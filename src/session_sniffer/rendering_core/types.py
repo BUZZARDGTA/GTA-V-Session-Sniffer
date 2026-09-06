@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from session_sniffer.capture.process import TargetProcessStatus
     from session_sniffer.gta5.process import GTA5Status
     from session_sniffer.rdr2.process import RDR2Status
-    from session_sniffer.toxic_commando.process import ToxicCommandoStatus
 
 _MAX_LATENCY_ENTRIES = 3600  # default; resized to Settings.gui_rate_graph_max_history after startup
 
@@ -134,12 +133,6 @@ class CaptureState:
     rdr2_pid: ClassVar[int | None] = None
     rdr2_is_suspended: ClassVar[bool] = False
     rdr2_udp_ports: ClassVar[frozenset[int]] = frozenset[int]()
-    toxic_commando_is_running: ClassVar[bool] = False
-    toxic_commando_just_started: ClassVar[bool] = False
-    toxic_commando_path: ClassVar[Path | None] = None
-    toxic_commando_pid: ClassVar[int | None] = None
-    toxic_commando_is_suspended: ClassVar[bool] = False
-    toxic_commando_udp_ports: ClassVar[frozenset[int]] = frozenset[int]()
 
     @classmethod
     def apply_interface_names(cls, *, is_neighbour: bool, name: str, ip: str, interface_type: str) -> None:
@@ -197,18 +190,6 @@ class CaptureState:
             cls.rdr2_pid = status.pid
             cls.rdr2_is_suspended = status.is_suspended
             cls.rdr2_udp_ports = status.udp_ports
-
-    @classmethod
-    def update_toxic_commando_status(cls, status: ToxicCommandoStatus) -> None:
-        """Update Toxic Commando running/suspended state and set `toxic_commando_just_started` on the first detected launch."""
-        with cls._lock:
-            if status.is_running and not cls.toxic_commando_is_running:
-                cls.toxic_commando_just_started = True
-            cls.toxic_commando_is_running = status.is_running
-            cls.toxic_commando_path = status.path
-            cls.toxic_commando_pid = status.pid
-            cls.toxic_commando_is_suspended = status.is_suspended
-            cls.toxic_commando_udp_ports = status.udp_ports
 
 
 class CaptureStats:

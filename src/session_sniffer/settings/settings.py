@@ -246,11 +246,6 @@ class Settings:
         return cls.capture_feature_set in ('GTA V', 'RDR2')
 
     @classmethod
-    def is_toxic_commando_feature_set(cls) -> bool:
-        """Return `True` when the active capture feature set is Toxic Commando."""
-        return cls.capture_feature_set == 'Toxic Commando'
-
-    @classmethod
     def is_session_host_feature_set(cls) -> bool:
         """Return `True` when the active capture feature set supports session host detection."""
         return cls.is_rockstar_feature_set()
