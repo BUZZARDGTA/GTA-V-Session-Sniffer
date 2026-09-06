@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 
-if TYPE_CHECKING:
-    from PySide6.QtGui import QResizeEvent, QShowEvent
-
 from session_sniffer.guis.table_context_menu import TableContextMenuManager, skip_if_menu_open
 from session_sniffer.guis.utils import NumericTableWidgetItem, ToggleAlwaysOnTopMixin, setup_stat_table
 from session_sniffer.player.registry import PlayersRegistry
+
+if TYPE_CHECKING:
+    from PySide6.QtGui import QResizeEvent, QShowEvent
 
 
 class ReconnectFrequencyWindow(ToggleAlwaysOnTopMixin):

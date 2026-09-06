@@ -742,7 +742,7 @@ def setup_static_table_column_resizing(
             current_flex_index += 1
             add_pixels = extra_per_flex + (remainder if current_flex_index == flex_count else 0)
             final_width = base_width + add_pixels
-        elif flex_count == 0 and column == last_visible_column:
+        elif not flex_count and column == last_visible_column:
             final_width = base_width + extra_space
         else:
             final_width = base_width

@@ -99,12 +99,12 @@ def resolve_mac_address(ip_address: str, source_ip: str | None = None) -> str:
             ctypes.byref(mac_address_buffer),
             ctypes.byref(mac_address_length),
         )
-        if result == 0:
+        if not result:
             return _mac_bytes_to_string(bytes(mac_address_buffer[:6]))
 
         last_error_code = result
         # If source_ip_dword was non-zero and failed, try falling back to 0 on subsequent attempts
-        if source_ip_dword.value != 0 and attempt == 0:
+        if source_ip_dword.value and not attempt:
             source_ip_dword = wintypes.DWORD(0)
         time.sleep(0.2)
 
