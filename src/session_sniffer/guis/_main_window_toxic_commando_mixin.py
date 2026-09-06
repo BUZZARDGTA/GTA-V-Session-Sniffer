@@ -1,19 +1,12 @@
 """Toxic Commando menu and status label mixin for `MainWindow`."""
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QFont, QFontMetrics
 from PySide6.QtWidgets import QLabel, QMainWindow, QMenu, QMenuBar, QWidgetAction
 
-from session_sniffer.guis.session_host_history_window import populate_host_history_submenu
 from session_sniffer.guis.stylesheets import GTA5_STATUS_LABEL_STYLESHEET
-from session_sniffer.player.registry import SessionHost
 from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import Settings
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 
 class ToxicCommandoMixin(QMainWindow):
@@ -22,18 +15,10 @@ class ToxicCommandoMixin(QMainWindow):
     _toxic_commando_menu: QMenu
     _toxic_commando_status_label: QLabel
     _toxic_commando_status_widget_action: QAction
-    _toxic_commando_menu_status_separator: QAction
-    _toxic_commando_session_host_submenu: QMenu
-    _toxic_commando_host_status_action: QAction
     _last_toxic_commando_status_key: tuple[bool, bool, bool]
 
-    if TYPE_CHECKING:
-        _highlight_ips: Callable[[list[str]], None]
-        _clear_session_host: Callable[[], None]
-        _redetect_session_host: Callable[[], None]
-
     def _build_toxic_commando_menu(self, menu_bar: QMenuBar) -> None:
-        """Construct the Toxic Commando menu and its Session Host submenu."""
+        """Construct the Toxic Commando menu and its status widget."""
         toxic_commando_menu = menu_bar.addMenu('Toxic Commando')
         if not toxic_commando_menu:
             message = 'Failed to create Toxic Commando menu'
@@ -59,52 +44,6 @@ class ToxicCommandoMixin(QMainWindow):
         self._resize_toxic_commando_status_label('● Toxic Commando not running')
 
         toxic_commando_menu.aboutToShow.connect(self._update_toxic_commando_status_label)
-        self._toxic_commando_menu_status_separator = toxic_commando_menu.addSeparator()
-
-        toxic_commando_session_host_submenu = toxic_commando_menu.addMenu('👑 Session Host')
-        if not toxic_commando_session_host_submenu:
-            message = 'Failed to create Toxic Commando Session Host submenu'
-            raise RuntimeError(message)
-        toxic_commando_session_host_submenu.setToolTipsVisible(True)
-        toxic_commando_session_host_submenu.menuAction().setToolTip("Session host detection controls for the current John Carpenter's Toxic Commando lobby")
-        self._toxic_commando_session_host_submenu = toxic_commando_session_host_submenu
-
-        toxic_commando_host_status_action = QAction('ℹ️ No host', self)  # noqa: RUF001
-        toxic_commando_host_status_action.setEnabled(False)
-        toxic_commando_host_status_action.setToolTip('Current session host detection state')
-        toxic_commando_session_host_submenu.addAction(toxic_commando_host_status_action)
-        self._toxic_commando_host_status_action = toxic_commando_host_status_action
-
-        def _update_toxic_commando_host_status_label() -> None:
-            current_session_host = SessionHost.get_player()
-            if current_session_host is not None:
-                self._toxic_commando_host_status_action.setText(f'ℹ️ Detected: {current_session_host.ip}')  # noqa: RUF001
-            elif SessionHost.search_player:
-                self._toxic_commando_host_status_action.setText('ℹ️ Searching…')  # noqa: RUF001
-            else:
-                self._toxic_commando_host_status_action.setText('ℹ️ No host')  # noqa: RUF001
-
-        toxic_commando_session_host_submenu.aboutToShow.connect(_update_toxic_commando_host_status_label)
-
-        toxic_commando_session_host_submenu.addSeparator()
-
-        clear_host_action = QAction('❌ Clear Session Host', self)
-        clear_host_action.setToolTip('Manually clear the currently detected session host')
-        clear_host_action.triggered.connect(self._clear_session_host)
-        toxic_commando_session_host_submenu.addAction(clear_host_action)
-
-        redetect_host_action = QAction('🔄 Re-detect Host', self)
-        redetect_host_action.setToolTip('Clear the current host and immediately re-trigger host detection')
-        redetect_host_action.triggered.connect(self._redetect_session_host)
-        toxic_commando_session_host_submenu.addAction(redetect_host_action)
-
-        toxic_commando_session_host_submenu.addSeparator()
-        host_history_submenu = toxic_commando_session_host_submenu.addMenu('📜 Host History')
-        if not host_history_submenu:
-            message = 'Failed to create Toxic Commando Host History submenu'
-            raise RuntimeError(message)
-        host_history_submenu.setToolTipsVisible(True)
-        host_history_submenu.aboutToShow.connect(lambda: populate_host_history_submenu(host_history_submenu, self._highlight_ips))
 
         self._last_toxic_commando_status_key = (False, False, False)
 
@@ -142,7 +81,7 @@ class ToxicCommandoMixin(QMainWindow):
         )
 
     def _sync_toxic_commando_status(self) -> None:
-        """Update Toxic Commando status label and submenu if process status changed."""
+        """Update Toxic Commando status label if process status changed."""
         toxic_commando_status_key = (
             CaptureState.toxic_commando_is_running,
             CaptureState.toxic_commando_is_suspended,
@@ -150,4 +89,3 @@ class ToxicCommandoMixin(QMainWindow):
         )
         if toxic_commando_status_key != self._last_toxic_commando_status_key:
             self._update_toxic_commando_status_label()
-            self._toxic_commando_session_host_submenu.setEnabled(CaptureState.toxic_commando_is_running or not CaptureState.is_local_capture())

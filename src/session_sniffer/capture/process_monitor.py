@@ -61,7 +61,7 @@ def _process_monitor() -> None:
 
     while not gui_closed__event.is_set():
         target_pid = Settings.capture_filter_process_pid
-        if target_pid <= 0 and not Settings.is_session_host_feature_set():
+        if target_pid <= 0 and not Settings.is_session_host_feature_set() and not Settings.is_toxic_commando_feature_set():
             CaptureState.update_target_process_status(TargetProcessStatus())
             CaptureState.update_gta5_status(GTA5Status(path=None))
             CaptureState.update_rdr2_status(RDR2Status(path=None))
@@ -120,7 +120,11 @@ def _process_monitor() -> None:
 
 def ensure_process_monitor_running() -> None:
     """Start the process monitor thread if needed and it is not already running."""
-    if Settings.capture_filter_process_pid <= 0 and not Settings.is_session_host_feature_set():
+    if (
+        Settings.capture_filter_process_pid <= 0
+        and not Settings.is_session_host_feature_set()
+        and not Settings.is_toxic_commando_feature_set()
+    ):
         return
     for thread in enumerate_threads():
         if thread.name == _PROCESS_MONITOR_THREAD_NAME and thread.is_alive():

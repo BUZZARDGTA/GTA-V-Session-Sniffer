@@ -260,7 +260,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
 
         if Settings.is_toxic_commando_feature_set():
             self._update_toxic_commando_status_label()
-            self._toxic_commando_session_host_submenu.setEnabled(CaptureState.toxic_commando_is_running or not CaptureState.is_local_capture())
 
         self._update_gta5_toolbar_visibility()
 
@@ -823,9 +822,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
                 return
             if Settings.is_rdr2_feature_set() and not CaptureState.rdr2_is_running:
                 QMessageBox.warning(self, TITLE, 'Red Dead Redemption 2 is not currently running.')
-                return
-            if Settings.is_toxic_commando_feature_set() and not CaptureState.toxic_commando_is_running:
-                QMessageBox.warning(self, TITLE, "John Carpenter's Toxic Commando is not currently running.")
                 return
 
         connected_players = PlayersRegistry.get_connected_players()

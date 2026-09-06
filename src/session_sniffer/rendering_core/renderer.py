@@ -490,10 +490,8 @@ def rendering_core(
         if Settings.is_session_host_feature_set():
             if Settings.is_gta5_feature_set():
                 game_is_running = CaptureState.gta5_is_running or not CaptureState.is_local_capture()
-            elif Settings.is_rdr2_feature_set():
-                game_is_running = CaptureState.rdr2_is_running or not CaptureState.is_local_capture()
             else:
-                game_is_running = CaptureState.toxic_commando_is_running or not CaptureState.is_local_capture()
+                game_is_running = CaptureState.rdr2_is_running or not CaptureState.is_local_capture()
 
             if not game_is_running or not Settings.gui_session_host_detection:
                 if (
@@ -510,9 +508,6 @@ def rendering_core(
                     game_just_started = True
                 elif Settings.is_rdr2_feature_set() and CaptureState.rdr2_just_started:
                     CaptureState.rdr2_just_started = False
-                    game_just_started = True
-                elif Settings.is_toxic_commando_feature_set() and CaptureState.toxic_commando_just_started:
-                    CaptureState.toxic_commando_just_started = False
                     game_just_started = True
 
                 if game_just_started:

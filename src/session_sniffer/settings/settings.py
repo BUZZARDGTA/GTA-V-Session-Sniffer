@@ -253,7 +253,7 @@ class Settings:
     @classmethod
     def is_session_host_feature_set(cls) -> bool:
         """Return `True` when the active capture feature set supports session host detection."""
-        return cls.capture_feature_set in ('GTA V', 'RDR2', 'Toxic Commando')
+        return cls.is_rockstar_feature_set()
 
     @classmethod
     def rebuild_blocked_ip_ranges(cls) -> None:
