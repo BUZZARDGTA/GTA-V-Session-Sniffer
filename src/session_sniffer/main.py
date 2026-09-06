@@ -497,8 +497,10 @@ def main() -> None:
         reset_resolver_cache()
 
         if is_same_adapter:
+            capture_action = 'Restarting' if was_running else 'Resuming'
             logger.info(
-                'Resuming/restarting capture on same interface "%s" (IP: %s) — preserving player tables.',
+                '%s capture on same interface "%s" (IP: %s) — preserving player tables.',
+                capture_action,
                 new_interface.name,
                 new_interface.ip_address,
             )
@@ -777,7 +779,8 @@ def main() -> None:
                 new_ip = adapter.ipv4_addresses[0]
                 if new_ip != capture_holder.config.interface.ip_address:
                     logger.info(
-                        'Capture interface IP changed from %s to %s — restarting capture.',
+                        'Capture interface "%s" IP changed from %s to %s — restarting capture.',
+                        capture_holder.config.interface.name,
                         capture_holder.config.interface.ip_address,
                         new_ip,
                     )

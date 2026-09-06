@@ -355,7 +355,7 @@ class PacketCapture:
                 )
                 is_open_error = isinstance(error_detail, PcapOpenError) or 'failed to open pcap adapter' in error_string.lower()
                 if has_monitored_adapter_guid and (is_device_removed or is_open_error):
-                    logger.info('Capture interface "%s" temporarily disconnected: %s — pausing capture.', self.config.interface.name, error_detail)
+                    logger.debug('Capture interface "%s" temporarily disconnected: %s — pausing capture.', self.config.interface.name, error_detail)
                 else:
                     logger.warning('Packet capture stopped unexpectedly: %s', error_detail)
 
