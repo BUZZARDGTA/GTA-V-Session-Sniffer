@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from session_sniffer import msgbox
 from session_sniffer.background.events import gui_closed__event
-from session_sniffer.capture.arp import resolve_mac_address, send_arp_spoof_packets
+from session_sniffer.capture.arp import ArpSpoofTargets, resolve_mac_address, send_arp_restore_packets, send_arp_spoof_packets
 from session_sniffer.capture.exceptions import ArpResolutionError, PcapOpenError, PcapSendError
 from session_sniffer.capture.pcap import PcapHandle
 from session_sniffer.error_messages import format_arp_spoofing_failed_message
@@ -106,6 +106,14 @@ def arp_spoofing_task(
         logger.error('ARP spoofing cannot start: interface MAC address is None')
         return
 
+    host_mac = selected_interface.interface.identity.mac_address or selected_interface.mac_address
+    target_ip = selected_interface.ip_address
+    target_mac = selected_interface.mac_address
+    source_ip = selected_interface.interface.ip_addresses[0] if selected_interface.interface.ip_addresses else None
+    gateway_ip = selected_interface.gateway_ip
+    gateway_mac: str | None = None
+    targets: ArpSpoofTargets | None = None
+
     def report_failure(
         stage: str,
         *,
@@ -175,14 +183,11 @@ def arp_spoofing_task(
                     return
 
             # Resolve gateway MAC address
-            gateway_ip = selected_interface.gateway_ip
             if gateway_ip is None:
-                logger.info('No gateway IP available, sending broadcast ARP spoofing only')
-
-            gateway_mac: str | None = None
-            if gateway_ip is not None:
+                logger.info('No gateway IP available, skipping gateway ARP spoofing')
+            elif gateway_mac is None:
                 try:
-                    gateway_mac = resolve_mac_address(gateway_ip)
+                    gateway_mac = resolve_mac_address(gateway_ip, source_ip=source_ip)
                     logger.info('Resolved gateway MAC: %s -> %s', gateway_ip, gateway_mac)
                 except ArpResolutionError as exception:
                     report_failure(
@@ -194,6 +199,14 @@ def arp_spoofing_task(
                     on_failed()
                     return
 
+            if gateway_ip is not None and gateway_mac is not None:
+                targets = ArpSpoofTargets(
+                    target_ip=target_ip,
+                    target_mac=target_mac,
+                    gateway_ip=gateway_ip,
+                    gateway_mac=gateway_mac,
+                )
+
             logger.info(
                 'Started spoofing on interface %s%s',
                 selected_interface.ip_address,
@@ -203,13 +216,11 @@ def arp_spoofing_task(
             # Send spoofed ARP replies while capture is running
             while capture_holder.is_running() and not _should_exit():
                 try:
-                    if gateway_ip is not None and gateway_mac is not None:
+                    if targets is not None:
                         send_arp_spoof_packets(
                             pcap_handle,
-                            interface_mac=selected_interface.mac_address,
-                            interface_ip=selected_interface.ip_address,
-                            gateway_ip=gateway_ip,
-                            gateway_mac=gateway_mac,
+                            host_mac=host_mac,
+                            targets=targets,
                         )
                 except PcapSendError as exception:
                     report_failure(
@@ -227,11 +238,27 @@ def arp_spoofing_task(
                     time.sleep(0.1)
                     elapsed += 0.1
 
-            # Capture stopped; close handle and wait for next capture start
+            # Capture stopped; restore ARP tables and close handle
+            if targets is not None:
+                try:
+                    send_arp_restore_packets(
+                        pcap_handle,
+                        targets=targets,
+                    )
+                except PcapSendError as exception:
+                    logger.warning('Failed sending ARP restore packets: %s', exception)
             pcap_handle.close()
             pcap_handle = None
             logger.info('Stopped spoofing.')
     finally:
         if pcap_handle is not None:
+            if targets is not None:
+                try:
+                    send_arp_restore_packets(
+                        pcap_handle,
+                        targets=targets,
+                    )
+                except PcapSendError as exception:
+                    logger.warning('Failed sending ARP restore packets: %s', exception)
             pcap_handle.close()
         logger.info('Task terminated.')

