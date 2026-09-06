@@ -235,7 +235,7 @@ def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool
             f'<span style="color: {StatusBarColors.LABEL_ACCENT};">Discord:</span> <span style="color: {rpc_color};">{rpc_status}</span>',
         )
 
-    if Settings.capture_filter_process_pid > 0:
+    if Settings.capture_filter_process_pid > 0 and CaptureState.is_local_capture():
         target_name = CaptureState.target_process_name or f'PID {Settings.capture_filter_process_pid}'
         target_color = StatusBarColors.ENABLED if CaptureState.target_process_running else StatusBarColors.DISABLED
         parts.append(

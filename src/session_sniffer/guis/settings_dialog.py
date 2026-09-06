@@ -79,6 +79,7 @@ from session_sniffer.guis.utils import (
 )
 from session_sniffer.networking.looky_system import LookyState
 from session_sniffer.networking.utils import format_mac_address, is_ipv4_address, is_mac_address
+from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import SETTING_CATEGORIES_ORDER, SETTING_DEFAULTS, SETTING_METADATA, SettingMeta, SettingType
 from session_sniffer.settings.settings import Settings
 from session_sniffer.text_templates import build_settings_ini_header_text
@@ -418,6 +419,13 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
         if tooltip:
             label.setToolTip(tooltip)
             widget.setToolTip(tooltip)
+
+        if key == 'capture_filter_process_pid' and not CaptureState.is_local_capture():
+            label.setEnabled(False)
+            widget.setEnabled(False)
+            disabled_tooltip = 'Process PID filtering is disabled when capturing traffic from an external device.'
+            label.setToolTip(disabled_tooltip)
+            widget.setToolTip(disabled_tooltip)
 
         form.addRow(label, widget)
 

@@ -15,6 +15,7 @@ from session_sniffer.capture.process_monitor import ensure_process_monitor_runni
 from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis._settings_widget_builders import format_setting_tooltip
 from session_sniffer.guis.target_process_dialog import TargetProcessDialog
+from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import SettingMeta, Settings
 
 
@@ -50,6 +51,14 @@ class ProcessSelectorWidget(QWidget):
         if self._setting_tooltip:
             self.setToolTip(self._setting_tooltip)
 
+        if not CaptureState.is_local_capture():
+            self.setEnabled(False)
+            disabled_tooltip = 'Process PID sniffing is disabled when capturing an external device (ARP spoofing / neighbour capture).'
+            self.setToolTip(disabled_tooltip)
+            self._combo.setToolTip(disabled_tooltip)
+            self._browse_button.setToolTip(disabled_tooltip)
+            self._refresh_button.setToolTip(disabled_tooltip)
+
         self.refresh_process_list()
 
     def _update_combo_tooltip(self) -> None:
@@ -67,6 +76,17 @@ class ProcessSelectorWidget(QWidget):
 
     def refresh_process_list(self) -> None:
         """Refresh the running processes list in the combo box while maintaining the current selection."""
+        if not CaptureState.is_local_capture():
+            globe_icon = QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'globe.svg'))
+            with QSignalBlocker(self._combo):
+                self._combo.clear()
+                self._combo.addItem(globe_icon, 'Disabled (External Device Capture)', 0)
+                self._combo.setCurrentIndex(0)
+            self.setEnabled(False)
+            disabled_tooltip = 'Process PID sniffing is disabled when capturing an external device (ARP spoofing / neighbour capture).'
+            self._combo.setToolTip(disabled_tooltip)
+            return
+
         current_pid = self.value()
         globe_icon = QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'globe.svg'))
         warning_icon = QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'warning.svg'))
@@ -135,6 +155,8 @@ class ProcessSelectorWidget(QWidget):
 
     def _on_browse_clicked(self) -> None:
         """Open the target process selection dialog and update combo if changed."""
+        if not CaptureState.is_local_capture():
+            return
         dialog = TargetProcessDialog(self)
         if dialog.exec():
             selected_pid = dialog.selected_pid

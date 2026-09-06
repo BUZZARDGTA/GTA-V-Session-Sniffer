@@ -150,10 +150,21 @@ class TargetProcessDialog(QDialog):
         self._icon_cache: dict[str, QIcon] = {}
         self._default_file_icon = self._icon_provider.icon(QFileIconProvider.IconType.File)
         self.selected_pid: int = Settings.capture_filter_process_pid
+        if not CaptureState.is_local_capture():
+            self._table.setEnabled(False)
+            self._pid_spinbox.setEnabled(False)
+            self._sniff_selected_button.setEnabled(False)
         self._populate_process_table()
 
     def _update_status_label(self) -> None:
         """Update the status label describing the active capture filter state."""
+        if not CaptureState.is_local_capture():
+            self._status_label.setText(
+                '<b>Status:</b> Process PID sniffing is <span style="color: #f44336; font-weight: bold;">DISABLED</span> '
+                'when capturing an external device (ARP spoofing / neighbour capture).',
+            )
+            return
+
         current_pid = Settings.capture_filter_process_pid
         if current_pid <= 0:
             self._status_label.setText('<b>Status:</b> Currently sniffing <b>ALL network traffic</b> (no process filter active).')
@@ -301,6 +312,8 @@ class TargetProcessDialog(QDialog):
 
     def _apply_pid(self, pid: int) -> None:
         """Store target PID, save settings, and trigger process monitor."""
+        if not CaptureState.is_local_capture():
+            return
         self.selected_pid = pid
         Settings.capture_filter_process_pid = pid
         Settings.rewrite_settings_file()

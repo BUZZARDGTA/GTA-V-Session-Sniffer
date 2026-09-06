@@ -68,7 +68,7 @@ def _process_monitor() -> None:
             CaptureState.update_toxic_commando_status(ToxicCommandoStatus(path=None))
             return
 
-        if target_pid > 0:
+        if target_pid > 0 and CaptureState.is_local_capture():
             previous_process_status = last_process_status
             last_process_status, cached_process = inspect_target_process(target_pid, cached_process)
             if not last_process_status.is_running:
