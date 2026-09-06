@@ -415,12 +415,16 @@ def main() -> None:
             window.set_change_interface_button_enabled(enabled=True)
             return
 
-        if (
-            new_interface.name == Settings.capture_interface_name
-            and new_interface.ip_address == Settings.capture_ip_address
-            and new_interface.mac_address == Settings.capture_mac_address
-            and capture_holder.is_running()
-        ):
+        current_selected = capture_holder.config.interface
+
+        is_exact_same_selection = (
+            new_interface.name == current_selected.name
+            and new_interface.ip_address == current_selected.ip_address
+            and new_interface.mac_address == current_selected.mac_address
+            and new_interface.is_neighbour == current_selected.is_neighbour
+        )
+
+        if is_exact_same_selection and capture_holder.is_running():
             if Settings.capture_arp_spoofing:
                 if not ArpSpoofingController.is_running():
                     ArpSpoofingController.start(new_interface)
@@ -428,6 +432,32 @@ def main() -> None:
                 ArpSpoofingController.stop()
             window.set_change_interface_button_enabled(enabled=True)
             return
+
+        is_same_adapter = False
+        if not new_interface.is_neighbour and not current_selected.is_neighbour:
+            current_adapter_guid = current_selected.interface.identity.adapter_guid
+            new_adapter_guid = new_interface.interface.identity.adapter_guid
+            if current_adapter_guid is not None and new_adapter_guid is not None:
+                is_same_adapter = current_adapter_guid == new_adapter_guid
+            else:
+                is_same_adapter = (
+                    new_interface.name == current_selected.name
+                    and new_interface.mac_address == current_selected.mac_address
+                )
+        elif new_interface.is_neighbour and current_selected.is_neighbour:
+            current_adapter_guid = current_selected.interface.identity.adapter_guid
+            new_adapter_guid = new_interface.interface.identity.adapter_guid
+            if current_adapter_guid is not None and new_adapter_guid is not None:
+                is_same_adapter = (
+                    current_adapter_guid == new_adapter_guid
+                    and new_interface.ip_address == current_selected.ip_address
+                )
+            else:
+                is_same_adapter = (
+                    new_interface.name == current_selected.name
+                    and new_interface.ip_address == current_selected.ip_address
+                    and new_interface.mac_address == current_selected.mac_address
+                )
 
         # Stop ARP spoofing first: the old ARP thread must not observe the new capture starting.
         ArpSpoofingController.stop()
@@ -464,11 +494,23 @@ def main() -> None:
         )
 
         CaptureState.vpn_mode_enabled = new_vpn_mode
-        CaptureStats.reset_on_interface_switch()
         reset_resolver_cache()
 
-        window.reset_players_for_interface_switch()
-        window.reset_session_graph()
+        if is_same_adapter:
+            logger.info(
+                'Resuming/restarting capture on same interface "%s" (IP: %s) — preserving player tables.',
+                new_interface.name,
+                new_interface.ip_address,
+            )
+        else:
+            logger.info(
+                'Switching capture interface from "%s" to "%s" — resetting player tables.',
+                current_selected.name,
+                new_interface.name,
+            )
+            CaptureStats.reset_on_interface_switch()
+            window.reset_players_for_interface_switch()
+            window.reset_session_graph()
 
         new_capture = PacketCapture(
             CaptureConfig(
