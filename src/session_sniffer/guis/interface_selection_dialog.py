@@ -465,13 +465,13 @@ class InterfaceSelectionDialog(QDialog):
 
         layout.addWidget(bottom_container)
 
-        # Populate the table with initial filtered data (after button is created)
-        self.apply_filters()
-        self._reset_column_sizes()
-
         # Connect selection change signal to enable/disable Select button
         selection_model = self.table.selectionModel()
         selection_model.selectionChanged.connect(self.update_select_button_state)
+
+        # Populate the table with initial filtered data (after button is created)
+        self.apply_filters()
+        self._reset_column_sizes()
 
         # Connect double-click signal to select interface (simulates Start button)
         self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
@@ -649,31 +649,18 @@ class InterfaceSelectionDialog(QDialog):
         Preserves the user's current selection by matching on
         (interface_name, ip_address, is_neighbour).
         """
-        # Snapshot the current selection identity before refresh
-        selected_key: tuple[str, str, bool] | None = None
-        current_row = self.table.currentRow()
-        if current_row != -1 and 0 <= current_row < len(self._data.interface_rows):
-            iface, ip, is_neighbour = self._data.interface_rows[current_row]
-            selected_key = (iface.identity.name, ip, is_neighbour)
-
         new_interfaces = refresh_available_interfaces()
         self._data.all_interfaces = new_interfaces
         self.apply_filters()
 
-        # Restore selection by matching the key
-        if selected_key is not None:
-            for i, (iface, ip, is_neighbour) in enumerate(self._data.interface_rows):
-                if (iface.identity.name, ip, is_neighbour) == selected_key:
-                    self.table.selectRow(i)
-                    break
-
     def apply_filters(self) -> None:
         """Apply the selected filters and populate the table."""
-        # Preserve currently selected row (by object identity) before filtering/rebuilding table
-        previously_selected_row: tuple[Interface, str, bool] | None = None
+        # Preserve currently selected row (by key identity) before filtering/rebuilding table
+        previously_selected_key: tuple[str, str, bool] | None = None
         current_row = self.table.currentRow()
         if current_row != -1 and 0 <= current_row < len(self._data.interface_rows):
-            previously_selected_row = self._data.interface_rows[current_row]
+            selected_interface, selected_ip_address, selected_is_neighbour = self._data.interface_rows[current_row]
+            previously_selected_key = (selected_interface.identity.name, selected_ip_address, selected_is_neighbour)
 
         hide_inactive = self._controls.hide_inactive_checkbox.isChecked()
         hide_neighbours = self._controls.hide_neighbours_checkbox.isChecked()
@@ -707,11 +694,16 @@ class InterfaceSelectionDialog(QDialog):
         self.populate_table()
 
         # Attempt to restore previous selection if still present & logically allowed
-        if previously_selected_row is not None:
-            for i, row in enumerate(self._data.interface_rows):
-                if row == previously_selected_row:
+        restored = False
+        if previously_selected_key is not None:
+            for i, (interface, ip_address, is_neighbour) in enumerate(self._data.interface_rows):
+                if (interface.identity.name, ip_address, is_neighbour) == previously_selected_key:
                     self.table.selectRow(i)
+                    restored = True
                     break
+
+        if not restored and self._data.interface_rows:
+            self.table.selectRow(0)
 
         # Ensure select button state reflects restored selection
         self.update_select_button_state()
@@ -724,6 +716,8 @@ class InterfaceSelectionDialog(QDialog):
     ) -> None:
         """Restore the previously saved interface selection from settings.
 
+        Falls back to selecting the first available interface row if no match is found.
+
         Args:
             saved_interface_name: The name of the previously selected interface from settings (optional).
             saved_ip_address: The IP address of the previously selected interface (optional).
@@ -735,10 +729,10 @@ class InterfaceSelectionDialog(QDialog):
             saved_ip_address,
             saved_mac_address,
         )
-        if best_match_index is None:
-            return
-
-        self.table.selectRow(best_match_index)
+        if best_match_index is not None:
+            self.table.selectRow(best_match_index)
+        elif self._data.interface_rows:
+            self.table.selectRow(0)
         self.update_select_button_state()
 
     def populate_table(self) -> None:
