@@ -417,22 +417,6 @@ def main() -> None:
 
         current_selected = capture_holder.config.interface
 
-        is_exact_same_selection = (
-            new_interface.name == current_selected.name
-            and new_interface.ip_address == current_selected.ip_address
-            and new_interface.mac_address == current_selected.mac_address
-            and new_interface.is_neighbour == current_selected.is_neighbour
-        )
-
-        if is_exact_same_selection and capture_holder.is_running():
-            if Settings.capture_arp_spoofing:
-                if not ArpSpoofingController.is_running():
-                    ArpSpoofingController.start(new_interface)
-            else:
-                ArpSpoofingController.stop()
-            window.set_change_interface_button_enabled(enabled=True)
-            return
-
         is_same_adapter = False
         if not new_interface.is_neighbour and not current_selected.is_neighbour:
             current_adapter_guid = current_selected.interface.identity.adapter_guid
@@ -458,6 +442,15 @@ def main() -> None:
                     and new_interface.ip_address == current_selected.ip_address
                     and new_interface.mac_address == current_selected.mac_address
                 )
+
+        if is_same_adapter and capture_holder.is_running():
+            if Settings.capture_arp_spoofing:
+                if not ArpSpoofingController.is_running():
+                    ArpSpoofingController.start(new_interface)
+            else:
+                ArpSpoofingController.stop()
+            window.set_change_interface_button_enabled(enabled=True)
+            return
 
         # Stop ARP spoofing first: the old ARP thread must not observe the new capture starting.
         ArpSpoofingController.stop()
@@ -497,10 +490,8 @@ def main() -> None:
         reset_resolver_cache()
 
         if is_same_adapter:
-            capture_action = 'Restarting' if was_running else 'Resuming'
             logger.info(
-                '%s capture on same interface "%s" (IP: %s) — preserving player tables.',
-                capture_action,
+                'Resuming capture on same interface "%s" (IP: %s) — preserving player tables.',
                 new_interface.name,
                 new_interface.ip_address,
             )
@@ -578,6 +569,10 @@ def main() -> None:
             ip_address=new_ip,
             is_neighbour=capture_holder.config.interface.is_neighbour,
         )
+        new_selected_interface.interface.ip_addresses = [new_ip]
+        registered_interface = AllInterfaces.get_interface_by_name(new_selected_interface.name)
+        if registered_interface is not None:
+            registered_interface.ip_addresses = [new_ip]
 
         CaptureState.apply_interface_names(
             is_neighbour=new_selected_interface.is_neighbour,
@@ -655,6 +650,7 @@ def main() -> None:
                 target_ip_address = matching_adapter.ipv4_addresses[0]
                 previous_ip_address = current_selected.ip_address
                 _adapter_lost_event.clear()
+                _adapter_lost_attempts = 0
 
                 if previous_ip_address != target_ip_address:
                     logger.info(
