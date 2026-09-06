@@ -4,14 +4,13 @@ from datetime import datetime
 from typing import override
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QResizeEvent, QShowEvent
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
 from session_sniffer.exceptions import PlayerDateTimeCorruptionError
-from session_sniffer.guis.table_context_menu import TableContextMenuManager, skip_if_menu_open
+from session_sniffer.guis.table_context_menu import StatTableWindowMixin, skip_if_menu_open
 from session_sniffer.guis.utils import (
     NumericTableWidgetItem,
-    ToggleAlwaysOnTopMixin,
     format_duration,
     format_player_display,
     setup_stat_table,
@@ -33,7 +32,7 @@ _COLOR_CONNECTED = QColor(80, 200, 80)
 _COLOR_DISCONNECTED = QColor(220, 80, 60)
 
 
-class SessionTimelineWindow(ToggleAlwaysOnTopMixin):
+class SessionTimelineWindow(StatTableWindowMixin):
     """Sortable table showing every player's join/leave timestamps and session durations."""
 
     def __init__(self, *, always_on_top: bool = True) -> None:
@@ -64,22 +63,9 @@ class SessionTimelineWindow(ToggleAlwaysOnTopMixin):
 
         self._table.sortByColumn(_COLUMN_FIRST_SEEN, Qt.SortOrder.AscendingOrder)
 
-        self._context_menu_manager = TableContextMenuManager(self._table, self, on_reset_column_sizes=self._reset_column_sizes)
-
-        self.add_always_on_top_checkbox(layout, always_on_top=always_on_top)
+        self.setup_stat_table_controls(layout, always_on_top=always_on_top)
 
     @override
-    def showEvent(self, event: QShowEvent) -> None:
-        """Adjust column widths when the session timeline window is shown."""
-        super().showEvent(event)
-        self._reset_column_sizes()
-
-    @override
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Adjust column widths when the session timeline window is resized."""
-        super().resizeEvent(event)
-        self._reset_column_sizes()
-
     def _reset_column_sizes(self) -> None:
         """Reset column widths back to their initial default layout."""
         for column in (_COLUMN_STATUS, _COLUMN_FIRST_SEEN, _COLUMN_LAST_REJOIN, _COLUMN_LAST_SEEN, _COLUMN_SESSION_TIME, _COLUMN_TOTAL_TIME, _COLUMN_REJOINS):

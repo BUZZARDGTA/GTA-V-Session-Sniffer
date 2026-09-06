@@ -13,7 +13,7 @@ from session_sniffer.error_messages import (
     format_rdr2_solo_session_process_not_running_message,
     format_rdr2_solo_session_suspend_failed_message,
 )
-from session_sniffer.guis.session_host_history_window import populate_host_history_submenu
+from session_sniffer.guis.session_host_history_window import setup_session_host_actions
 from session_sniffer.guis.stylesheets import GTA5_STATUS_LABEL_STYLESHEET
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.player.registry import SessionHost
@@ -118,26 +118,7 @@ class RDR2Mixin(QMainWindow):
                 self._rdr2_host_status_action.setText('ℹ️ No host')  # noqa: RUF001
 
         session_host_submenu.aboutToShow.connect(_update_rdr2_host_status_label)
-
-        session_host_submenu.addSeparator()
-
-        clear_host_action = QAction('❌ Clear Session Host', self)
-        clear_host_action.setToolTip('Manually clear the currently detected session host')
-        clear_host_action.triggered.connect(self._clear_session_host)
-        session_host_submenu.addAction(clear_host_action)
-
-        redetect_host_action = QAction('🔄 Re-detect Host', self)
-        redetect_host_action.setToolTip('Clear the current host and immediately re-trigger host detection')
-        redetect_host_action.triggered.connect(self._redetect_session_host)
-        session_host_submenu.addAction(redetect_host_action)
-
-        session_host_submenu.addSeparator()
-        host_history_submenu = session_host_submenu.addMenu('📜 Host History')
-        if not host_history_submenu:
-            message = 'Failed to create RDR2 Host History submenu'
-            raise RuntimeError(message)
-        host_history_submenu.setToolTipsVisible(True)
-        host_history_submenu.aboutToShow.connect(lambda: populate_host_history_submenu(host_history_submenu, self._highlight_ips))
+        setup_session_host_actions(session_host_submenu, self._clear_session_host, self._redetect_session_host, self._highlight_ips, error_label='RDR2 Host History')
 
         self._rdr2_menu_process_separator = rdr2_menu.addSeparator()
 

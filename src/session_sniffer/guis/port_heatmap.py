@@ -1,19 +1,16 @@
 """Port heatmap statistics window."""
 
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 
-from session_sniffer.guis.table_context_menu import TableContextMenuManager, skip_if_menu_open
-from session_sniffer.guis.utils import NumericTableWidgetItem, ToggleAlwaysOnTopMixin, setup_stat_table
+from session_sniffer.guis.table_context_menu import StatTableWindowMixin, skip_if_menu_open
+from session_sniffer.guis.utils import NumericTableWidgetItem, setup_stat_table
 from session_sniffer.player.registry import PlayersRegistry
 
-if TYPE_CHECKING:
-    from PySide6.QtGui import QResizeEvent, QShowEvent
 
-
-class PortHeatmapWindow(ToggleAlwaysOnTopMixin):
+class PortHeatmapWindow(StatTableWindowMixin):
     """A standalone window ranking observed ports by frequency across all players."""
 
     def __init__(self, *, always_on_top: bool = True) -> None:
@@ -29,22 +26,9 @@ class PortHeatmapWindow(ToggleAlwaysOnTopMixin):
         setup_stat_table(self._table, layout)
         self._reset_column_sizes()
 
-        self._context_menu_manager = TableContextMenuManager(self._table, self, on_reset_column_sizes=self._reset_column_sizes)
-
-        self.add_always_on_top_checkbox(layout, always_on_top=always_on_top)
+        self.setup_stat_table_controls(layout, always_on_top=always_on_top)
 
     @override
-    def showEvent(self, event: QShowEvent) -> None:
-        """Adjust column widths when the port heatmap window is shown."""
-        super().showEvent(event)
-        self._reset_column_sizes()
-
-    @override
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Adjust column widths when the port heatmap window is resized."""
-        super().resizeEvent(event)
-        self._reset_column_sizes()
-
     def _reset_column_sizes(self) -> None:
         """Reset column widths back to their initial default layout."""
         available_width = self._table.viewport().width() if self._table.viewport() else self._table.width()

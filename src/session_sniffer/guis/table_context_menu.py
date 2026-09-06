@@ -1,11 +1,11 @@
 """Provides a manager for standard QTableWidget context menus."""
 
 import functools
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
-from PySide6.QtWidgets import QMenu
+from PySide6.QtGui import QAction, QKeySequence, QResizeEvent, QShortcut, QShowEvent
+from PySide6.QtWidgets import QBoxLayout, QMenu, QTableWidget, QWidget
 
 from session_sniffer.guis.stylesheets import SVG_ICON_CONTEXT_MENU_STYLESHEET
 from session_sniffer.guis.table_column_resizing import add_column_sizing_actions, setup_table_header_context_menu
@@ -15,13 +15,12 @@ from session_sniffer.guis.tables_player_actions import (
     tcp_port_ping,
     tcp_port_ping_multi,
 )
-from session_sniffer.guis.utils import copy_table_widget_selection, popup_menu_at_table_widget
+from session_sniffer.guis.utils import ToggleAlwaysOnTopMixin, copy_table_widget_selection, popup_menu_at_table_widget
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from PySide6.QtCore import QPoint
-    from PySide6.QtWidgets import QTableWidget, QWidget
 
 
 def extract_ip_addresses_from_table_selection(table: QTableWidget) -> list[str]:
@@ -202,3 +201,31 @@ class TableContextMenuManager:
 
         self._is_open = True
         menu.aboutToHide.connect(lambda: setattr(self, '_is_open', False))
+
+
+class StatTableWindowMixin(ToggleAlwaysOnTopMixin):
+    """Mixin for statistic table windows providing resizing, context menu, and always-on-top setup."""
+
+    _table: QTableWidget
+    _context_menu_manager: TableContextMenuManager
+
+    def setup_stat_table_controls(self, layout: QBoxLayout, *, always_on_top: bool) -> None:
+        """Initialize the context menu manager and add the always-on-top checkbox."""
+        self._context_menu_manager = TableContextMenuManager(self._table, self, on_reset_column_sizes=self._reset_column_sizes)
+        self.add_always_on_top_checkbox(layout, always_on_top=always_on_top)
+
+    @override
+    def showEvent(self, event: QShowEvent) -> None:
+        """Adjust column widths when the window is shown."""
+        super().showEvent(event)
+        self._reset_column_sizes()
+
+    @override
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Adjust column widths when the window is resized."""
+        super().resizeEvent(event)
+        self._reset_column_sizes()
+
+    def _reset_column_sizes(self) -> None:
+        """Reset column widths back to their initial default layout."""
+        raise NotImplementedError

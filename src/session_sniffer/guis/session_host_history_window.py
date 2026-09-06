@@ -25,14 +25,46 @@ def populate_host_history_submenu(menu: QMenu, highlight_ip_callback: Callable[[
         act.setEnabled(False)
         menu.addAction(act)
         return
+
     now = datetime.now(tz=LOCAL_TZ)
     for entry in reversed(history):
         matched_player = PlayersRegistry.get_player_by_ip(entry.ip)
         usernames = ', '.join(matched_player.usernames) if matched_player is not None and matched_player.usernames else '—'
         elapsed_time_str = format_elapsed_time(now - entry.detected_at)
         act = QAction(f'{entry.ip}  |  {usernames}  |  {entry.detected_at.strftime("%H:%M:%S")} ({elapsed_time_str} ago)', menu)
-        act.triggered.connect(lambda _checked=False, _ip=entry.ip: highlight_ip_callback([_ip]))
+        target_ip = entry.ip
+        act.triggered.connect(lambda _checked=False, ip=target_ip: highlight_ip_callback([ip]))
         country_code = entry.country_code.strip().upper()
         if country_code and country_code in AVAILABLE_FLAG_CODES:
             act.setIcon(QIcon(QPixmap(str(COUNTRY_FLAGS_DIR / f'{country_code}.png'))))
         menu.addAction(act)
+
+
+def setup_session_host_actions(
+    session_host_submenu: QMenu,
+    clear_host_callback: Callable[[], None],
+    redetect_host_callback: Callable[[], None],
+    highlight_ips_callback: Callable[[list[str]], None],
+    *,
+    error_label: str = 'Host History',
+) -> None:
+    """Populate common session host control actions and the Host History submenu."""
+    session_host_submenu.addSeparator()
+
+    clear_host_action = QAction('❌ Clear Session Host', session_host_submenu)
+    clear_host_action.setToolTip('Manually clear the currently detected session host')
+    clear_host_action.triggered.connect(clear_host_callback)
+    session_host_submenu.addAction(clear_host_action)
+
+    redetect_host_action = QAction('🔄 Re-detect Host', session_host_submenu)
+    redetect_host_action.setToolTip('Clear the current host and immediately re-trigger host detection')
+    redetect_host_action.triggered.connect(redetect_host_callback)
+    session_host_submenu.addAction(redetect_host_action)
+
+    session_host_submenu.addSeparator()
+    host_history_submenu = session_host_submenu.addMenu('📜 Host History')
+    if not host_history_submenu:
+        message = f'Failed to create {error_label} submenu'
+        raise RuntimeError(message)
+    host_history_submenu.setToolTipsVisible(True)
+    host_history_submenu.aboutToShow.connect(lambda: populate_host_history_submenu(host_history_submenu, highlight_ips_callback))

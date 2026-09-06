@@ -32,7 +32,7 @@ from session_sniffer.guis.discord_intro import DiscordIntro
 from session_sniffer.guis.html_templates import generate_gui_header_html
 from session_sniffer.guis.logs_manager import LogsManager
 from session_sniffer.guis.player_resolver import PlayerResolverWindow
-from session_sniffer.guis.session_host_history_window import populate_host_history_submenu
+from session_sniffer.guis.session_host_history_window import setup_session_host_actions
 from session_sniffer.guis.settings_dialog import SettingsDialog
 from session_sniffer.guis.stylesheets import GTA5_STATUS_LABEL_STYLESHEET, MENU_BAR_STYLESHEET
 from session_sniffer.guis.userip_manager import UserIPDatabasesManager
@@ -206,25 +206,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
 
         session_host_submenu.aboutToShow.connect(_update_host_status_label)
 
-        session_host_submenu.addSeparator()
-
-        clear_host_action = QAction('❌ Clear Session Host', self)
-        clear_host_action.setToolTip('Manually clear the currently detected session host')
-        clear_host_action.triggered.connect(self._clear_session_host)
-        session_host_submenu.addAction(clear_host_action)
-
-        redetect_host_action = QAction('🔄 Re-detect Host', self)
-        redetect_host_action.setToolTip('Clear the current host and immediately re-trigger host detection')
-        redetect_host_action.triggered.connect(self._redetect_session_host)
-        session_host_submenu.addAction(redetect_host_action)
-
-        session_host_submenu.addSeparator()
-        host_history_submenu = session_host_submenu.addMenu('📜 Host History')
-        if not host_history_submenu:
-            message = 'Failed to create Host History submenu'
-            raise RuntimeError(message)
-        host_history_submenu.setToolTipsVisible(True)
-        host_history_submenu.aboutToShow.connect(lambda: populate_host_history_submenu(host_history_submenu, self._highlight_ips))
+        setup_session_host_actions(session_host_submenu, self._clear_session_host, self._redetect_session_host, self._highlight_ips)
 
         self._gta5_menu_process_separator = gta5_menu.addSeparator()
 
@@ -811,10 +793,12 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
         for ip in stale_ips:
             model.remove_player_by_ip(ip)
 
+    @override
     def _clear_session_host(self) -> None:
         """Manually clear the current session host and reset host detection state."""
         SessionHost.clear_session_host_data()
 
+    @override
     def _redetect_session_host(self) -> None:
         """Clear the current session host and immediately re-evaluate host detection with notification on failure."""
         if not Settings.is_session_host_feature_set():
@@ -908,6 +892,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
         self._detections_manager_window.destroyed.connect(lambda: setattr(self, '_detections_manager_window', None))
         self._detections_manager_window.show()
 
+    @override
     def _open_player_resolver(self) -> None:
         """Open the Player Resolver window, or focus the existing one."""
         self._player_resolver_window.show_and_focus()
