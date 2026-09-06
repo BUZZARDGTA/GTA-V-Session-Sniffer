@@ -25,6 +25,7 @@ from session_sniffer.capture.exceptions import (
     MalformedVlanFrameTooShortError,
     MissingPortError,
     MissingRequiredPacketFieldError,
+    PcapError,
 )
 from session_sniffer.capture.pcap import DLT_EN10MB, DLT_NULL, DLT_RAW, PcapHandle
 from session_sniffer.constants.standalone import MAX_PORT, MIN_PORT
@@ -339,8 +340,8 @@ class PacketCapture:
 
             try:
                 self._capture_and_process()
-            except CaptureExitError as e:
-                logger.warning('Packet capture stopped unexpectedly: %s', e)
+            except (CaptureExitError, PcapError) as e:
+                logger.warning('Packet capture stopped unexpectedly: %s', e.cause if isinstance(e, CaptureExitError) and e.cause is not None else e)
                 with self._state.control_lock:
                     self._state.running_event.clear()
                 if self.config.on_capture_lost is not None:
@@ -363,7 +364,7 @@ class PacketCapture:
             )
             if self.config.capture_filter:
                 pcap_handle.set_filter(self.config.capture_filter)
-        except Exception as e:
+        except PcapError as e:
             raise CaptureExitError(e) from e
 
         with self._state.control_lock:
@@ -373,7 +374,13 @@ class PacketCapture:
 
         try:
             while self._state.running_event.is_set() and not self._state.restart_requested.is_set():
-                captured_packet = pcap_handle.next_packet()
+                try:
+                    captured_packet = pcap_handle.next_packet()
+                except PcapError as e:
+                    if not self._state.running_event.is_set():
+                        break
+                    raise CaptureExitError(e) from e
+
                 if captured_packet is None:
                     continue
 
