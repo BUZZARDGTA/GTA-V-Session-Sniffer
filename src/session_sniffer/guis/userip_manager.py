@@ -467,7 +467,10 @@ class UserIPDatabasesManager(EntriesContextMenuMixin, FileSyncMixin, SettingsPan
         else:
             self._splitter.setSizes([scale_by_ui(280), scale_by_ui(820)])
 
-        self._splitter.splitterMoved.connect(lambda *_: self._adjust_username_column_width())
+        def _on_splitter_moved(_pos: int, _index: int) -> None:
+            self._adjust_username_column_width()
+
+        self._splitter.splitterMoved.connect(_on_splitter_moved)
         root_layout.addWidget(self._splitter)
 
         # --- Real-time filesystem sync ---

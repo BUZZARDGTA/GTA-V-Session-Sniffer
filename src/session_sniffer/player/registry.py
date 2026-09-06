@@ -295,9 +295,12 @@ class SessionHost:
         """Clear the in-memory session host history."""
         cls._history.clear()
 
-    @staticmethod
-    def get_host_player(session_connected: list[Player]) -> Player | None:
-        """Infer and cache the session host from currently connected players."""
+    @classmethod
+    def evaluate_host_player_with_reason(cls, session_connected: list[Player]) -> tuple[Player | None, str | None]:
+        """Evaluate connected players and return the detected session host or a rejection reason."""
+        if not session_connected:
+            return None, 'No other players are currently connected in your session.'
+
         p2p_players = [player for player in session_connected if not is_third_party_server_ip(player.ip)]
         if len(p2p_players) < len(session_connected):
             logger.debug(
@@ -307,7 +310,7 @@ class SessionHost:
             )
         if not p2p_players:
             logger.debug('[SessionHost] No P2P players remain after server filtering, skipping host search')
-            return None
+            return None, f'All {len(session_connected)} connected IP(s) are game or relay servers, not direct peer-to-peer players.'
         connected_players: list[Player] = nsmallest(SESSION_HOST_CANDIDATE_PLAYERS_COUNT, p2p_players, key=attrgetter('datetime.last_rejoin'))
 
         for i, player in enumerate(connected_players):
@@ -320,36 +323,38 @@ class SessionHost:
             )
 
         potential_session_host_player: Player | None = None
+        rejection_reason: str | None = None
 
         if len(connected_players) == 1:
             logger.debug('[SessionHost] Single candidate, selecting as potential host')
             potential_session_host_player = connected_players[0]
         elif len(connected_players) == SESSION_HOST_CANDIDATE_PLAYERS_COUNT:
             time_difference = connected_players[1].datetime.last_rejoin - connected_players[0].datetime.last_rejoin
+            gap_seconds = time_difference.total_seconds()
+            gap_milliseconds = gap_seconds * 1000
             logger.debug('[SessionHost] Two candidates, time_difference=%s', time_difference)
             if time_difference > timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS):
-                logger.debug(
-                    '[SessionHost] Rejected: gap %.0fms exceeds max threshold %sms, candidate[0] is temporally isolated',
-                    time_difference.total_seconds() * 1000,
-                    SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS,
+                rejection_reason = (
+                    f'Player {connected_players[0].ip} connected too long before the next player ({gap_seconds:.1f}s gap). '
+                    f'Host detection requires players to connect together in a lobby to reliably identify the session host.'
                 )
-                return None
-            if time_difference >= timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS):
+                cls.search_player = False
+                cls.search_start_time = None
+            elif time_difference >= timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS):
                 logger.debug(
                     '[SessionHost] Gap %.0fms in range [%sms, %sms], selecting candidate[0] as potential host',
-                    time_difference.total_seconds() * 1000,
+                    gap_milliseconds,
                     SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS,
                     SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS,
                 )
                 potential_session_host_player = connected_players[0]
             else:
-                logger.debug(
-                    '[SessionHost] Gap %.0fms < %sms, ambiguous timing, cannot determine host',
-                    time_difference.total_seconds() * 1000,
-                    SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS,
+                rejection_reason = (
+                    'The first two players connected almost at the exact same moment (less than 0.2s apart). '
+                    'Their connection times are too close to determine who hosted the session.'
                 )
-                SessionHost.search_player = False
-                SessionHost.search_start_time = None
+                cls.search_player = False
+                cls.search_start_time = None
         else:
             raise UnexpectedPlayerCountError(len(connected_players))
 
@@ -360,57 +365,42 @@ class SessionHost:
         # ensures relay hosts with few packets are detected rather than silently missed.
         is_sole_p2p_candidate = len(connected_players) == 1
 
-        if (
-            not potential_session_host_player
-            # Skip players remaining to be disconnected from the previous session.
-            or potential_session_host_player in SessionHost.players_pending_for_disconnection
-            # The lower this value, the riskier it becomes, as it could potentially flag a player who ultimately isn't part of the newly discovered session.
-            # In such scenarios, a better approach might involve checking around 25-100 packets.
-            # However, increasing this value also increases the risk, as the host may have already disconnected.
-            or potential_session_host_player.packets.exchanged < MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST
-            # A candidate with too many packets has been connected far too long to be the host of a
-            # newly joined session — host detection only applies at session join time.
-            # Skip this check for manual re-detects: the user explicitly requested re-detection,
-            # so packet count is irrelevant (the session is already in progress).
-            or (not SessionHost.manual_redetect and potential_session_host_player.packets.exchanged > SESSION_HOST_MAX_PACKETS_FOR_DETECTION)
-        ):
+        if rejection_reason is None:
             if not potential_session_host_player:
-                logger.debug('[SessionHost] Rejected: no potential host candidate was selected')
-            elif potential_session_host_player in SessionHost.players_pending_for_disconnection:
-                logger.debug(
-                    '[SessionHost] Rejected: candidate %s is in players_pending_for_disconnection (%d pending)',
-                    potential_session_host_player.ip,
-                    len(SessionHost.players_pending_for_disconnection),
+                rejection_reason = 'No potential host candidate could be selected.'
+            elif potential_session_host_player in cls.players_pending_for_disconnection:
+                rejection_reason = f'Player {potential_session_host_player.ip} is currently disconnecting or leaving the session.'
+            elif potential_session_host_player.packets.exchanged < MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
+                rejection_reason = (
+                    f'Not enough network packets exchanged yet with player {potential_session_host_player.ip} '
+                    f'({potential_session_host_player.packets.exchanged} / {MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST} packets). '
+                    f'Please wait a moment and try again.'
                 )
-            elif potential_session_host_player.packets.exchanged > SESSION_HOST_MAX_PACKETS_FOR_DETECTION:
-                logger.debug(
-                    '[SessionHost] Rejected: candidate %s has %d packets (exceeds max %d, too many for a newly joined session)',
-                    potential_session_host_player.ip,
-                    potential_session_host_player.packets.exchanged,
-                    SESSION_HOST_MAX_PACKETS_FOR_DETECTION,
+                if not is_sole_p2p_candidate and len(connected_players) >= SESSION_HOST_CANDIDATE_PLAYERS_COUNT:
+                    cls.last_timing_gap_candidate = (connected_players[0].ip, connected_players[1].ip)
+                    cls.search_player = False
+                    cls.search_start_time = None
+            elif not cls.manual_redetect and potential_session_host_player.packets.exchanged > SESSION_HOST_MAX_PACKETS_FOR_DETECTION:
+                rejection_reason = (
+                    f'Player {potential_session_host_player.ip} has already exchanged too many packets '
+                    f'to determine if they originally hosted the session.'
                 )
-            elif is_sole_p2p_candidate:
-                logger.debug(
-                    '[SessionHost] Rejected: sole candidate %s has %d packets (need >= %d)',
-                    potential_session_host_player.ip,
-                    potential_session_host_player.packets.exchanged,
-                    MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
-                )
-            else:
-                logger.debug(
-                    '[SessionHost] Rejected: candidate %s has %d packets (need >= %d)',
-                    potential_session_host_player.ip,
-                    potential_session_host_player.packets.exchanged,
-                    MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
-                )
-                SessionHost.last_timing_gap_candidate = (connected_players[0].ip, connected_players[1].ip)
-                SessionHost.search_player = False
-                SessionHost.search_start_time = None
-            return None
 
-        logger.debug('[SessionHost] Host found: %s', potential_session_host_player.ip)
-        SessionHost.set_player(potential_session_host_player)
-        SessionHost.search_player = False
-        SessionHost.manual_redetect = False
-        SessionHost.search_start_time = None
-        return potential_session_host_player
+        if rejection_reason is not None:
+            logger.debug('[SessionHost] Rejected: %s', rejection_reason)
+            return None, rejection_reason
+
+        return potential_session_host_player, None
+
+    @classmethod
+    def get_host_player(cls, session_connected: list[Player]) -> Player | None:
+        """Infer and cache the session host from currently connected players."""
+        potential_session_host_player, _ = cls.evaluate_host_player_with_reason(session_connected)
+        if potential_session_host_player is not None:
+            logger.debug('[SessionHost] Host found: %s', potential_session_host_player.ip)
+            cls.set_player(potential_session_host_player)
+            cls.search_player = False
+            cls.manual_redetect = False
+            cls.search_start_time = None
+            return potential_session_host_player
+        return None

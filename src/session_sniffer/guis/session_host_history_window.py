@@ -1,4 +1,4 @@
-"""Session Host History submenu population for the GTA5 Session Host menu."""
+"""Session Host History submenu population for the Session Host menu."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING

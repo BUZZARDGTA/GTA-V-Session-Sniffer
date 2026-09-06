@@ -14,6 +14,7 @@ from session_sniffer.gta5.process import GTA5Status, find_running_gta5_path
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import Settings
+from session_sniffer.toxic_commando.process import ToxicCommandoStatus, find_running_toxic_commando_path
 
 if TYPE_CHECKING:
     import psutil
@@ -46,18 +47,21 @@ def _log_process_status_transition(previous: TargetProcessStatus, current: Targe
 def _process_monitor() -> None:
     """Poll for the configured target PID and update `CaptureState`.
 
-    Exits as soon as neither process PID filtering nor the GTA5 feature set is active.
+    Exits as soon as neither process PID filtering nor any session host feature set is active.
     """
     last_process_status = TargetProcessStatus()
     last_gta5_status = GTA5Status(path=None)
+    last_toxic_commando_status = ToxicCommandoStatus(path=None)
     cached_process: psutil.Process | None = None
     cached_gta5_process: psutil.Process | None = None
+    cached_toxic_commando_process: psutil.Process | None = None
 
     while not gui_closed__event.is_set():
         target_pid = Settings.capture_filter_process_pid
-        if target_pid <= 0 and not Settings.is_gta5_feature_set():
+        if target_pid <= 0 and not Settings.is_session_host_feature_set():
             CaptureState.update_target_process_status(TargetProcessStatus())
             CaptureState.update_gta5_status(GTA5Status(path=None))
+            CaptureState.update_toxic_commando_status(ToxicCommandoStatus(path=None))
             return
 
         if target_pid > 0:
@@ -89,12 +93,21 @@ def _process_monitor() -> None:
             cached_gta5_process = None
             CaptureState.update_gta5_status(last_gta5_status)
 
+        # Update Toxic Commando status
+        if Settings.is_toxic_commando_feature_set():
+            last_toxic_commando_status, cached_toxic_commando_process = find_running_toxic_commando_path(cached_toxic_commando_process, last_toxic_commando_status)
+            CaptureState.update_toxic_commando_status(last_toxic_commando_status)
+        elif last_toxic_commando_status.is_running:
+            last_toxic_commando_status = ToxicCommandoStatus(path=None)
+            cached_toxic_commando_process = None
+            CaptureState.update_toxic_commando_status(last_toxic_commando_status)
+
         gui_closed__event.wait(1.0)
 
 
 def ensure_process_monitor_running() -> None:
     """Start the process monitor thread if needed and it is not already running."""
-    if Settings.capture_filter_process_pid <= 0 and not Settings.is_gta5_feature_set():
+    if Settings.capture_filter_process_pid <= 0 and not Settings.is_session_host_feature_set():
         return
     for thread in enumerate_threads():
         if thread.name == _PROCESS_MONITOR_THREAD_NAME and thread.is_alive():

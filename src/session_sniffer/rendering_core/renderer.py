@@ -483,8 +483,12 @@ def rendering_core(
                 if country_code_value is not None:
                     player.country_flag = get_country_flag(country_code_value)
 
-        if Settings.is_gta5_feature_set():
-            if not (CaptureState.gta5_is_running or not CaptureState.is_local_capture()) or not Settings.gui_session_host_detection:
+        if Settings.is_session_host_feature_set():
+            game_is_running = (
+                (CaptureState.gta5_is_running if Settings.is_gta5_feature_set() else CaptureState.toxic_commando_is_running)
+                or not CaptureState.is_local_capture()
+            )
+            if not game_is_running or not Settings.gui_session_host_detection:
                 if (
                     SessionHost.has_player()
                     or SessionHost.players_pending_for_disconnection
@@ -493,8 +497,15 @@ def rendering_core(
                 ):
                     SessionHost.clear_session_host_data()
             else:
-                if CaptureState.gta5_just_started:
+                game_just_started = False
+                if Settings.is_gta5_feature_set() and CaptureState.gta5_just_started:
                     CaptureState.gta5_just_started = False
+                    game_just_started = True
+                elif Settings.is_toxic_commando_feature_set() and CaptureState.toxic_commando_just_started:
+                    CaptureState.toxic_commando_just_started = False
+                    game_just_started = True
+
+                if game_just_started:
                     _sniffer_just_started = True
                     _sniffer_start_time = time.monotonic()
                     _session_host_was_active = False

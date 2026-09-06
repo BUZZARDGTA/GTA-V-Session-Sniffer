@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
     QWidgetAction,
@@ -23,6 +24,7 @@ from session_sniffer.guis._main_window_files_mixin import FilesMixin
 from session_sniffer.guis._main_window_gta5_mixin import GTA5_SOLO_TOOLTIP, GTA5Mixin
 from session_sniffer.guis._main_window_looky_mixin import LookyMixin
 from session_sniffer.guis._main_window_stats_mixin import StatsMixin
+from session_sniffer.guis._main_window_toxic_commando_mixin import ToxicCommandoMixin
 from session_sniffer.guis._session_table_section import SessionStatusBar, SessionTableSection
 from session_sniffer.guis.detections_manager import DetectionsManagerDialog
 from session_sniffer.guis.discord_intro import DiscordIntro
@@ -63,7 +65,7 @@ class _WindowState:
     min_accepted_snapshot_version: int
 
 
-class MainWindow(LookyMixin, GTA5Mixin, StatsMixin, FilesMixin, QMainWindow):
+class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMixin, QMainWindow):
     """Main Qt window that hosts session tables and control UI."""
 
     _actions: _MenuActions
@@ -256,12 +258,18 @@ class MainWindow(LookyMixin, GTA5Mixin, StatsMixin, FilesMixin, QMainWindow):
         self._gta5_process_detected = False
         self._last_gta5_status_key: tuple[bool, bool, bool, bool, bool] = (False, False, False, False, False)
 
+        self._build_toxic_commando_menu(menu_bar)
+
         if Settings.is_gta5_feature_set():
             self._sync_gta5_process_button()
             self._update_gta5_status_label()
             self._session_host_submenu.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
             self._player_resolver_action.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
             self._update_looky_actions()
+
+        if Settings.is_toxic_commando_feature_set():
+            self._update_toxic_commando_status_label()
+            self._toxic_commando_session_host_submenu.setEnabled(CaptureState.toxic_commando_is_running or not CaptureState.is_local_capture())
 
         self._update_gta5_toolbar_visibility()
 
@@ -744,6 +752,8 @@ class MainWindow(LookyMixin, GTA5Mixin, StatsMixin, FilesMixin, QMainWindow):
             self._update_looky_actions()
             self._sync_gta5_process_button()
 
+        self._sync_toxic_commando_status()
+
         if self._capture_statistics_window is not None:
             self._capture_statistics_window.refresh()
 
@@ -797,10 +807,48 @@ class MainWindow(LookyMixin, GTA5Mixin, StatsMixin, FilesMixin, QMainWindow):
         SessionHost.clear_session_host_data()
 
     def _redetect_session_host(self) -> None:
-        """Clear the current session host and immediately re-trigger host detection."""
+        """Clear the current session host and immediately re-evaluate host detection with notification on failure."""
+        if not Settings.is_session_host_feature_set():
+            QMessageBox.warning(self, TITLE, 'Session Host Detection is not supported for the current game feature set.')
+            return
+
+        if not Settings.gui_session_host_detection:
+            QMessageBox.warning(
+                self,
+                TITLE,
+                'Session Host Detection is disabled in Settings.\n\nPlease enable it in Settings to detect the session host.',
+            )
+            return
+
+        if CaptureState.is_local_capture():
+            if Settings.is_gta5_feature_set() and not CaptureState.gta5_is_running:
+                QMessageBox.warning(self, TITLE, 'Grand Theft Auto V is not currently running.')
+                return
+            if Settings.is_toxic_commando_feature_set() and not CaptureState.toxic_commando_is_running:
+                QMessageBox.warning(self, TITLE, "John Carpenter's Toxic Commando is not currently running.")
+                return
+
+        connected_players = PlayersRegistry.get_connected_players()
+        if not connected_players:
+            QMessageBox.information(self, TITLE, 'No connected players were found in the current session.')
+            return
+
         SessionHost.clear_session_host_data()
-        SessionHost.search_player = True
         SessionHost.manual_redetect = True
+
+        host_player, failure_reason = SessionHost.evaluate_host_player_with_reason(connected_players)
+        SessionHost.manual_redetect = False
+        SessionHost.search_player = False
+        SessionHost.search_start_time = None
+
+        if host_player is not None:
+            SessionHost.set_player(host_player)
+        else:
+            QMessageBox.warning(
+                self,
+                TITLE,
+                f'Could not resolve session host:\n\n{failure_reason}',
+            )
 
     def _apply_always_on_top(self) -> None:
         """Apply the always-on-top setting to the main window."""

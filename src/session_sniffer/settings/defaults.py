@@ -121,6 +121,7 @@ SETTING_METADATA: dict[str, SettingMeta] = {
         allowed_values=(
             'None',
             'GTA5',
+            'Toxic Commando',
         ),
     ),
     'capture_filter_process_pid': SettingMeta(
@@ -328,7 +329,7 @@ SETTING_METADATA: dict[str, SettingMeta] = {
         group='General',
         display_label='Session Host Detection',
         setting_type=SettingType.BOOLEAN,
-        tooltip='Detect and highlight the session host in the connected-players table (GTA5 feature set only).',
+        tooltip='Detect and highlight the session host in the connected-players table (supported feature sets only).',
     ),
     'gui_columns_connected_shown': SettingMeta(
         category='Columns',
