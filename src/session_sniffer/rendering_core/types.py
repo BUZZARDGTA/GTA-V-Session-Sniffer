@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from session_sniffer.capture.process import TargetProcessStatus
     from session_sniffer.gta5.process import GTA5Status
+    from session_sniffer.rdr2.process import RDR2Status
     from session_sniffer.toxic_commando.process import ToxicCommandoStatus
 
 _MAX_LATENCY_ENTRIES = 3600  # default; resized to Settings.gui_rate_graph_max_history after startup
@@ -127,6 +128,12 @@ class CaptureState:
     gta5_pid: ClassVar[int | None] = None
     gta5_is_suspended: ClassVar[bool] = False
     gta5_udp_ports: ClassVar[frozenset[int]] = frozenset[int]()
+    rdr2_is_running: ClassVar[bool] = False
+    rdr2_just_started: ClassVar[bool] = False
+    rdr2_path: ClassVar[Path | None] = None
+    rdr2_pid: ClassVar[int | None] = None
+    rdr2_is_suspended: ClassVar[bool] = False
+    rdr2_udp_ports: ClassVar[frozenset[int]] = frozenset[int]()
     toxic_commando_is_running: ClassVar[bool] = False
     toxic_commando_just_started: ClassVar[bool] = False
     toxic_commando_path: ClassVar[Path | None] = None
@@ -178,6 +185,18 @@ class CaptureState:
             cls.gta5_pid = status.pid
             cls.gta5_is_suspended = status.is_suspended
             cls.gta5_udp_ports = status.udp_ports
+
+    @classmethod
+    def update_rdr2_status(cls, status: RDR2Status) -> None:
+        """Update RDR2 running/suspended state and set `rdr2_just_started` on the first detected launch."""
+        with cls._lock:
+            if status.is_running and not cls.rdr2_is_running:
+                cls.rdr2_just_started = True
+            cls.rdr2_is_running = status.is_running
+            cls.rdr2_path = status.path
+            cls.rdr2_pid = status.pid
+            cls.rdr2_is_suspended = status.is_suspended
+            cls.rdr2_udp_ports = status.udp_ports
 
     @classmethod
     def update_toxic_commando_status(cls, status: ToxicCommandoStatus) -> None:

@@ -12,6 +12,7 @@ from session_sniffer.background.events import gui_closed__event
 from session_sniffer.capture.process import TargetProcessStatus, inspect_target_process
 from session_sniffer.gta5.process import GTA5Status, find_running_gta5_path
 from session_sniffer.logging_setup import get_logger
+from session_sniffer.rdr2.process import RDR2Status, find_running_rdr2_path
 from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import Settings
 from session_sniffer.toxic_commando.process import ToxicCommandoStatus, find_running_toxic_commando_path
@@ -51,9 +52,11 @@ def _process_monitor() -> None:
     """
     last_process_status = TargetProcessStatus()
     last_gta5_status = GTA5Status(path=None)
+    last_rdr2_status = RDR2Status(path=None)
     last_toxic_commando_status = ToxicCommandoStatus(path=None)
     cached_process: psutil.Process | None = None
     cached_gta5_process: psutil.Process | None = None
+    cached_rdr2_process: psutil.Process | None = None
     cached_toxic_commando_process: psutil.Process | None = None
 
     while not gui_closed__event.is_set():
@@ -61,6 +64,7 @@ def _process_monitor() -> None:
         if target_pid <= 0 and not Settings.is_session_host_feature_set():
             CaptureState.update_target_process_status(TargetProcessStatus())
             CaptureState.update_gta5_status(GTA5Status(path=None))
+            CaptureState.update_rdr2_status(RDR2Status(path=None))
             CaptureState.update_toxic_commando_status(ToxicCommandoStatus(path=None))
             return
 
@@ -92,6 +96,15 @@ def _process_monitor() -> None:
             last_gta5_status = GTA5Status(path=None)
             cached_gta5_process = None
             CaptureState.update_gta5_status(last_gta5_status)
+
+        # Update RDR2 status for RDR2-specific features (suspend manager, session host)
+        if Settings.is_rdr2_feature_set():
+            last_rdr2_status, cached_rdr2_process = find_running_rdr2_path(cached_rdr2_process, last_rdr2_status)
+            CaptureState.update_rdr2_status(last_rdr2_status)
+        elif last_rdr2_status.is_running:
+            last_rdr2_status = RDR2Status(path=None)
+            cached_rdr2_process = None
+            CaptureState.update_rdr2_status(last_rdr2_status)
 
         # Update Toxic Commando status
         if Settings.is_toxic_commando_feature_set():

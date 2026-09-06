@@ -1,9 +1,8 @@
-"""GTA5 process detection and immutable state snapshot.
+"""RDR2 process detection and immutable state snapshot.
 
-Detects the currently running GTA V process (Legacy `GTA5.exe` or Enhanced
-`GTA5_Enhanced.exe`), verifies its Authenticode signature to reject impostor
-executables that merely reuse the process name, and exposes the result as an
-immutable `GTA5Status` snapshot.
+Detects the currently running Red Dead Redemption 2 process (`RDR2.exe`),
+verifies its Authenticode signature to reject impostor executables that merely
+reuse the process name, and exposes the result as an immutable `RDR2Status` snapshot.
 """
 
 from contextlib import suppress
@@ -21,27 +20,24 @@ logger = get_logger(__name__)
 
 # pylint: disable=duplicate-code
 
-_GTA5_PROCESS_NAMES: frozenset[str] = frozenset(
+_RDR2_PROCESS_NAMES: frozenset[str] = frozenset(
     {
-        'gta5.exe',
-        'gta5_enhanced.exe',
+        'rdr2.exe',
     },
 )
 
 
 @dataclass(frozen=True, slots=True)
-class GTA5Status:
-    """Immutable snapshot of the running GTA5 process state.
+class RDR2Status:
+    """Immutable snapshot of the running RDR2 process state.
 
     Attributes:
-        path: Resolved path to the running GTA5 executable, or `None` if not running.
-        pid: PID of the running GTA5 process, or `None` if not running.
-        is_suspended: `True` if the running GTA5 process is currently suspended at the
+        path: Resolved path to the running RDR2 executable, or `None` if not running.
+        pid: PID of the running RDR2 process, or `None` if not running.
+        is_suspended: `True` if the running RDR2 process is currently suspended at the
             OS level (its threads are stopped), regardless of what suspended it.
-        udp_ports: Set of local UDP socket ports currently bound by the GTA5 process.
-        is_running: `True` if a GTA5 process was detected.
-        is_enhanced: `True` if the running version is GTA V Enhanced (`GTA5_Enhanced.exe`).
-        is_legacy: `True` if the running version is GTA V Legacy (`GTA5.exe`).
+        udp_ports: Set of local UDP socket ports currently bound by the RDR2 process.
+        is_running: `True` if an RDR2 process was detected.
     """
 
     path: Path | None
@@ -49,29 +45,21 @@ class GTA5Status:
     is_suspended: bool = False
     udp_ports: frozenset[int] = frozenset()
     is_running: bool = field(init=False)
-    is_enhanced: bool = field(init=False)
-    is_legacy: bool = field(init=False)
 
     def __post_init__(self) -> None:
-        """Derive `is_running`, `is_enhanced`, and `is_legacy` from `path`."""
-        stem = self.path.stem.lower() if self.path is not None else ''
-
+        """Derive `is_running` from `path`."""
         object.__setattr__(self, 'is_running', self.path is not None)
-        object.__setattr__(self, 'is_enhanced', stem == 'gta5_enhanced')
-        object.__setattr__(self, 'is_legacy', stem == 'gta5')
 
 
-def find_running_gta5_path(
+def find_running_rdr2_path(
     cached_proc: psutil.Process | None = None,
-    cached_status: GTA5Status | None = None,
-) -> tuple[GTA5Status, psutil.Process | None]:
-    """Return a `GTA5Status` snapshot for the currently running GTA5 process plus its process handle.
+    cached_status: RDR2Status | None = None,
+) -> tuple[RDR2Status, psutil.Process | None]:
+    """Return an `RDR2Status` snapshot for the currently running RDR2 process plus its process handle.
 
-    Scans all running processes for `GTA5.exe` or `GTA5_Enhanced.exe`
-    (legacy retail and enhanced PC versions respectively) using a
-    case-insensitive filename stem match, then verifies the binary carries
-    a valid Authenticode signature to reject any impostor executable that
-    merely reuses the GTA5 process name.
+    Scans all running processes for `RDR2.exe` using a case-insensitive filename stem match,
+    then verifies the binary carries a valid Authenticode signature to reject any impostor
+    executable that merely reuses the RDR2 process name.
 
     The full scan is the expensive part: resolving each process `exe` opens a handle to
     every running process. So when `cached_proc`/`cached_status` describe a process a
@@ -87,13 +75,13 @@ def find_running_gta5_path(
     Args:
         cached_proc: The `psutil.Process` returned by the previous call, re-queried
             directly to avoid a full scan. Pass `None` to force a full scan.
-        cached_status: The `GTA5Status` returned by the previous call, supplying the
+        cached_status: The `RDR2Status` returned by the previous call, supplying the
             already-resolved executable path reused on the fast path.
 
     Returns:
-        A `(GTA5Status, psutil.Process | None)` tuple. `GTA5Status.path` is set to the
+        A `(RDR2Status, psutil.Process | None)` tuple. `RDR2Status.path` is set to the
         resolved executable path when found, or `None` (with all boolean flags `False`)
-        when neither version is running. The returned process handle should be passed
+        when not running. The returned process handle should be passed
         back as `cached_proc` on the next call, or is `None` when nothing was found.
     """
     # Fast path: re-query only the previously validated PID.
@@ -101,7 +89,7 @@ def find_running_gta5_path(
         with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
             if cached_proc.is_running():
                 return (
-                    GTA5Status(
+                    RDR2Status(
                         path=cached_status.path,
                         pid=cached_proc.pid,
                         is_suspended=cached_proc.status() == psutil.STATUS_STOPPED,
@@ -114,7 +102,7 @@ def find_running_gta5_path(
     for process in psutil.process_iter(['name']):
         process_name = cast('str | None', process.info.get('name'))
 
-        if not process_name or process_name.lower() not in _GTA5_PROCESS_NAMES:
+        if not process_name or process_name.lower() not in _RDR2_PROCESS_NAMES:
             continue
 
         try:
@@ -123,16 +111,16 @@ def find_running_gta5_path(
             continue
 
         if not has_valid_authenticode_signature(process_path):
-            logger.debug('[GTA5Monitor] Authenticode signature invalid, ignoring impostor: "%s" (PID: %s)', process_path, process.pid)
+            logger.debug('[RDR2Monitor] Authenticode signature invalid, ignoring impostor: "%s" (PID: %s)', process_path, process.pid)
             continue
 
         resolved_path = process_path.resolve()
 
-        logger.debug('[GTA5Monitor] Authenticode signature verified: "%s" (PID: %s)', resolved_path, process.pid)
+        logger.debug('[RDR2Monitor] Authenticode signature verified: "%s" (PID: %s)', resolved_path, process.pid)
 
         with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
             return (
-                GTA5Status(
+                RDR2Status(
                     path=resolved_path,
                     pid=process.pid,
                     is_suspended=process.status() == psutil.STATUS_STOPPED,
@@ -142,6 +130,6 @@ def find_running_gta5_path(
             )
 
     return (
-        GTA5Status(path=None),
+        RDR2Status(path=None),
         None,
     )

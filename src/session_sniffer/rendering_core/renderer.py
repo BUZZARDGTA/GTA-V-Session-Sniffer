@@ -35,6 +35,7 @@ from session_sniffer.player.registry import (
     SessionHost,
 )
 from session_sniffer.player.userip import UserIPDatabases, UserIPSettings
+from session_sniffer.rdr2.suspend_manager import RDR2SuspendManager
 from session_sniffer.rendering_core.modmenu_logs_parser import ModMenuLogsParser
 from session_sniffer.rendering_core.session_table_renderer import (
     SessionTableRenderContext,
@@ -423,10 +424,13 @@ def rendering_core(
 
                 handle_detection_notification(player, 'player_left_session')
 
-        # Nudge the GTA5 suspend monitor so reasons waiting on a player 'left' event
+        # Nudge the GTA5 / RDR2 suspend monitor so reasons waiting on a player 'left' event
         # resume the process immediately instead of waiting for the next poll cycle.
-        if players_to_disconnect and Settings.is_gta5_feature_set():
-            GTASuspendManager.wake()
+        if players_to_disconnect:
+            if Settings.is_gta5_feature_set():
+                GTASuspendManager.wake()
+            elif Settings.is_rdr2_feature_set():
+                RDR2SuspendManager.wake()
 
         _active_threads = threading.active_count()
         if _active_threads > _THREAD_COUNT_WARN_THRESHOLD:
@@ -484,10 +488,13 @@ def rendering_core(
                     player.country_flag = get_country_flag(country_code_value)
 
         if Settings.is_session_host_feature_set():
-            game_is_running = (
-                (CaptureState.gta5_is_running if Settings.is_gta5_feature_set() else CaptureState.toxic_commando_is_running)
-                or not CaptureState.is_local_capture()
-            )
+            if Settings.is_gta5_feature_set():
+                game_is_running = CaptureState.gta5_is_running or not CaptureState.is_local_capture()
+            elif Settings.is_rdr2_feature_set():
+                game_is_running = CaptureState.rdr2_is_running or not CaptureState.is_local_capture()
+            else:
+                game_is_running = CaptureState.toxic_commando_is_running or not CaptureState.is_local_capture()
+
             if not game_is_running or not Settings.gui_session_host_detection:
                 if (
                     SessionHost.has_player()
@@ -501,6 +508,9 @@ def rendering_core(
                 if Settings.is_gta5_feature_set() and CaptureState.gta5_just_started:
                     CaptureState.gta5_just_started = False
                     game_just_started = True
+                elif Settings.is_rdr2_feature_set() and CaptureState.rdr2_just_started:
+                    CaptureState.rdr2_just_started = False
+                    game_just_started = True
                 elif Settings.is_toxic_commando_feature_set() and CaptureState.toxic_commando_just_started:
                     CaptureState.toxic_commando_just_started = False
                     game_just_started = True
@@ -513,7 +523,11 @@ def rendering_core(
                 p2p_session_connected = [player for player in session_connected if not is_third_party_server_ip(player.ip)]
                 current_session_host = SessionHost.get_player()
                 if current_session_host is not None and current_session_host.left_event.is_set():
-                    if current_session_host.packets.exchanged <= MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST and _relay_host_logged_ip != current_session_host.ip:
+                    if (
+                        Settings.is_rockstar_feature_set()
+                        and current_session_host.packets.exchanged <= MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST
+                        and _relay_host_logged_ip != current_session_host.ip
+                    ):
                         logger.debug(
                             '[SessionHost] Current host %s disconnected but is relayed (%d packets <= %d), keeping as host until session clears',
                             current_session_host.ip,
@@ -521,7 +535,7 @@ def rendering_core(
                             MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
                         )
                         _relay_host_logged_ip = current_session_host.ip
-                    elif current_session_host.packets.exchanged > MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
+                    elif not Settings.is_rockstar_feature_set() or current_session_host.packets.exchanged > MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
                         logger.debug('[SessionHost] Current host %s left_event is set, clearing host', current_session_host.ip)
                         _relay_host_logged_ip = None
                         SessionHost.set_player(None)

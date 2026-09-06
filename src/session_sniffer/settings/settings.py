@@ -232,8 +232,18 @@ class Settings:
 
     @classmethod
     def is_gta5_feature_set(cls) -> bool:
-        """Return `True` when the active capture feature set is GTA5."""
-        return cls.capture_feature_set == 'GTA5'
+        """Return `True` when the active capture feature set is GTA V."""
+        return cls.capture_feature_set == 'GTA V'
+
+    @classmethod
+    def is_rdr2_feature_set(cls) -> bool:
+        """Return `True` when the active capture feature set is RDR2."""
+        return cls.capture_feature_set == 'RDR2'
+
+    @classmethod
+    def is_rockstar_feature_set(cls) -> bool:
+        """Return `True` when the active capture feature set is a Rockstar title (GTA V or RDR2)."""
+        return cls.capture_feature_set in ('GTA V', 'RDR2')
 
     @classmethod
     def is_toxic_commando_feature_set(cls) -> bool:
@@ -243,7 +253,7 @@ class Settings:
     @classmethod
     def is_session_host_feature_set(cls) -> bool:
         """Return `True` when the active capture feature set supports session host detection."""
-        return cls.capture_feature_set in ('GTA5', 'Toxic Commando')
+        return cls.capture_feature_set in ('GTA V', 'RDR2', 'Toxic Commando')
 
     @classmethod
     def rebuild_blocked_ip_ranges(cls) -> None:

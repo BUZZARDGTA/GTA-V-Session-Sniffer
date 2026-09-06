@@ -120,7 +120,8 @@ SETTING_METADATA: dict[str, SettingMeta] = {
         requires_capture_restart=True,
         allowed_values=(
             'None',
-            'GTA5',
+            'GTA V',
+            'RDR2',
             'Toxic Commando',
         ),
     ),

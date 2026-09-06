@@ -67,6 +67,8 @@ class _PlayerLifecycleState:
     userip_check_version: int = -1
     userip_check_positive: bool = False
     is_gta5_process: bool = False
+    is_rdr2_process: bool = False
+    is_toxic_commando_process: bool = False
 
 
 @dataclass(slots=True)
@@ -184,6 +186,24 @@ class Player:  # pylint: disable=too-many-public-methods
     @is_gta5_process.setter
     def is_gta5_process(self, value: bool) -> None:
         self._lifecycle.is_gta5_process = value
+
+    @property
+    def is_rdr2_process(self) -> bool:
+        """Whether this player's traffic matched the detected RDR2 process."""
+        return self._lifecycle.is_rdr2_process
+
+    @is_rdr2_process.setter
+    def is_rdr2_process(self, value: bool) -> None:
+        self._lifecycle.is_rdr2_process = value
+
+    @property
+    def is_toxic_commando_process(self) -> bool:
+        """Whether this player's traffic matched the detected Toxic Commando process."""
+        return self._lifecycle.is_toxic_commando_process
+
+    @is_toxic_commando_process.setter
+    def is_toxic_commando_process(self, value: bool) -> None:
+        self._lifecycle.is_toxic_commando_process = value
 
     @property
     def datetime(self) -> PlayerDateTime:

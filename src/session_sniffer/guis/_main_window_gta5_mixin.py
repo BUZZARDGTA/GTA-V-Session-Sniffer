@@ -48,6 +48,13 @@ class GTA5Mixin(QMainWindow):
     _gta5_menu_status_separator: QAction
     _gta5_menu_process_separator: QAction
     _session_host_submenu: QMenu
+    _rdr2_menu: QMenu
+    _rdr2_status_widget_action: QAction
+    _rdr2_menu_status_separator: QAction
+    _rdr2_session_host_submenu: QMenu
+    _rdr2_player_resolver_action: QAction
+    _rdr2_menu_process_separator: QAction
+    _rdr2_process_submenu: QMenu
     _toxic_commando_menu: QMenu
     _toxic_commando_status_widget_action: QAction
     _toxic_commando_menu_status_separator: QAction
@@ -262,6 +269,22 @@ class GTA5Mixin(QMainWindow):
         self._session_host_submenu.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
         self._player_resolver_action.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
         self._update_looky_actions()
+
+        rdr2_feature_set = Settings.is_rdr2_feature_set()
+        rdr2_menu_action = self._rdr2_menu.menuAction()
+        if rdr2_menu_action:
+            rdr2_menu_action.setVisible(rdr2_feature_set)
+
+        rdr2_local_only = rdr2_feature_set and CaptureState.is_local_capture()
+        self._rdr2_status_widget_action.setVisible(rdr2_local_only)
+        self._rdr2_menu_status_separator.setVisible(rdr2_local_only)
+        self._rdr2_menu_process_separator.setVisible(rdr2_local_only)
+        rdr2_process_action = self._rdr2_process_submenu.menuAction()
+        if rdr2_process_action:
+            rdr2_process_action.setVisible(rdr2_local_only)
+
+        self._rdr2_session_host_submenu.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
+        self._rdr2_player_resolver_action.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
 
         toxic_commando_feature_set = Settings.is_toxic_commando_feature_set()
         toxic_commando_menu_action = self._toxic_commando_menu.menuAction()

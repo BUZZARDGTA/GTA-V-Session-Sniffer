@@ -23,6 +23,7 @@ from session_sniffer.gta5.suspend_manager import GTASuspendManager
 from session_sniffer.guis._main_window_files_mixin import FilesMixin
 from session_sniffer.guis._main_window_gta5_mixin import GTA5_SOLO_TOOLTIP, GTA5Mixin
 from session_sniffer.guis._main_window_looky_mixin import LookyMixin
+from session_sniffer.guis._main_window_rdr2_mixin import RDR2Mixin
 from session_sniffer.guis._main_window_stats_mixin import StatsMixin
 from session_sniffer.guis._main_window_toxic_commando_mixin import ToxicCommandoMixin
 from session_sniffer.guis._session_table_section import SessionStatusBar, SessionTableSection
@@ -65,7 +66,7 @@ class _WindowState:
     min_accepted_snapshot_version: int
 
 
-class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMixin, QMainWindow):
+class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixin, FilesMixin, QMainWindow):  # pylint: disable=too-many-ancestors
     """Main Qt window that hosts session tables and control UI."""
 
     _actions: _MenuActions
@@ -143,7 +144,7 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
         change_interface_action.triggered.connect(on_change_interface)
         capture_menu.addAction(change_interface_action)
 
-        gta5_menu = menu_bar.addMenu('GTA5')
+        gta5_menu = menu_bar.addMenu('GTA V')
         if not gta5_menu:
             message = 'Failed to create GTA5 menu'
             raise RuntimeError(message)
@@ -258,6 +259,7 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
         self._gta5_process_detected = False
         self._last_gta5_status_key: tuple[bool, bool, bool, bool, bool] = (False, False, False, False, False)
 
+        self._build_rdr2_menu(menu_bar)
         self._build_toxic_commando_menu(menu_bar)
 
         if Settings.is_gta5_feature_set():
@@ -266,6 +268,12 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
             self._session_host_submenu.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
             self._player_resolver_action.setEnabled(CaptureState.gta5_is_running or not CaptureState.is_local_capture())
             self._update_looky_actions()
+
+        if Settings.is_rdr2_feature_set():
+            self._sync_rdr2_process_button()
+            self._update_rdr2_status_label()
+            self._rdr2_session_host_submenu.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
+            self._rdr2_player_resolver_action.setEnabled(CaptureState.rdr2_is_running or not CaptureState.is_local_capture())
 
         if Settings.is_toxic_commando_feature_set():
             self._update_toxic_commando_status_label()
@@ -752,6 +760,7 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
             self._update_looky_actions()
             self._sync_gta5_process_button()
 
+        self._sync_rdr2_status()
         self._sync_toxic_commando_status()
 
         if self._capture_statistics_window is not None:
@@ -823,6 +832,9 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
         if CaptureState.is_local_capture():
             if Settings.is_gta5_feature_set() and not CaptureState.gta5_is_running:
                 QMessageBox.warning(self, TITLE, 'Grand Theft Auto V is not currently running.')
+                return
+            if Settings.is_rdr2_feature_set() and not CaptureState.rdr2_is_running:
+                QMessageBox.warning(self, TITLE, 'Red Dead Redemption 2 is not currently running.')
                 return
             if Settings.is_toxic_commando_feature_set() and not CaptureState.toxic_commando_is_running:
                 QMessageBox.warning(self, TITLE, "John Carpenter's Toxic Commando is not currently running.")

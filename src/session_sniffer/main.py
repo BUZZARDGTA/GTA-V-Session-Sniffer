@@ -285,6 +285,18 @@ def main() -> None:
             and CaptureState.gta5_is_running
             and local_port in CaptureState.gta5_udp_ports
         )
+        is_rdr2_packet = (
+            Settings.is_rdr2_feature_set()
+            and CaptureState.is_local_capture()
+            and CaptureState.rdr2_is_running
+            and local_port in CaptureState.rdr2_udp_ports
+        )
+        is_toxic_commando_packet = (
+            Settings.is_toxic_commando_feature_set()
+            and CaptureState.is_local_capture()
+            and CaptureState.toxic_commando_is_running
+            and local_port in CaptureState.toxic_commando_udp_ports
+        )
 
         matched_player = PlayersRegistry.get_player_by_ip(target_ip)
         if matched_player is None:
@@ -322,6 +334,12 @@ def main() -> None:
 
         if is_gta5_packet and not matched_player.is_gta5_process:
             matched_player.is_gta5_process = True
+
+        if is_rdr2_packet and not matched_player.is_rdr2_process:
+            matched_player.is_rdr2_process = True
+
+        if is_toxic_commando_packet and not matched_player.is_toxic_commando_process:
+            matched_player.is_toxic_commando_process = True
 
         if packet.payload is not None and (resolved_ps3_username := extract_ps3_username(packet.payload, sent_by_local_host=sent_by_local_host)):
             matched_player.ps3_username = resolved_ps3_username

@@ -1,7 +1,7 @@
-"""Reason-based process suspension manager for the global GTA5 process.
+"""Reason-based process suspension manager for the global RDR2 process.
 
 This module provides a singleton manager that controls suspension and resumption
-of the single, globally-resolved GTA5 process based on multiple concurrent
+of the single, globally-resolved RDR2 process based on multiple concurrent
 "reasons" (e.g. detections, player events, manual overrides). It ensures the
 process is only suspended once and only resumed when all active reasons are resolved.
 """
@@ -37,7 +37,7 @@ class _ProcessState:
 
 
 @dataclass(frozen=True, slots=True)
-class GTASuspendSnapshot:
+class RDR2SuspendSnapshot:
     """Immutable, lock-free view of the manager state for GUI reads.
 
     Republished by the background suspend threads after every state change so the GUI
@@ -50,14 +50,14 @@ class GTASuspendSnapshot:
     solo_active: bool = False
 
 
-class GTASuspendManager:
+class RDR2SuspendManager:
     """Singleton suspend manager (thread-safe, reason-based)."""
 
     _state: ClassVar[_ProcessState | None] = None
     _condition: ClassVar[Condition] = Condition()
     _shutdown_event: ClassVar[Event] = Event()
     _monitor_thread: ClassVar[Thread | None] = None
-    _snapshot: ClassVar[GTASuspendSnapshot] = GTASuspendSnapshot()
+    _snapshot: ClassVar[RDR2SuspendSnapshot] = RDR2SuspendSnapshot()
 
     # ------------------------------------------------------------
     # Public API
@@ -70,7 +70,7 @@ class GTASuspendManager:
         left_event: Event,
         duration: int | Literal['Auto', 'Manual'],
     ) -> None:
-        """Register a suspend reason for the global GTA5 process.
+        """Register a suspend reason for the global RDR2 process.
 
         The process will be suspended on the first active reason and will remain
         suspended until all registered reasons are resolved.
@@ -119,15 +119,15 @@ class GTASuspendManager:
             # -------------------------
             # first suspend
             # -------------------------
-            target_gta5_process_id = CaptureState.gta5_pid
-            if target_gta5_process_id is None:
-                logger.debug('GTA5 process not running; suspend request ignored for reason: %s', reason_key)
+            target_rdr2_process_id = CaptureState.rdr2_pid
+            if target_rdr2_process_id is None:
+                logger.debug('RDR2 process not running; suspend request ignored for reason: %s', reason_key)
                 return
 
-            if not cls._try_suspend_pid(target_gta5_process_id, f'first reason: {reason_key}'):
+            if not cls._try_suspend_pid(target_rdr2_process_id, f'first reason: {reason_key}'):
                 return
 
-            cls._state = _ProcessState(pid=target_gta5_process_id, suspended=True)
+            cls._state = _ProcessState(pid=target_rdr2_process_id, suspended=True)
             cls._state.reasons[reason_key] = reason
 
             cls._publish_snapshot_locked()
@@ -200,7 +200,7 @@ class GTASuspendManager:
 
     @classmethod
     def is_suspended(cls) -> bool:
-        """Return whether the global GTA5 process is currently suspended by this manager."""
+        """Return whether the global RDR2 process is currently suspended by this manager."""
         with cls._condition:
             return cls._state is not None and cls._state.suspended
 
@@ -211,11 +211,11 @@ class GTASuspendManager:
             return cls._state is not None and reason_key in cls._state.reasons
 
     @classmethod
-    def snapshot(cls) -> GTASuspendSnapshot:
+    def snapshot(cls) -> RDR2SuspendSnapshot:
         """Return the latest published state snapshot without acquiring the lock.
 
         Reads a single immutable reference (atomic under the GIL), letting the GUI
-        thread refresh its GTA5 menu flags with zero lock contention against the
+        thread refresh its RDR2 menu flags with zero lock contention against the
         background suspend and monitor threads.
         """
         return cls._snapshot
@@ -234,21 +234,21 @@ class GTASuspendManager:
 
     @classmethod
     def resume_os_suspended(cls) -> bool:
-        """Resume the live GTA5 process when it was suspended outside this manager.
+        """Resume the live RDR2 process when it was suspended outside this manager.
 
         Recovers a process left stopped outside this manager's control (for example, by
         a previously-crashed session) by issuing a single resume on the PID cached by the
-        GTA5 process monitor, so the OS thread suspend counts are not left unbalanced.
+        RDR2 process monitor, so the OS thread suspend counts are not left unbalanced.
         Does nothing and returns `False` when this manager owns an active suspend state,
         since the monitor thread is responsible for resuming in that case.
         """
         with cls._condition:
             if cls._state is not None:
                 return False
-            target_gta5_process_id = CaptureState.gta5_pid
-            if target_gta5_process_id is None:
+            target_rdr2_process_id = CaptureState.rdr2_pid
+            if target_rdr2_process_id is None:
                 return False
-            return cls._try_resume_pid(target_gta5_process_id)
+            return cls._try_resume_pid(target_rdr2_process_id)
 
     # ------------------------------------------------------------
     # Monitor lifecycle
@@ -260,7 +260,7 @@ class GTASuspendManager:
         if cls._monitor_thread is None or not cls._monitor_thread.is_alive():
             cls._monitor_thread = Thread(
                 target=cls._monitor,
-                name='SuspendMonitor-GTA5',
+                name='SuspendMonitor-RDR2',
                 daemon=True,
             )
             cls._monitor_thread.start()
@@ -274,11 +274,11 @@ class GTASuspendManager:
                         return
 
                     # Stale-PID check (process exited -> None, or restarted -> new PID).
-                    # Reads the PID cached by the GTA5 process monitor to avoid a full
+                    # Reads the PID cached by the RDR2 process monitor to avoid a full
                     # `process_iter` scan on every monitor iteration while holding the lock.
-                    current_gta5_process_id = CaptureState.gta5_pid
-                    if current_gta5_process_id != cls._state.pid:
-                        logger.warning('GTA5 PID changed (%s -> %s); clearing suspend state', cls._state.pid, current_gta5_process_id)
+                    current_rdr2_process_id = CaptureState.rdr2_pid
+                    if current_rdr2_process_id != cls._state.pid:
+                        logger.warning('RDR2 PID changed (%s -> %s); clearing suspend state', cls._state.pid, current_rdr2_process_id)
                         cls._state = None
                         cls._publish_snapshot_locked()
                         return
@@ -313,9 +313,9 @@ class GTASuspendManager:
         immutable object so lock-free GUI readers always observe a consistent view.
         """
         if cls._state is None:
-            cls._snapshot = GTASuspendSnapshot()
+            cls._snapshot = RDR2SuspendSnapshot()
             return
-        cls._snapshot = GTASuspendSnapshot(
+        cls._snapshot = RDR2SuspendSnapshot(
             is_suspended=cls._state.suspended,
             manual_active='manual:toolbar' in cls._state.reasons,
             solo_active='solo:toolbar' in cls._state.reasons,

@@ -423,8 +423,8 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
 
     def _on_feature_set_changed(self, feature_set: str) -> None:
         """Show or hide feature-set-dependent rows depending on the active feature set."""
-        session_host_supported = feature_set in ('GTA5', 'Toxic Commando')
-        gta5_only = feature_set == 'GTA5'
+        session_host_supported = feature_set in ('GTA V', 'RDR2', 'Toxic Commando')
+        gta5_only = feature_set == 'GTA V'
         for key in ('gui_session_host_detection',):
             widget = self._widgets.get(key)
             label = self._labels.get(key)

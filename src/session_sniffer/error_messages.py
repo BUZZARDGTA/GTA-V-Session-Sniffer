@@ -305,3 +305,13 @@ def format_gta5_solo_session_process_not_running_message() -> str:
 def format_gta5_solo_session_suspend_failed_message() -> str:
     """Format the error shown when the GTA5 process suspend attempt fails."""
     return 'Failed to suspend the GTA5 process.\n\nTry running Session Sniffer as administrator.'
+
+
+def format_rdr2_solo_session_process_not_running_message() -> str:
+    """Format the warning shown when Solo Public Session is triggered but RDR2 is not running."""
+    return 'RDR2 is not currently running.\n\nPlease launch RDR2 before using this feature.'
+
+
+def format_rdr2_solo_session_suspend_failed_message() -> str:
+    """Format the error shown when the RDR2 process suspend attempt fails."""
+    return 'Failed to suspend the RDR2 process.\n\nTry running Session Sniffer as administrator.'
