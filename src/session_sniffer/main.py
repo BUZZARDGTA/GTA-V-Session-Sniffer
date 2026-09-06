@@ -742,25 +742,6 @@ def main() -> None:
 
     ensure_process_monitor_running()
 
-    splash.finish_loading()
-
-    def _reveal_main_window() -> None:
-        # Lower splash before showing main window so it can rise above it;
-        # show while splash still owns the foreground to avoid activateWindow() being ignored.
-        splash.lower_to_back()
-        window.show()
-        window.raise_()
-        window.activateWindow()
-        QTimer.singleShot(100, splash.close_splash)
-
-    QTimer.singleShot(1500, _reveal_main_window)
-
-    def _check_startup_relay_conflict() -> None:
-        """Warn at startup when relay detection is enabled but relay IPs are being filtered out."""
-        prompt_to_disable_gta5_relay_if_filtered(window, context='startup')
-
-    QTimer.singleShot(2000, _check_startup_relay_conflict)
-
     player_rates_core__thread = Thread(target=player_rates_core, name='player_rates_core', daemon=True)
     player_rates_core__thread.start()
 
@@ -779,6 +760,25 @@ def main() -> None:
         daemon=True,
     )
     rendering_core__thread.start()
+
+    splash.finish_loading()
+
+    def _reveal_main_window() -> None:
+        # Lower splash before showing main window so it can rise above it;
+        # show while splash still owns the foreground to avoid activateWindow() being ignored.
+        splash.lower_to_back()
+        window.show()
+        window.raise_()
+        window.activateWindow()
+        QTimer.singleShot(100, splash.close_splash)
+
+    QTimer.singleShot(1500, _reveal_main_window)
+
+    def _check_startup_relay_conflict() -> None:
+        """Warn at startup when relay detection is enabled but relay IPs are being filtered out."""
+        prompt_to_disable_gta5_relay_if_filtered(window, context='startup')
+
+    QTimer.singleShot(2000, _check_startup_relay_conflict)
 
     if Settings.webserver_enabled:
         start_webserver_from_settings()

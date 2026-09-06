@@ -39,6 +39,7 @@ from session_sniffer.guis.userip_manager import UserIPDatabasesManager
 from session_sniffer.guis.utils import apply_always_on_top, resize_window_for_screen, scale_by_ui
 from session_sniffer.guis.worker_thread import GUIWorkerThread
 from session_sniffer.player.registry import PlayersRegistry, SessionHost
+from session_sniffer.rendering_core.status_bar_renderer import build_gui_status_text
 from session_sniffer.rendering_core.types import CaptureState, GUIRenderingState, GUIUpdatePayload
 from session_sniffer.settings import Settings
 
@@ -566,6 +567,9 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
 
         self._apply_always_on_top()
 
+        self._update_header_capture_status()
+        self._update_status_bar()
+
     def show_discord_intro(self) -> None:
         """Open the Discord intro dialog, retaining a reference to prevent garbage collection."""
         # Parentless: an owned Qt.Tool/Dialog window disables the owner's native close (X) button.
@@ -901,6 +905,20 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
         """Immediately update the header text to reflect current capture state."""
         self._header.setText(generate_gui_header_html(capture=self.capture.get()))
 
+    def _update_status_bar(self) -> None:
+        """Immediately render the status bar with current capture state."""
+        capture_section, config_section, issues_section, performance_section = build_gui_status_text(
+            capture=self.capture.get(),
+            vpn_mode_enabled=CaptureState.vpn_mode_enabled,
+            discord_rpc_manager=None,
+        )
+        self._status_bar.set_texts(
+            capture=capture_section,
+            config=config_section,
+            issues=issues_section,
+            performance=performance_section,
+        )
+
     def _toggle_capture(self) -> None:
         """Toggle the packet capture on/off."""
         if self.capture.is_running():
@@ -913,6 +931,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
             self._actions.toggle_capture.setToolTip('Stop packet capture')
 
         self._update_header_capture_status()
+        self._update_status_bar()
 
     def set_interface_switching_mode(self, *, switching: bool) -> None:
         """Disable or re-enable the UI while an interface switch is in progress."""
@@ -953,6 +972,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, ToxicCommandoMixin, StatsMixi
             self._actions.toggle_capture.setToolTip('Start packet capture')
         self._actions.toggle_capture.setEnabled(True)
         self._update_header_capture_status()
+        self._update_status_bar()
 
     def _clear_connected_players(self) -> None:
         """Clear all connected players from the table and registry."""
