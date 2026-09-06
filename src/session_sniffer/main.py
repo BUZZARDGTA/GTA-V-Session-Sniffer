@@ -79,6 +79,7 @@ USER_SCRIPTS_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
 
 _PACKET_DROUGHT_THRESHOLD_SECONDS = 8.0
+_MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS = 6
 
 
 def main() -> None:
@@ -502,10 +503,108 @@ def main() -> None:
         finally:
             _capture_lost_lock.release()
 
+    _adapter_lost_attempts = 0
+
+    def _restart_capture_with_ip(new_ip: str) -> None:
+        """Silently restart packet capture with a specified IP address on the current interface."""
+        was_running = capture_holder.is_running()
+        if was_running:
+            capture_holder.stop()
+
+        new_capture_filter, new_display_filter_fn = build_capture_filters(
+            capture_ip_address=new_ip,
+            broadcast_support=capture_holder.config.broadcast_support,
+            multicast_support=capture_holder.config.multicast_support,
+        )
+
+        Settings.capture_ip_address = new_ip
+        Settings.rewrite_settings_file()
+
+        new_selected_interface = SelectedInterfaceRow(
+            interface=capture_holder.config.interface.interface,
+            ip_address=new_ip,
+            is_neighbour=capture_holder.config.interface.is_neighbour,
+        )
+
+        CaptureState.apply_interface_names(
+            is_neighbour=new_selected_interface.is_neighbour,
+            name=new_selected_interface.name,
+            ip=new_selected_interface.ip_address,
+            interface_type=new_selected_interface.interface.interface_type,
+        )
+        reset_resolver_cache()
+
+        new_capture = PacketCapture(
+            CaptureConfig(
+                interface=new_selected_interface,
+                broadcast_support=capture_holder.config.broadcast_support,
+                multicast_support=capture_holder.config.multicast_support,
+                capture_filter=new_capture_filter,
+                display_filter_fn=new_display_filter_fn,
+                include_payload=Settings.capture_ps3_name_resolver,
+                callback=packet_callback,
+                on_capture_lost=_adapter_lost_event.set,
+            ),
+        )
+
+        new_capture.start()
+        CaptureStats.capture_started_at = time.monotonic()
+        capture_holder.set(new_capture)
+
+        if Settings.capture_arp_spoofing:
+            ArpSpoofingController.stop()
+            ArpSpoofingController.start(new_selected_interface)
+
+        window.on_interface_switched()
+
     def _on_adapter_lost_poll() -> None:
-        """Poll for unexpected capture exits and re-show the interface selection dialog."""
-        if gui_closed__event.is_set() or not _adapter_lost_event.is_set():
+        """Poll for unexpected capture exits, attempt automatic silent recovery, or re-show the interface selection dialog."""
+        nonlocal _adapter_lost_attempts
+
+        if gui_closed__event.is_set():
             return
+
+        if not _adapter_lost_event.is_set():
+            _adapter_lost_attempts = 0
+            return
+
+        current_selected = capture_holder.config.interface
+        adapter_guid = current_selected.interface.identity.adapter_guid
+
+        if not current_selected.is_neighbour and adapter_guid is not None:
+            matching_adapter = None
+            for adapter in get_adapters_info():
+                if adapter.identity.adapter_guid == adapter_guid:
+                    matching_adapter = adapter
+                    break
+
+            if matching_adapter is not None:
+                if matching_adapter.ipv4_addresses:
+                    target_ip = matching_adapter.ipv4_addresses[0]
+                    _adapter_lost_attempts += 1
+                    if _adapter_lost_attempts <= _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS:
+                        _adapter_lost_event.clear()
+                        logger.info(
+                            'Capture adapter "%s" still available with IP %s — silently recovering capture (attempt %d/%d).',
+                            matching_adapter.identity.friendly_name,
+                            target_ip,
+                            _adapter_lost_attempts,
+                            _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
+                        )
+                        _restart_capture_with_ip(target_ip)
+                        return
+                else:
+                    _adapter_lost_attempts += 1
+                    if _adapter_lost_attempts <= _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS:
+                        logger.debug(
+                            'Capture adapter "%s" present but waiting for IPv4 assignment (attempt %d/%d).',
+                            matching_adapter.identity.friendly_name,
+                            _adapter_lost_attempts,
+                            _MAX_ADAPTER_LOST_RECOVERY_ATTEMPTS,
+                        )
+                        return
+
+        _adapter_lost_attempts = 0
         _adapter_lost_event.clear()
         _handle_capture_lost(stop_capture=False, warning_message=format_capture_interrupted_message())
 
@@ -538,50 +637,10 @@ def main() -> None:
         except queue.Empty:
             return
 
-        if capture_holder.config.interface.ip_address == new_ip:
+        if capture_holder.config.interface.ip_address == new_ip and capture_holder.is_running():
             return
 
-        was_running = capture_holder.is_running()
-        if was_running:
-            capture_holder.stop()
-
-        new_capture_filter, new_display_filter_fn = build_capture_filters(
-            capture_ip_address=new_ip,
-            broadcast_support=capture_holder.config.broadcast_support,
-            multicast_support=capture_holder.config.multicast_support,
-        )
-
-        Settings.capture_ip_address = new_ip
-        Settings.rewrite_settings_file()
-
-        new_selected_interface = SelectedInterfaceRow(
-            interface=capture_holder.config.interface.interface,
-            ip_address=new_ip,
-            is_neighbour=capture_holder.config.interface.is_neighbour,
-        )
-
-        new_capture = PacketCapture(
-            CaptureConfig(
-                interface=new_selected_interface,
-                broadcast_support=capture_holder.config.broadcast_support,
-                multicast_support=capture_holder.config.multicast_support,
-                capture_filter=new_capture_filter,
-                display_filter_fn=new_display_filter_fn,
-                include_payload=Settings.capture_ps3_name_resolver,
-                callback=packet_callback,
-                on_capture_lost=_adapter_lost_event.set,
-            ),
-        )
-
-        new_capture.start()
-        CaptureStats.capture_started_at = time.monotonic()
-        capture_holder.set(new_capture)
-
-        if Settings.capture_arp_spoofing:
-            ArpSpoofingController.stop()
-            ArpSpoofingController.start(new_selected_interface)
-
-        window.on_interface_switched()
+        _restart_capture_with_ip(new_ip)
 
     _ip_changed_timer = QTimer()
     _ip_changed_timer.setInterval(500)

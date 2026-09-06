@@ -939,6 +939,7 @@ class MainWindow(LookyMixin, GTA5Mixin, ToxicCommandoMixin, StatsMixin, FilesMix
         self._clear_connected_players()
         self._clear_disconnected_players()
         SessionHost.clear_history()
+        SessionHost.players_pending_for_disconnection.clear()
 
     def set_capture_toggle_enabled(self, *, enabled: bool) -> None:
         """Enable or disable the Stop/Start Capture toolbar button."""
