@@ -64,13 +64,22 @@ jobs:
           .github/workflows/.venv/Scripts/python -c @'
           import os
           import platform
+          import re
           import tomllib
           from pathlib import Path
 
           from packaging.requirements import Requirement
 
           pyproject_path = Path('pyproject.toml')
-          pyproject_data = tomllib.loads(pyproject_path.read_text(encoding='utf-8'))
+          pyproject_text = pyproject_path.read_text(encoding='utf-8')
+          updated_pyproject_text = re.sub(
+              r'(?m)^version\s*=\s*".*?"',
+              f'version = "{os.environ["RELEASE_TAG"]}"',
+              pyproject_text,
+              count=1,
+          )
+          pyproject_path.write_text(updated_pyproject_text, encoding='utf-8')
+          pyproject_data = tomllib.loads(updated_pyproject_text)
           dependencies = pyproject_data['project']['dependencies']
 
           pyside6_version = None

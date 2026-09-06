@@ -176,9 +176,7 @@ UPDATE_DOWNLOAD_VERSION_CARD_VALUE_ACCENT_STYLESHEET = 'color: #f0f4fa;backgroun
 
 UPDATE_DOWNLOAD_VERSION_CARD_DATE_STYLESHEET = 'color: #6f7e91;background: transparent;font-family: Consolas, "Courier New", monospace;'
 
-UPDATE_DOWNLOAD_VERSION_CARD_SHA_STYLESHEET = (
-    'color: #6f7e91;background: transparent;font-family: Consolas, "Courier New", monospace;font-size: 11.5px;'
-)
+UPDATE_DOWNLOAD_VERSION_CARD_SHA_STYLESHEET = 'color: #6f7e91;background: transparent;font-family: Consolas, "Courier New", monospace;font-size: 11.5px;'
 
 UPDATE_DOWNLOAD_VERSION_ARROW_STYLESHEET = 'color: #4aa3ee;background: transparent;font-weight: 800;'
 
@@ -230,6 +228,62 @@ UPDATE_DOWNLOAD_CANCEL_BUTTON_STYLESHEET = (
     '  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
     '      stop:0 #2a1018, stop:1 #4a2030);'
     '  border: 1px solid #5a2030;'
+    '  padding-top: 8px;'
+    '  padding-bottom: 6px;'
+    '}'
+)
+
+UPDATE_DOWNLOAD_SKIP_BUTTON_STYLESHEET = (
+    'QPushButton {'
+    '  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
+    '      stop:0 #253140, stop:1 #1a222d);'
+    '  color: #c0d0e0;'
+    '  border: 1px solid #3d4f65;'
+    '  border-radius: 8px;'
+    '  padding: 7px 22px;'
+    '  font-weight: 700;'
+    '  font-size: 10pt;'
+    '  letter-spacing: 0.5px;'
+    '  min-width: 80px;'
+    '}'
+    'QPushButton:hover {'
+    '  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
+    '      stop:0 #334358, stop:1 #222d3c);'
+    '  border: 1px solid #5a708d;'
+    '  color: #ffffff;'
+    '}'
+    'QPushButton:pressed {'
+    '  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,'
+    '      stop:0 #1a222d, stop:1 #253140);'
+    '  border: 1px solid #2f3e52;'
+    '  padding-top: 8px;'
+    '  padding-bottom: 6px;'
+    '}'
+)
+
+UPDATE_DOWNLOAD_UPDATE_BUTTON_STYLESHEET = (
+    'QPushButton {'
+    '  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,'
+    '      stop:0 #1f6cc8, stop:0.5 #3d8ec9, stop:1 #5fb4f5);'
+    '  color: #ffffff;'
+    '  border: 1px solid #4aa3ee;'
+    '  border-radius: 8px;'
+    '  padding: 7px 24px;'
+    '  font-weight: 700;'
+    '  font-size: 10pt;'
+    '  letter-spacing: 0.5px;'
+    '  min-width: 90px;'
+    '}'
+    'QPushButton:hover {'
+    '  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,'
+    '      stop:0 #2b7ee0, stop:0.5 #4aa3ee, stop:1 #7fc8ff);'
+    '  border: 1px solid #7fc8ff;'
+    '  color: #ffffff;'
+    '}'
+    'QPushButton:pressed {'
+    '  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,'
+    '      stop:0 #185299, stop:0.5 #2b7ee0, stop:1 #4aa3ee);'
+    '  border: 1px solid #3d8ec9;'
     '  padding-top: 8px;'
     '  padding-bottom: 6px;'
     '}'

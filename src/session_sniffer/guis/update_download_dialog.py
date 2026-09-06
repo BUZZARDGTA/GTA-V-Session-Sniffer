@@ -3,6 +3,7 @@
 import hashlib
 import sys
 import threading
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, override
@@ -33,8 +34,10 @@ from session_sniffer.guis.stylesheets import (
     UPDATE_DOWNLOAD_PROGRESS_BAR_STYLESHEET,
     UPDATE_DOWNLOAD_SIZE_LABEL_STYLESHEET,
     UPDATE_DOWNLOAD_SIZE_PILL_STYLESHEET,
+    UPDATE_DOWNLOAD_SKIP_BUTTON_STYLESHEET,
     UPDATE_DOWNLOAD_STATUS_LABEL_STYLESHEET,
     UPDATE_DOWNLOAD_TITLE_LABEL_STYLESHEET,
+    UPDATE_DOWNLOAD_UPDATE_BUTTON_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_ARROW_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET,
     UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET,
@@ -114,6 +117,7 @@ class UpdateCandidate:
     sha256_hash: str
     size_bytes: int | None = None
     is_prerelease: bool = False
+    release_url: str | None = None
 
 
 class UpdateDownloadDialog(QDialog):
@@ -131,25 +135,32 @@ class UpdateDownloadDialog(QDialog):
         dest_path: Path,
         parent: QWidget | None = None,
     ) -> None:
-        """Initialise the dialog and start the background download worker."""
+        """Initialise the dialog in confirmation state."""
         super().__init__(parent)
         self._candidate = candidate
         self._dest_path = dest_path
         self._success = False
+        self._skipped = False
         self._drag_offset: tuple[int, int] | None = None
         self._current_version_label = format_project_version(CURRENT_VERSION)
         self._current_size_text = self._compute_current_build_size_text()
         self._current_sha256_hash = self._compute_current_build_sha256()
         self._error_message = ''
         self._new_size_label: QLabel | None = None
+        self._new_version_card_label: QLabel | None = None
+        self._title_label: QLabel | None = None
+        self._skip_button: QPushButton | None = None
+        self._update_button: QPushButton | None = None
+        self._cancel_button: QPushButton | None = None
+        self._worker: _DownloadWorker | None = None
         self._progress_bar = QProgressBar()
-        self._status_label = QLabel('Preparing download…')
+        self._status_label = QLabel('A new version of Session Sniffer is available. Would you like to update now?')
         initial_total_size = self._format_size_mb(candidate.size_bytes) if candidate.size_bytes is not None else 'xx.x MB'
         self._size_label = QLabel(
-            f'0.0 MB<span style="color: #5a6878;">&nbsp;&nbsp;/&nbsp;&nbsp;</span>{initial_total_size}',
+            f'Download size:&nbsp;&nbsp;<b>{initial_total_size}</b>',
         )
 
-        self.setWindowTitle('Downloading Update')
+        self.setWindowTitle('Update Available')
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, on=True)
         self.setFixedSize(640, 500)
@@ -187,11 +198,6 @@ class UpdateDownloadDialog(QDialog):
 
         self._center_on_screen()
 
-        self._worker = _DownloadWorker(candidate.download_url, dest_path)
-        self._worker.progress_signal.connect(self._on_progress)
-        self._worker.finished_signal.connect(self._on_finished)
-        self._worker.start()
-
     def _build_header(self) -> QHBoxLayout:
         """Build the icon + title block at the top of the dialog."""
         header = QHBoxLayout()
@@ -200,10 +206,10 @@ class UpdateDownloadDialog(QDialog):
 
         header.addWidget(self._create_download_icon(), 0, Qt.AlignmentFlag.AlignVCenter)
 
-        title_label = QLabel('Downloading Update')
-        title_label.setFont(QFont('Segoe UI', 17, QFont.Weight.Bold))
-        title_label.setStyleSheet(UPDATE_DOWNLOAD_TITLE_LABEL_STYLESHEET)
-        header.addWidget(title_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._title_label = QLabel('Update Available')
+        self._title_label.setFont(QFont('Segoe UI', 17, QFont.Weight.Bold))
+        self._title_label.setStyleSheet(UPDATE_DOWNLOAD_TITLE_LABEL_STYLESHEET)
+        header.addWidget(self._title_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
         header.addStretch(1)
         return header
@@ -235,7 +241,7 @@ class UpdateDownloadDialog(QDialog):
         new_size_text = self._format_size_mb(self._candidate.size_bytes) if self._candidate.size_bytes is not None else ''
         row.addWidget(
             self._create_version_card(
-                'DOWNLOADING',
+                'NEW VERSION',
                 self._candidate.version_label,
                 new_size_text,
                 self._candidate.sha256_hash,
@@ -260,11 +266,7 @@ class UpdateDownloadDialog(QDialog):
         `accent=True` styles the card as the highlighted "downloading" target.
         """
         version_text, date_text = self._split_version_label(version_label)
-        is_prerelease = (
-            (self._candidate.is_prerelease or Version(version_text).is_prerelease)
-            if accent
-            else CURRENT_VERSION.is_prerelease
-        )
+        is_prerelease = (self._candidate.is_prerelease or Version(version_text).is_prerelease) if accent else CURRENT_VERSION.is_prerelease
 
         card = QFrame()
         card.setFixedWidth(270)
@@ -303,11 +305,7 @@ class UpdateDownloadDialog(QDialog):
         label_row.addStretch(1)
 
         badge_text = 'PRE-RELEASE' if is_prerelease else 'STABLE'
-        badge_stylesheet = (
-            UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET
-            if is_prerelease
-            else UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET
-        )
+        badge_stylesheet = UPDATE_DOWNLOAD_VERSION_CARD_BADGE_PRERELEASE_STYLESHEET if is_prerelease else UPDATE_DOWNLOAD_VERSION_CARD_BADGE_STABLE_STYLESHEET
         badge_widget = QLabel(badge_text)
         badge_widget.setFont(QFont('Segoe UI', 7, QFont.Weight.Bold))
         badge_widget.setStyleSheet(badge_stylesheet)
@@ -369,6 +367,7 @@ class UpdateDownloadDialog(QDialog):
 
         if accent:
             self._new_size_label = size_widget
+            self._new_version_card_label = label_widget
 
         return card
 
@@ -459,6 +458,7 @@ class UpdateDownloadDialog(QDialog):
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(0)
         self._progress_bar.setTextVisible(True)
+        self._progress_bar.setFormat('Ready to update')
         self._progress_bar.setFixedHeight(30)
         self._progress_bar.setStyleSheet(UPDATE_DOWNLOAD_PROGRESS_BAR_STYLESHEET)
         section.addWidget(self._progress_bar)
@@ -496,16 +496,31 @@ class UpdateDownloadDialog(QDialog):
         return pill
 
     def _build_footer(self) -> QHBoxLayout:
-        """Build the footer row containing the Cancel button."""
+        """Build the footer row containing Skip, Update, and Cancel buttons."""
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(10)
         footer.addStretch(1)
 
-        cancel_button = QPushButton('Cancel')
-        cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        cancel_button.setStyleSheet(UPDATE_DOWNLOAD_CANCEL_BUTTON_STYLESHEET)
-        cancel_button.clicked.connect(self._on_cancel)
-        footer.addWidget(cancel_button)
+        self._skip_button = QPushButton('Skip')
+        self._skip_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._skip_button.setStyleSheet(UPDATE_DOWNLOAD_SKIP_BUTTON_STYLESHEET)
+        self._skip_button.clicked.connect(self._on_skip)
+        footer.addWidget(self._skip_button)
+
+        update_button_text = 'Update Now' if is_pyinstaller_compiled() else 'View Release'
+        self._update_button = QPushButton(update_button_text)
+        self._update_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_button.setStyleSheet(UPDATE_DOWNLOAD_UPDATE_BUTTON_STYLESHEET)
+        self._update_button.clicked.connect(self._on_start_update)
+        footer.addWidget(self._update_button)
+
+        self._cancel_button = QPushButton('Cancel')
+        self._cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._cancel_button.setStyleSheet(UPDATE_DOWNLOAD_CANCEL_BUTTON_STYLESHEET)
+        self._cancel_button.clicked.connect(self._on_cancel)
+        self._cancel_button.hide()
+        footer.addWidget(self._cancel_button)
 
         return footer
 
@@ -561,9 +576,53 @@ class UpdateDownloadDialog(QDialog):
         return self._success
 
     @property
+    def skipped(self) -> bool:
+        """Whether the user skipped updating."""
+        return self._skipped
+
+    @property
     def error_message(self) -> str:
         """The error message if the download failed, or empty if successful/cancelled."""
         return self._error_message
+
+    def _on_start_update(self) -> None:
+        """Handle the user confirming the update action."""
+        if not is_pyinstaller_compiled() and self._candidate.release_url:
+            webbrowser.open(self._candidate.release_url)
+            self.accept()
+            return
+
+        if self._title_label is not None:
+            self._title_label.setText('Downloading Update')
+        self.setWindowTitle('Downloading Update')
+
+        if self._new_version_card_label is not None:
+            self._new_version_card_label.setText('DOWNLOADING')
+
+        if self._skip_button is not None:
+            self._skip_button.hide()
+        if self._update_button is not None:
+            self._update_button.hide()
+        if self._cancel_button is not None:
+            self._cancel_button.show()
+
+        self._status_label.setText('Preparing download…')
+        self._progress_bar.setFormat('%p%')
+
+        initial_total_size = self._format_size_mb(self._candidate.size_bytes) if self._candidate.size_bytes is not None else 'xx.x MB'
+        self._size_label.setText(
+            f'0.0 MB<span style="color: #5a6878;">&nbsp;&nbsp;/&nbsp;&nbsp;</span>{initial_total_size}',
+        )
+
+        self._worker = _DownloadWorker(self._candidate.download_url, self._dest_path)
+        self._worker.progress_signal.connect(self._on_progress)
+        self._worker.finished_signal.connect(self._on_finished)
+        self._worker.start()
+
+    def _on_skip(self) -> None:
+        """Handle the user skipping the update."""
+        self._skipped = True
+        self.reject()
 
     def _on_progress(self, done: int, total: int) -> None:
         """Update the progress bar and size labels."""
@@ -591,17 +650,29 @@ class UpdateDownloadDialog(QDialog):
 
     def _on_cancel(self) -> None:
         """Cancel the in-progress download."""
-        self._worker.cancel()
-        self._worker.wait()
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait()
         if self._dest_path.exists():
             self._dest_path.unlink(missing_ok=True)
         self.reject()
 
     @override
+    def reject(self) -> None:
+        """Handle dialog rejection (Skip, Cancel, or Escape)."""
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait()
+        if self._dest_path.exists():
+            self._dest_path.unlink(missing_ok=True)
+        super().reject()
+
+    @override
     def closeEvent(self, event: QCloseEvent) -> None:
         """Cancel the download if the dialog is closed via the window chrome."""
-        self._worker.cancel()
-        self._worker.wait()
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait()
         if self._dest_path.exists():
             self._dest_path.unlink(missing_ok=True)
         super().closeEvent(event)

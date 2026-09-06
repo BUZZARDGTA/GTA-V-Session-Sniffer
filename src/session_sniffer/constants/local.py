@@ -6,6 +6,7 @@ from typing import Any
 
 from packaging.version import Version
 
+from session_sniffer.constants._build_info import RELEASE_TAG
 from session_sniffer.utils import format_project_version, get_app_dir, get_working_directory_to_script_location, resource_path
 
 SCRIPT_DIR: Path = get_working_directory_to_script_location()
@@ -18,7 +19,7 @@ TTS_DIR_PATH: Path = RESOURCES_DIR_PATH / 'tts'
 
 
 PYPROJECT_DATA: dict[str, Any] = tomllib.loads(PYPROJECT_PATH.read_text(encoding='utf-8'))
-CURRENT_VERSION: Version = Version(PYPROJECT_DATA['project']['version'])
+CURRENT_VERSION: Version = Version(RELEASE_TAG) if RELEASE_TAG != '-' else Version(PYPROJECT_DATA['project']['version'])
 VERSION: str = format_project_version(CURRENT_VERSION)
 
 

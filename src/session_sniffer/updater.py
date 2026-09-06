@@ -222,6 +222,17 @@ def _resolve_candidate_file_size(candidate_info: VersionInfo) -> int | None:
     return None
 
 
+def _is_running_executable_identical(candidate_info: VersionInfo) -> bool:
+    """Return whether the running PyInstaller executable matches the candidate SHA-256."""
+    if not is_pyinstaller_compiled():
+        return False
+    current_executable_path = Path(sys.executable)
+    if not current_executable_path.is_file():
+        return False
+    current_executable_sha256 = hashlib.sha256(current_executable_path.read_bytes()).hexdigest()
+    return current_executable_sha256.lower() == candidate_info.sha256.lower()
+
+
 def _download_and_apply(
     candidate_info: VersionInfo,
     version_str: str,
@@ -238,6 +249,7 @@ def _download_and_apply(
         sha256_hash=candidate_info.sha256,
         size_bytes=_resolve_candidate_file_size(candidate_info),
         is_prerelease=is_prerelease,
+        release_url=candidate_info.release_url,
     )
     dialog = UpdateDownloadDialog(candidate, dest)
     dialog.exec()
@@ -253,6 +265,10 @@ def _download_and_apply(
             )
         return
 
+    if not is_pyinstaller_compiled():
+        _remove_file_if_possible(dest)
+        return
+
     actual_hash = hashlib.sha256(dest.read_bytes()).hexdigest()
     if actual_hash.lower() != candidate_info.sha256.lower():
         logger.warning('SHA-256 mismatch for update download: expected %s, got %s', candidate_info.sha256, actual_hash)
@@ -266,8 +282,9 @@ def _download_and_apply(
         )
         return
 
-    if not is_pyinstaller_compiled():
-        logger.info('Running from source: skipping binary replacement.')
+    current_executable_hash = hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest()
+    if actual_hash.lower() == current_executable_hash.lower():
+        logger.info('Downloaded update is identical to running executable (%s); skipping replacement.', actual_hash)
         _remove_file_if_possible(dest)
         return
 
@@ -298,6 +315,10 @@ def _handle_update_decision(
     if candidate <= CURRENT_VERSION:
         return (UpdateCheckOutcome.PROCEED, None)
 
+    if _is_running_executable_identical(candidate_info):
+        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.sha256)
+        return (UpdateCheckOutcome.PROCEED, None)
+
     is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
     logger.info(
         'Update available (%s): %s -> %s',
@@ -306,17 +327,8 @@ def _handle_update_decision(
         format_project_version(candidate),
     )
 
-    pending: Callable[[], None] | None = None
-    if is_pyinstaller_compiled():
-        version_str = format_project_version(candidate)
-        pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
-    else:
-
-        def _open_browser() -> None:
-            webbrowser.open(candidate_info.release_url)
-
-        pending = _open_browser
-
+    version_str = format_project_version(candidate)
+    pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
     return (UpdateCheckOutcome.PROCEED, pending)
 
 
@@ -346,6 +358,10 @@ def _handle_prerelease_update_decision(
     else:
         candidate_info = latest_prerelease_info
 
+    if _is_running_executable_identical(candidate_info):
+        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.sha256)
+        return (UpdateCheckOutcome.PROCEED, None)
+
     candidate = Version(candidate_info.version)
     is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
     logger.info(
@@ -355,15 +371,6 @@ def _handle_prerelease_update_decision(
         format_project_version(candidate),
     )
 
-    pending: Callable[[], None] | None = None
-    if is_pyinstaller_compiled():
-        version_str = format_project_version(candidate)
-        pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
-    else:
-
-        def _open_browser() -> None:
-            webbrowser.open(candidate_info.release_url)
-
-        pending = _open_browser
-
+    version_str = format_project_version(candidate)
+    pending = functools.partial(_download_and_apply, candidate_info, version_str, is_prerelease=is_candidate_prerelease)
     return (UpdateCheckOutcome.PROCEED, pending)

@@ -7,14 +7,18 @@ so the frozen exe always carries the correct release info.
 
 import os
 import platform
+import tomllib
+from pathlib import Path
 
 from packaging.requirements import Requirement
 
-from session_sniffer.constants.local import PYPROJECT_DATA, PYPROJECT_PATH
+from session_sniffer.utils import resource_path
 
 
 def _read_pyside6_version() -> str:
-    for dependency in PYPROJECT_DATA['project']['dependencies']:
+    pyproject_path = resource_path(Path('pyproject.toml'))
+    pyproject_data = tomllib.loads(pyproject_path.read_text(encoding='utf-8'))
+    for dependency in pyproject_data['project']['dependencies']:
         requirement = Requirement(dependency)
 
         if requirement.name.lower() == 'pyside6':
@@ -22,7 +26,7 @@ def _read_pyside6_version() -> str:
                 if specifier.operator == '==':
                     return specifier.version
 
-    message = f'PySide6 dependency is missing from {PYPROJECT_PATH}.'
+    message = f'PySide6 dependency is missing from {pyproject_path}.'
     raise RuntimeError(message)
 
 
