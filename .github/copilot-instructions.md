@@ -59,6 +59,7 @@ Ruff / Pyrefly / Pyright / MyPy operate in strict modes; line length is 176; man
 - Release workflow builds a one‑file PyInstaller executable; additions to resources must be reflected in both repo and spec file.
 
 ## Patterns & Conventions
+- **Line Endings (CRLF)**: Always use CRLF (`\r\n`) line endings for all text files (Python source files, SVGs, JSON, TOML, Markdown, config files, etc.) throughout the project. Never write or leave files with LF (`\n`) or mixed line endings.
 - **String Quotes**: Always use single quotes (`'`) for strings throughout the project. Use double quotes (`"`) only when the string itself contains single quotes.
 - **Docstring Backticks**: Always use a single backtick (`` ` ``) to inline code in docstrings and comments. Never use RST-style double backticks (` `` `).
 - **Future Imports**: Never use `from __future__ import annotations`. The project uses Python 3.14, which has native support for postponed annotation evaluation and does not require this import.
@@ -106,3 +107,7 @@ When adding or expanding features, make clean replacements. Replace older usage 
 
 ## Documentation
 - **Settings Documentation Sync:** If you edit a default setting, introduce a new setting, or remove an existing setting in the project's configuration (e.g. `src/session_sniffer/settings/defaults.py`), you MUST also verify and reflect those changes in the project's Wiki repository (`d:\Git\Session-Sniffer.wiki`), particularly updating the default values and setting lists in `Configuration-Guide.md` or other relevant documentation pages.
+
+## AI Agent Instructions Source of Truth
+- This file (`.github/copilot-instructions.md`) is the single source of truth for all AI agent instructions, conventions, and project rules.
+- Other AI configuration files (such as `.agents/AGENTS.md`) must only contain a pointer referencing this file and must never duplicate rules, instructions, or guidelines.
