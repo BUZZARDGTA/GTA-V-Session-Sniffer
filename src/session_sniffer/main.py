@@ -123,10 +123,16 @@ def main() -> None:
     # Own splash msgboxes so they appear above it without being globally topmost
     msgbox.set_owner_hwnd(splash.winId())
 
+    preload_executor = ThreadPoolExecutor(max_workers=4)
+    update_check_future = preload_executor.submit(check_for_updates, updater_channel=Settings.updater_channel)
+    npcap_future = preload_executor.submit(ensure_npcap_installed)
+    geolite2_future = preload_executor.submit(update_and_initialize_geolite2_readers)
+    mac_lookup_future = preload_executor.submit(MacLookup.load)
+
     if not is_pyinstaller_compiled():
         splash.update_status('Checking Python package versions')
-        dependencies = splash.run_with_spinner(get_dependencies_from_pyproject)
-        outdated_packages = splash.run_with_spinner(check_packages_version, dependencies)
+        dependencies = get_dependencies_from_pyproject()
+        outdated_packages = check_packages_version(dependencies)
         if outdated_packages:
             msgbox_message = format_outdated_packages_message(
                 app_title=TITLE,
@@ -137,34 +143,36 @@ def main() -> None:
             msgbox_title = TITLE
             errorlevel = msgbox.show(msgbox_title, msgbox_message, msgbox_style)
             if errorlevel != msgbox.ReturnValues.IDYES:
+                preload_executor.shutdown(wait=False)
                 sys.exit(0)
 
     splash.update_status('Applying custom settings from Settings.ini')
-    splash.run_with_spinner(Settings.load_from_settings_file, SETTINGS_PATH)
     register_secret_provider(lambda: Settings.looky_api_key)
     register_secret_provider(lambda: Settings.webserver_password)
     Settings.rebuild_blocked_ip_ranges()
     CaptureStats.resize_history_deques(DEFAULT_MAX_HISTORY)
 
-    splash.run_with_spinner(GUIDetectionSettings.load_from_file_or_defaults, DETECTIONS_JSON_PATH)
-    splash.run_with_spinner(ComboRulesManager.load_from_file, COMBO_RULES_PATH)
+    GUIDetectionSettings.load_from_file_or_defaults(DETECTIONS_JSON_PATH)
+    ComboRulesManager.load_from_file(COMBO_RULES_PATH)
 
     splash.update_status('Checking for updates')
-    outcome, pending_download = splash.run_with_spinner(check_for_updates, updater_channel=Settings.updater_channel)
+    outcome, pending_download = splash.run_with_spinner(update_check_future.result)
     if outcome is UpdateCheckOutcome.ABORT:
+        preload_executor.shutdown(wait=False)
         sys.exit(0)
     if pending_download is not None:
         splash.lower_to_back()
         pending_download()
 
     splash.update_status('Verifying Npcap driver')
-    splash.run_with_spinner(ensure_npcap_installed)
+    splash.run_with_spinner(npcap_future.result)
 
     splash.update_status('Initializing GeoLite2 databases')
-    geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = splash.run_with_spinner(update_and_initialize_geolite2_readers)
+    geoip2_enabled, geolite2_asn_reader, geolite2_city_reader, geolite2_country_reader = splash.run_with_spinner(geolite2_future.result)
 
     splash.update_status('Initializing MAC lookup')
-    splash.run_with_spinner(MacLookup.load)
+    splash.run_with_spinner(mac_lookup_future.result)
+    preload_executor.shutdown(wait=False)
 
     splash.update_status('Network interface selection')
     splash.run_with_spinner(populate_network_interfaces_info)
@@ -226,8 +234,7 @@ def main() -> None:
     broadcast_support, multicast_support = splash.run_with_spinner(check_broadcast_multicast_support, selected_interface.device_name or selected_interface.name)
     vpn_mode_enabled = not (broadcast_support and multicast_support)
 
-    capture_filter_str, display_filter_fn = splash.run_with_spinner(
-        build_capture_filters,
+    capture_filter_str, display_filter_fn = build_capture_filters(
         capture_ip_address=selected_interface.ip_address,
         broadcast_support=broadcast_support,
         multicast_support=multicast_support,
@@ -392,6 +399,28 @@ def main() -> None:
         ArpSpoofingController.start(selected_interface)
 
     splash.update_status('Preparing GUI')
+
+    # Start rendering_core and player_rates_core now so they run concurrently with
+    # MainWindow construction. By the time the window is built the first snapshot
+    # is almost always already published, making the subsequent wait near-instant.
+    player_rates_core__thread = Thread(target=player_rates_core, name='player_rates_core', daemon=True)
+    player_rates_core__thread.start()
+
+    rendering_core__thread = Thread(
+        target=rendering_core,
+        name='rendering_core',
+        args=(
+            capture_holder,
+            GeoIP2Readers(
+                enabled=geoip2_enabled,
+                asn_reader=geolite2_asn_reader,
+                city_reader=geolite2_city_reader,
+                country_reader=geolite2_country_reader,
+            ),
+        ),
+        daemon=True,
+    )
+    rendering_core__thread.start()
 
     def _switch_interface() -> None:
         window.set_change_interface_button_enabled(enabled=False)
@@ -799,29 +828,7 @@ def main() -> None:
 
     ensure_process_monitor_running()
 
-    player_rates_core__thread = Thread(target=player_rates_core, name='player_rates_core', daemon=True)
-    player_rates_core__thread.start()
-
-    rendering_core__thread = Thread(
-        target=rendering_core,
-        name='rendering_core',
-        args=(
-            capture_holder,
-            GeoIP2Readers(
-                enabled=geoip2_enabled,
-                asn_reader=geolite2_asn_reader,
-                city_reader=geolite2_city_reader,
-                country_reader=geolite2_country_reader,
-            ),
-        ),
-        daemon=True,
-    )
-    rendering_core__thread.start()
-
-    def _wait_for_first_render() -> None:
-        GUIRenderingState.wait_rendering_snapshot(last_seen_version=0)
-
-    splash.run_with_spinner(_wait_for_first_render)
+    GUIRenderingState.wait_rendering_snapshot(last_seen_version=0)
     app.processEvents()
 
     splash.finish_loading()
@@ -835,7 +842,7 @@ def main() -> None:
         window.activateWindow()
         QTimer.singleShot(100, splash.close_splash)
 
-    QTimer.singleShot(1500, _reveal_main_window)
+    QTimer.singleShot(200, _reveal_main_window)
 
     def _check_startup_relay_conflict() -> None:
         """Warn at startup when relay detection is enabled but relay IPs are being filtered out."""

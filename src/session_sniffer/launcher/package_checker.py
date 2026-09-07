@@ -24,7 +24,7 @@ def check_packages_version(required_packages: dict[str, Requirement]) -> list[tu
     for package_name, requirement in required_packages.items():
         try:
             installed_version = importlib.metadata.version(package_name)
-            if installed_version not in Requirement(f'{package_name}{requirement}').specifier:
+            if installed_version not in requirement.specifier:
                 outdated_packages.append((package_name, requirement.specifier, installed_version))
         except importlib.metadata.PackageNotFoundError:
             outdated_packages.append((package_name, requirement.specifier, 'Not Installed'))
