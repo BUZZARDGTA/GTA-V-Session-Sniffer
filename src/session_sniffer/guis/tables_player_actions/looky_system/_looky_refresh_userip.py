@@ -647,6 +647,10 @@ def looky_refresh_userip_entries(
 
     loading_dialog.rejected.connect(_on_rejected)
 
-    worker.setParent(parent)
     worker.start()
-    loading_dialog.exec()
+    try:
+        loading_dialog.exec()
+    finally:
+        if worker.isRunning():
+            worker.requestInterruption()
+            worker.wait()

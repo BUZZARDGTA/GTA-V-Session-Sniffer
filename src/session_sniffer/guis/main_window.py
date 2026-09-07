@@ -34,6 +34,7 @@ from session_sniffer.guis.player_resolver import PlayerResolverWindow
 from session_sniffer.guis.session_host_history_window import setup_session_host_actions
 from session_sniffer.guis.settings_dialog import SettingsDialog
 from session_sniffer.guis.stylesheets import GTA5_STATUS_LABEL_STYLESHEET, MENU_BAR_STYLESHEET
+from session_sniffer.guis.tables_player_actions.looky_system._looky_crawler_request_dialog import close_all_crawler_dialogs
 from session_sniffer.guis.userip_manager import UserIPDatabasesManager
 from session_sniffer.guis.utils import apply_always_on_top, resize_window_for_screen, scale_by_ui
 from session_sniffer.guis.worker_thread import GUIWorkerThread
@@ -624,6 +625,9 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         """Handle the main window close event and terminate background work."""
         gui_closed__event.set()
+        if self._leaderboard_window is not None:
+            self._leaderboard_window.close()
+        close_all_crawler_dialogs()
         if self.capture.is_running():
             self.capture.stop()
         GTASuspendManager.shutdown()

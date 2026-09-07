@@ -52,8 +52,10 @@ def _svg_file_to_pixmap(svg_path: str, size: int) -> QPixmap:
     pixmap = QPixmap(size, size)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
-    renderer.render(painter, QRectF(0, 0, size, size))
-    painter.end()
+    try:
+        renderer.render(painter, QRectF(0, 0, size, size))
+    finally:
+        painter.end()
     return pixmap
 
 

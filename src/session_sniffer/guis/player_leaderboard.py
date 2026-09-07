@@ -674,6 +674,7 @@ class _LeaderboardTableView(QTableView):
             lines.append('\t'.join(column_map[column_index] for column_index in sorted(column_map)))
 
         set_clipboard_text('\n'.join(lines))
+
     # pylint: enable=duplicate-code
 
     @override
@@ -925,7 +926,6 @@ class PlayerLeaderboardWindow(QWidget):
         worker.finished_ok.connect(self._on_session_files_scanned)
         worker.finished.connect(self._on_scan_finished)
         self._scan_worker = worker
-        worker.setParent(self)
         worker.start()
 
     def _on_session_files_scanned(self, result: SessionScanResult) -> None:
@@ -964,7 +964,6 @@ class PlayerLeaderboardWindow(QWidget):
         worker.finished.connect(self._clear_baseline_worker)
         worker.finished_ok.connect(self._apply_baseline)
         self._baseline_worker = worker
-        worker.setParent(self)
         worker.start()
 
     def _set_controls_enabled(self, *, enabled: bool) -> None:
@@ -1005,7 +1004,6 @@ class PlayerLeaderboardWindow(QWidget):
                 on_ready()
 
         worker.finished_ok.connect(_on_finished_ok)
-        worker.setParent(self)
         worker.start()
 
     def _clear_baseline_worker(self) -> None:
@@ -1346,6 +1344,9 @@ class PlayerLeaderboardWindow(QWidget):
         """Stop live refresh and wait for any in-flight workers before the window is destroyed."""
         self._scan_cooldown.stop()
         self._live_timer.stop()
+        watched_paths = [*self._sessions_watcher.files(), *self._sessions_watcher.directories()]
+        if watched_paths:
+            self._sessions_watcher.removePaths(watched_paths)
         if self._scan_worker is not None and self._scan_worker.isRunning():
             self._scan_worker.requestInterruption()
             self._scan_worker.wait()
@@ -1353,5 +1354,6 @@ class PlayerLeaderboardWindow(QWidget):
             self._baseline_worker.requestInterruption()
             self._baseline_worker.wait()
         if self._overlay_worker is not None and self._overlay_worker.isRunning():
+            self._overlay_worker.requestInterruption()
             self._overlay_worker.wait()
         super().closeEvent(event)

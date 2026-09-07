@@ -4,7 +4,7 @@ import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, ClassVar, cast, override
+from typing import TYPE_CHECKING, ClassVar, override
 
 import requests
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -57,7 +57,6 @@ from session_sniffer.text_utils import pluralize
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
 
     from PySide6.QtGui import QCloseEvent
 
@@ -74,8 +73,8 @@ class _CrawlerSendWorker(CrashingQThread):
     send_failed: Signal = Signal(str)  # error message
     log_message: Signal = Signal(str, str)  # (icon, text)
 
-    def __init__(self, send_fn: Callable[[], str], parent: QWidget) -> None:
-        super().__init__(parent)
+    def __init__(self, send_fn: Callable[[], str]) -> None:
+        super().__init__()
         self._send_fn = send_fn
 
     @override
@@ -84,25 +83,27 @@ class _CrawlerSendWorker(CrashingQThread):
         try:
             tracking_id = self._send_fn()
         except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-                self.send_rate_limited.emit(extract_rate_limit_wait_seconds(e), extract_rate_limit_message(e))
-            else:
-                status_code = e.response.status_code if e.response is not None else '?'
-                self.send_failed.emit(f'API error: HTTP {status_code}')
-                if e.response is not None:
-                    logger.debug('HTTP %s Response: %s', status_code, e.response.text)
-                    logger.debug('Response Headers: %s', dict(e.response.headers))
-                    logger.debug('Request Headers: %s', dict(e.request.headers))
-            return
+            if not self.isInterruptionRequested():
+                if e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+                    self.send_rate_limited.emit(extract_rate_limit_wait_seconds(e), extract_rate_limit_message(e))
+                else:
+                    status_code = e.response.status_code if e.response is not None else '?'
+                    self.send_failed.emit(f'API error: HTTP {status_code}')
+                    if e.response is not None:
+                        logger.debug('HTTP %s Response: %s', status_code, e.response.text)
+                        logger.debug('Response Headers: %s', dict(e.response.headers))
+                        logger.debug('Request Headers: %s', dict(e.request.headers))
         except requests.RequestException as e:
-            self.send_failed.emit(f'Connection error: {e}')
-            if hasattr(e, 'request') and e.request is not None:
-                logger.debug('Request Headers: %s', dict(e.request.headers))
-            return
+            if not self.isInterruptionRequested():
+                self.send_failed.emit(f'Connection error: {e}')
+                if hasattr(e, 'request') and e.request is not None:
+                    logger.debug('Request Headers: %s', dict(e.request.headers))
         except KeyError:
-            self.send_failed.emit('Unexpected API response: missing trackingId.')
-            return
-        self.send_succeeded.emit(tracking_id)
+            if not self.isInterruptionRequested():
+                self.send_failed.emit('Unexpected API response: missing trackingId.')
+        else:
+            if not self.isInterruptionRequested():
+                self.send_succeeded.emit(tracking_id)
 
 
 class _CrawlerWatchWorker(CrashingQThread):
@@ -121,6 +122,17 @@ class _CrawlerWatchWorker(CrashingQThread):
         self._api_key = api_key
         self._version = version
         self._rid = rid
+        self._active_response: requests.Response | None = None
+
+    def cancel(self) -> None:
+        """Interrupt streaming and close the active socket immediately."""
+        self.requestInterruption()
+        if self._active_response is not None:
+            with contextlib.suppress(Exception):
+                self._active_response.close()
+
+    def _on_response(self, response: requests.Response) -> None:
+        self._active_response = response
 
     @override
     def _run(self) -> None:
@@ -139,6 +151,7 @@ class _CrawlerWatchWorker(CrashingQThread):
                 context,
                 should_cancel=self.isInterruptionRequested,
                 on_reconnect=self.reconnect_triggered.emit,
+                on_response=self._on_response,
             ):
                 if self.isInterruptionRequested():
                     return
@@ -191,10 +204,6 @@ class _CrawlerRequestDialog(QDialog):
     # Tracks the currently-open crawler dialogs, keyed by request, so re-invoking the action restores
     # the existing (possibly minimized) window instead of opening a duplicate and sending a new crawl.
     _open_dialogs: ClassVar[dict[str, _CrawlerRequestDialog]] = {}
-
-    # Workers whose dialog closed while they were still running. Kept referenced here (parent-less) so
-    # they are not garbage-collected mid-run, and removed once they finish on their own and self-delete.
-    _detached_workers: ClassVar[set[CrashingQThread]] = set()
 
     def __init__(self, parent: QWidget, request: _CrawlerRequest) -> None:
         super().__init__(parent)
@@ -265,24 +274,10 @@ class _CrawlerRequestDialog(QDialog):
         return True
 
     @classmethod
-    def _detach_and_release(cls, worker: CrashingQThread) -> None:
-        """Detach a still-running *worker* so its dialog can close without freezing the GUI.
-
-        Closing a streaming socket does not reliably unblock a thread already blocked in `recv()` on
-        Windows, so waiting on the worker here could hang the GUI for minutes. Instead the worker's
-        signals are dropped (so no queued slot fires against the closing dialog) and it is kept
-        referenced, parent-less, until it finishes on its own, at which point it is scheduled for deletion.
-        """
-        with contextlib.suppress(TypeError, RuntimeError):
-            cast('Any', worker).disconnect()
-        worker.setParent(None)
-        cls._detached_workers.add(worker)
-
-        def _release() -> None:
-            cls._detached_workers.discard(worker)
-            worker.deleteLater()
-
-        worker.finished.connect(_release)
+    def close_all_open_dialogs(cls) -> None:
+        """Close and cleanly cancel all open crawler dialogs."""
+        for dialog in list(cls._open_dialogs.values()):
+            dialog.close()
 
     # ------------------------------------------------------------------
     # Send (with rate-limit auto-retry)
@@ -311,7 +306,7 @@ class _CrawlerRequestDialog(QDialog):
         if self._cancel_button is not None:
             self._cancel_button.setText('Cancel')
             self._cancel_button.setToolTip('Stop the crawler request and close this window.')
-        worker = _CrawlerSendWorker(self._request.send_fn, self)
+        worker = _CrawlerSendWorker(self._request.send_fn)
         worker.send_succeeded.connect(self._on_send_succeeded)
         worker.send_rate_limited.connect(self._on_send_rate_limited)
         worker.send_failed.connect(self._show_failed)
@@ -331,7 +326,6 @@ class _CrawlerRequestDialog(QDialog):
         worker.request_failed.connect(self._show_watch_stream_lost)
         worker.instruction_failed.connect(self._show_failed)
         worker.log_message.connect(self._append_log_line)
-        worker.setParent(self)
         self._watch_worker = worker
         worker.start()
 
@@ -438,24 +432,25 @@ class _CrawlerRequestDialog(QDialog):
     # Lifetime / cleanup
     # ------------------------------------------------------------------
 
-    def _cancel_and_detach_workers(self) -> None:
-        """Stop the retry timer and interrupt/detach any still-running workers. Idempotent."""
+    def _cancel_workers(self) -> None:
+        """Stop the retry timer and cleanly cancel/wait for any running workers. Idempotent."""
         self._retry_timer.stop()
         if self._watch_worker is not None:
             if self._watch_worker.isRunning():
-                self._watch_worker.requestInterruption()
-                _CrawlerRequestDialog._detach_and_release(self._watch_worker)
+                self._watch_worker.cancel()
+                self._watch_worker.wait(1500)
             self._watch_worker = None
         if self._send_worker is not None:
             if self._send_worker.isRunning():
-                _CrawlerRequestDialog._detach_and_release(self._send_worker)
+                self._send_worker.requestInterruption()
+                self._send_worker.wait(1500)
             self._send_worker = None
 
     @override
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Cancel and detach the background workers so the dialog closes instantly without freezing."""
+        """Cancel the background workers so the dialog closes cleanly."""
         _CrawlerRequestDialog._open_dialogs.pop(self._registry_key, None)
-        self._cancel_and_detach_workers()
+        self._cancel_workers()
         super().closeEvent(event)
 
     @override
@@ -466,7 +461,7 @@ class _CrawlerRequestDialog(QDialog):
         re-enter `QDialog.closeEvent`, which itself calls `reject()`, causing infinite recursion.
         """
         _CrawlerRequestDialog._open_dialogs.pop(self._registry_key, None)
-        self._cancel_and_detach_workers()
+        self._cancel_workers()
         super().reject()
 
 
@@ -640,3 +635,8 @@ def show_crawlme_request(parent: QWidget) -> None:
             on_completed=_on_crawl_completed,
         ),
     )
+
+
+def close_all_crawler_dialogs() -> None:
+    """Close and cleanly cancel all open crawler dialogs."""
+    _CrawlerRequestDialog.close_all_open_dialogs()

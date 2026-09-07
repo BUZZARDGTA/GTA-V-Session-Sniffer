@@ -103,118 +103,121 @@ class RateGraphWidget(QWidget):
         if not a0:
             return
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, on=True)
-        painter.fillRect(a0.rect(), Qt.GlobalColor.black)
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, on=True)
+            painter.fillRect(a0.rect(), Qt.GlobalColor.black)
 
-        rect = self.rect()
-        margin_left = 60
-        margin_bottom = 45
-        margin_top = 10
-        margin_right = 10
+            rect = self.rect()
+            margin_left = 60
+            margin_bottom = 45
+            margin_top = 10
+            margin_right = 10
 
-        graph_width = rect.width() - margin_left - margin_right
-        graph_height = rect.height() - margin_top - margin_bottom
+            graph_width = rect.width() - margin_left - margin_right
+            graph_height = rect.height() - margin_top - margin_bottom
 
-        if graph_width <= 0 or graph_height <= 0:
-            return
+            if graph_width <= 0 or graph_height <= 0:
+                return
 
-        # Draw grid
-        painter.setPen(QPen(QColor(50, 50, 50), 1, Qt.PenStyle.SolidLine))
-        num_x_lines = 6
-        for i in range(num_x_lines + 1):
-            x_position = margin_left + i * graph_width / num_x_lines
-            painter.drawLine(int(x_position), margin_top, int(x_position), margin_top + graph_height)
+            # Draw grid
+            painter.setPen(QPen(QColor(50, 50, 50), 1, Qt.PenStyle.SolidLine))
+            num_x_lines = 6
+            for i in range(num_x_lines + 1):
+                x_position = margin_left + i * graph_width / num_x_lines
+                painter.drawLine(int(x_position), margin_top, int(x_position), margin_top + graph_height)
 
-        num_y_lines = 4
-        for i in range(num_y_lines + 1):
-            y_position = margin_top + i * graph_height / num_y_lines
-            painter.drawLine(margin_left, int(y_position), margin_left + graph_width, int(y_position))
-
-        # Y-axis labels
-        painter.setPen(QPen(self.line_color, 1))
-        font = painter.font()
-        font.setPointSize(8)
-        painter.setFont(font)
-        for i in range(num_y_lines + 1):
-            y_value = self._y_min + (self._y_max - self._y_min) * (num_y_lines - i) / num_y_lines
-            y_position = margin_top + i * graph_height / num_y_lines
-            text = f'{int(y_value)}' if y_value >= INTEGER_FORMAT_THRESHOLD else f'{y_value:.1f}'
-            painter.drawText(0, int(y_position) - 10, margin_left - 5, 20, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, text)
-
-        # X-axis labels
-        painter.setPen(QPen(QColor(200, 200, 200), 1))
-        for i in range(num_x_lines + 1):
-            x_value = self.visible_window * (num_x_lines - i) / num_x_lines
-            x_position = margin_left + i * graph_width / num_x_lines
-            text = f'{int(x_value)}'
-            painter.drawText(int(x_position) - 20, margin_top + graph_height + 5, 40, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, text)
-
-        # Axis titles
-        painter.save()
-        painter.setPen(QPen(self.line_color, 1))
-        painter.translate(15, margin_top + graph_height / 2)
-        painter.rotate(-90)
-        painter.drawText(-100, -10, 200, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, self.left_label)
-        painter.restore()
-
-        painter.setPen(QPen(QColor(200, 200, 200), 1))
-        painter.drawText(margin_left, margin_top + graph_height + 20, graph_width, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, 'Time (seconds ago)')
-
-        # Draw data
-        if not self._data:
-            return
-
-        def value_to_y(value: float) -> float:
-            span = self._y_max - self._y_min
-            if not span:
-                span = 1
-            normalized = (value - self._y_min) / span
-            return margin_top + graph_height * (1 - normalized)
-
-        path = QPainterPath()
-        num_points = len(self._data)
-        dx = graph_width / (self.visible_window - 1) if self.visible_window > 1 else 0
-
-        line_path = QPainterPath()
-        for i, rate_value in enumerate(self._data):
-            x_position = margin_left + graph_width - (num_points - 1 - i) * dx
-            y_position = value_to_y(rate_value)
-            if i:
-                line_path.lineTo(x_position, y_position)
-                path.lineTo(x_position, y_position)
-            else:
-                line_path.moveTo(x_position, y_position)
-                path.moveTo(x_position, margin_top + graph_height)
-                path.lineTo(x_position, y_position)
-
-        if num_points > 0:
-            last_x = margin_left + graph_width
-            path.lineTo(last_x, margin_top + graph_height)
-            path.closeSubpath()
-
-            # Fill
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(self.fill_color))
-            painter.drawPath(path)
-
-            # Line
-            pen = QPen(self.line_color, 2)
-            painter.setPen(pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawPath(line_path)
-
-        # Average line
-        if self._average > 0:
-            y_position = value_to_y(self._average)
-            if margin_top <= y_position <= margin_top + graph_height:
-                pen = QPen(self.avg_color, 1.5, Qt.PenStyle.DotLine)
-                painter.setPen(pen)
+            num_y_lines = 4
+            for i in range(num_y_lines + 1):
+                y_position = margin_top + i * graph_height / num_y_lines
                 painter.drawLine(margin_left, int(y_position), margin_left + graph_width, int(y_position))
 
-        # Threshold line
-        if self._threshold is not None and self.threshold_color:
-            y_position = value_to_y(self._threshold)
-            if margin_top <= y_position <= margin_top + graph_height:
-                pen = QPen(self.threshold_color, 1.5, Qt.PenStyle.DashLine)
+            # Y-axis labels
+            painter.setPen(QPen(self.line_color, 1))
+            font = painter.font()
+            font.setPointSize(8)
+            painter.setFont(font)
+            for i in range(num_y_lines + 1):
+                y_value = self._y_min + (self._y_max - self._y_min) * (num_y_lines - i) / num_y_lines
+                y_position = margin_top + i * graph_height / num_y_lines
+                text = f'{int(y_value)}' if y_value >= INTEGER_FORMAT_THRESHOLD else f'{y_value:.1f}'
+                painter.drawText(0, int(y_position) - 10, margin_left - 5, 20, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, text)
+
+            # X-axis labels
+            painter.setPen(QPen(QColor(200, 200, 200), 1))
+            for i in range(num_x_lines + 1):
+                x_value = self.visible_window * (num_x_lines - i) / num_x_lines
+                x_position = margin_left + i * graph_width / num_x_lines
+                text = f'{int(x_value)}'
+                painter.drawText(int(x_position) - 20, margin_top + graph_height + 5, 40, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, text)
+
+            # Axis titles
+            painter.save()
+            painter.setPen(QPen(self.line_color, 1))
+            painter.translate(15, margin_top + graph_height / 2)
+            painter.rotate(-90)
+            painter.drawText(-100, -10, 200, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, self.left_label)
+            painter.restore()
+
+            painter.setPen(QPen(QColor(200, 200, 200), 1))
+            painter.drawText(margin_left, margin_top + graph_height + 20, graph_width, 20, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, 'Time (seconds ago)')
+
+            # Draw data
+            if not self._data:
+                return
+
+            def value_to_y(value: float) -> float:
+                span = self._y_max - self._y_min
+                if not span:
+                    span = 1
+                normalized = (value - self._y_min) / span
+                return margin_top + graph_height * (1 - normalized)
+
+            path = QPainterPath()
+            num_points = len(self._data)
+            dx = graph_width / (self.visible_window - 1) if self.visible_window > 1 else 0
+
+            line_path = QPainterPath()
+            for i, rate_value in enumerate(self._data):
+                x_position = margin_left + graph_width - (num_points - 1 - i) * dx
+                y_position = value_to_y(rate_value)
+                if i:
+                    line_path.lineTo(x_position, y_position)
+                    path.lineTo(x_position, y_position)
+                else:
+                    line_path.moveTo(x_position, y_position)
+                    path.moveTo(x_position, margin_top + graph_height)
+                    path.lineTo(x_position, y_position)
+
+            if num_points > 0:
+                last_x = margin_left + graph_width
+                path.lineTo(last_x, margin_top + graph_height)
+                path.closeSubpath()
+
+                # Fill
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(self.fill_color))
+                painter.drawPath(path)
+
+                # Line
+                pen = QPen(self.line_color, 2)
                 painter.setPen(pen)
-                painter.drawLine(margin_left, int(y_position), margin_left + graph_width, int(y_position))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawPath(line_path)
+
+            # Average line
+            if self._average > 0:
+                y_position = value_to_y(self._average)
+                if margin_top <= y_position <= margin_top + graph_height:
+                    pen = QPen(self.avg_color, 1.5, Qt.PenStyle.DotLine)
+                    painter.setPen(pen)
+                    painter.drawLine(margin_left, int(y_position), margin_left + graph_width, int(y_position))
+
+            # Threshold line
+            if self._threshold is not None and self.threshold_color:
+                y_position = value_to_y(self._threshold)
+                if margin_top <= y_position <= margin_top + graph_height:
+                    pen = QPen(self.threshold_color, 1.5, Qt.PenStyle.DashLine)
+                    painter.setPen(pen)
+                    painter.drawLine(margin_left, int(y_position), margin_left + graph_width, int(y_position))
+        finally:
+            painter.end()

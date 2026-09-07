@@ -712,11 +712,7 @@ def setup_static_table_column_resizing(
             continue
         last_visible_column = column
         header_label = str(table_model.headerData(column, Qt.Orientation.Horizontal) or '')
-        base_width = (
-            compute_base_width(font_metrics, header_label)
-            if compute_base_width is not None
-            else font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
-        )
+        base_width = compute_base_width(font_metrics, header_label) if compute_base_width is not None else font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
         total_base_width += base_width
         if header_label in target_flexible_columns:
             flex_count += 1
@@ -732,11 +728,7 @@ def setup_static_table_column_resizing(
         header_label = str(table_model.headerData(column, Qt.Orientation.Horizontal) or '')
         horizontal_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
 
-        base_width = (
-            compute_base_width(font_metrics, header_label)
-            if compute_base_width is not None
-            else font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
-        )
+        base_width = compute_base_width(font_metrics, header_label) if compute_base_width is not None else font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
 
         if header_label in target_flexible_columns:
             current_flex_index += 1
@@ -901,8 +893,10 @@ def _svg_to_icon(svg: bytes) -> QIcon:
     pixmap = QPixmap(16, 16)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
-    renderer.render(painter)
-    painter.end()
+    try:
+        renderer.render(painter)
+    finally:
+        painter.end()
     return QIcon(pixmap)
 
 
@@ -932,8 +926,10 @@ def make_padded_icon(source: QIcon, icon_size: tuple[int, int], right_padding: i
     pixmap = QPixmap(width + right_padding, height)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
-    source.paint(painter, 0, 0, width, height)
-    painter.end()
+    try:
+        source.paint(painter, 0, 0, width, height)
+    finally:
+        painter.end()
     return QIcon(pixmap)
 
 
@@ -943,10 +939,12 @@ def render_svg_pixmap_from_resource(filename: str, width: int, height: int) -> Q
     pixmap = QPixmap(width, height)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    renderer.render(painter, QRectF(0, 0, width, height))
-    painter.end()
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        renderer.render(painter, QRectF(0, 0, width, height))
+    finally:
+        painter.end()
     return pixmap
 
 

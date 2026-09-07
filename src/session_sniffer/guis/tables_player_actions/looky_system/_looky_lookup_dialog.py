@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from session_sniffer.guis._crashing_qthread import CrashingQThread
 from session_sniffer.guis.looky_text import LOOKY_TITLE
@@ -122,6 +123,9 @@ class LookyLookupDialog(PlayerInfoDialogMixin):
         outer_layout.addWidget(button_box)
 
 
+_active_lookup_workers: set[_LookyFetchWorker] = set()
+
+
 def show_looky_lookup(parent: QWidget, player: Player) -> None:
     """Validate and fetch Looky System IP lookup results for *player*; open a results dialog or show an error."""
     api_key = check_looky_prerequisites(parent, player=player)
@@ -138,6 +142,9 @@ def show_looky_lookup(parent: QWidget, player: Player) -> None:
             player.looky_system.last_fetched_at = time.monotonic()
             player.looky_system.is_initialized = True
 
+        if not isValid(parent):
+            return
+
         if not worker.results:
             QMessageBox.information(parent, LOOKY_TITLE, 'No players found for this IP on Looky System.')
             return
@@ -145,14 +152,17 @@ def show_looky_lookup(parent: QWidget, player: Player) -> None:
         LookyLookupDialog(parent, player, worker.results).show()
 
     def _on_fetch_not_found() -> None:
-        QMessageBox.information(parent, LOOKY_TITLE, f'No results found\n\nWe couldn\'t find any players matching "{player.ip}"')
+        if isValid(parent):
+            QMessageBox.information(parent, LOOKY_TITLE, f'No results found\n\nWe couldn\'t find any players matching "{player.ip}"')
 
     def _on_fetch_failed(message: str) -> None:
-        QMessageBox.warning(parent, LOOKY_TITLE, f'Failed: {message}')
+        if isValid(parent):
+            QMessageBox.warning(parent, LOOKY_TITLE, f'Failed: {message}')
 
     worker.fetch_succeeded.connect(_on_fetch_succeeded)
     worker.fetch_not_found.connect(_on_fetch_not_found)
     worker.fetch_failed.connect(_on_fetch_failed)
+    _active_lookup_workers.add(worker)
+    worker.finished.connect(lambda: _active_lookup_workers.discard(worker))
     worker.finished.connect(worker.deleteLater)
-    worker.setParent(parent)
     worker.start()

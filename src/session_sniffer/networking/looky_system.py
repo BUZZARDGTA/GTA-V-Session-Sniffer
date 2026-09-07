@@ -314,6 +314,7 @@ def watch_instruction_status(
     *,
     should_cancel: Callable[[], bool] | None = None,
     on_reconnect: Callable[[int], None] | None = None,
+    on_response: Callable[[requests.Response], None] | None = None,
 ) -> Generator[tuple[LookyInstructionStatus, str | None]]:
     """Stream SSE status updates for a Looky System instruction until a terminal status arrives.
 
@@ -334,6 +335,8 @@ def watch_instruction_status(
             times out (whichever comes first).
         on_reconnect: Optional callback invoked just before each reconnect attempt, receiving the
             1-based attempt number. Called from the streaming thread, not the GUI thread.
+        on_response: Optional callback receiving the active streaming response object, allowing callers
+            to abort or close the underlying socket immediately when cancelling.
 
     Raises:
         requests.HTTPError: On a non-2xx response.
@@ -402,6 +405,8 @@ def watch_instruction_status(
                     stream=True,
                     timeout=(3.0, 300.0),
                 ) as response:
+                    if on_response is not None:
+                        on_response(response)
                     response.raise_for_status()
                     for raw_line in response.iter_lines():
                         check_cancel()
