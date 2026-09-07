@@ -66,7 +66,7 @@ from session_sniffer.player.detections import GUIDetectionSettings
 from session_sniffer.player.registry import PlayersRegistry
 from session_sniffer.player.userip import UserIPDatabases
 from session_sniffer.rendering_core.renderer import rendering_core
-from session_sniffer.rendering_core.types import CaptureState, CaptureStats, GeoIP2Readers
+from session_sniffer.rendering_core.types import CaptureState, CaptureStats, GeoIP2Readers, GUIRenderingState
 from session_sniffer.settings import Settings
 from session_sniffer.updater import UpdateCheckOutcome, check_for_updates
 from session_sniffer.utils import is_pyinstaller_compiled
@@ -390,6 +390,8 @@ def main() -> None:
     ArpSpoofingController.configure(capture_holder, on_failed=_arp_failed_event.set)
     if Settings.capture_arp_spoofing:
         ArpSpoofingController.start(selected_interface)
+
+    splash.update_status('Preparing GUI')
 
     def _switch_interface() -> None:
         window.set_change_interface_button_enabled(enabled=False)
@@ -815,6 +817,12 @@ def main() -> None:
         daemon=True,
     )
     rendering_core__thread.start()
+
+    def _wait_for_first_render() -> None:
+        GUIRenderingState.wait_rendering_snapshot(last_seen_version=0)
+
+    splash.run_with_spinner(_wait_for_first_render)
+    app.processEvents()
 
     splash.finish_loading()
 

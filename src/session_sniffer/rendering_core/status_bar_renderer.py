@@ -137,8 +137,8 @@ def _compute_disk_io_rates() -> None:
 def _capture_global_state(capture: PacketCapture, discord_rpc_manager: DiscordRPC | None) -> StatusBarSnapshot:
     """Capture global state atomically to avoid race conditions."""
     discord_rpc_connected = False
-    if Settings.discord_presence and discord_rpc_manager is not None:
-        discord_rpc_connected = discord_rpc_manager.connection_status.is_set()
+    if Settings.discord_presence:
+        discord_rpc_connected = discord_rpc_manager.connection_status.is_set() if discord_rpc_manager is not None else CaptureState.discord_rpc_connected
 
     CaptureStats.app_cpu_percent = _PROCESS.cpu_percent(interval=None) / _CPU_COUNT
     CaptureStats.app_memory_mb = _PROCESS.memory_info().rss / _BYTES_PER_MB
@@ -203,7 +203,7 @@ def _build_capture_section(snapshot: StatusBarSnapshot) -> str:
     )
 
 
-def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool, discord_rpc_manager: DiscordRPC | None) -> str:
+def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool) -> str:
     parts: list[str] = []
 
     if snapshot.interface.arp_spoofing:
@@ -228,7 +228,7 @@ def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool
             f'<span style="color: {StatusBarColors.SECONDARY_ACCENT};">{snapshot.capture.feature_set}</span>',
         )
 
-    if snapshot.system.discord_presence_enabled and discord_rpc_manager is not None:
+    if snapshot.system.discord_presence_enabled:
         rpc_color = StatusBarColors.ENABLED if snapshot.system.discord_rpc_connected else StatusBarColors.DISABLED
         rpc_status = 'Connected' if snapshot.system.discord_rpc_connected else 'Waiting'
         parts.append(
@@ -243,7 +243,7 @@ def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool
         )
 
     divider = f'<span style="color: {StatusBarColors.DIVIDER};"> • </span>'
-    body = divider.join(parts)
+    body = divider.join(parts) if parts else f'<span style="color: {StatusBarColors.DISABLED};">Default</span>'
     return f'<span style="font-size: 10pt;"><span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">⚙️ Config:</span> {body}</span>'
 
 
@@ -305,7 +305,7 @@ def build_gui_status_text(
     snapshot = _capture_global_state(capture, discord_rpc_manager)
 
     capture_section = _build_capture_section(snapshot)
-    config_section = _build_config_section(snapshot, vpn_mode_enabled=vpn_mode_enabled, discord_rpc_manager=discord_rpc_manager)
+    config_section = _build_config_section(snapshot, vpn_mode_enabled=vpn_mode_enabled)
     userip_issues_section = _build_userip_issues_section(snapshot)
     performance_section = _build_performance_section(snapshot)
 

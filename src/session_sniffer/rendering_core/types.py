@@ -345,7 +345,7 @@ class GUIRenderingState:
     def wait_rendering_snapshot(
         cls,
         *,
-        timeout: float,
+        timeout: float | None = None,
         last_seen_version: int = 0,
     ) -> tuple[GUIRenderingSnapshot | None, int]:
         """Wait for a new snapshot if it's newer than last_seen_version.
