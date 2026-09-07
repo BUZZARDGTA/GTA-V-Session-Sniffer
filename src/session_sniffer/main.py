@@ -128,7 +128,12 @@ def main() -> None:
     npcap_future = preload_executor.submit(ensure_npcap_installed)
     geolite2_future = preload_executor.submit(update_and_initialize_geolite2_readers)
     mac_lookup_future = preload_executor.submit(MacLookup.load)
-    network_interfaces_future = preload_executor.submit(populate_network_interfaces_info)
+
+    def _populate_interfaces_after_mac() -> None:
+        mac_lookup_future.result()  # Vendor name lookups require MacLookup to be loaded first.
+        populate_network_interfaces_info()
+
+    network_interfaces_future = preload_executor.submit(_populate_interfaces_after_mac)
 
     if not is_pyinstaller_compiled():
         splash.update_status('Checking Python package versions')
