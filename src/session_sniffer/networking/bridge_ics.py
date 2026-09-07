@@ -108,6 +108,11 @@ def _get_ics_classification() -> dict[str, AdapterClassification]:
     except pythoncom.com_error:
         return result
 
+    manager = None
+    ics_connections = None
+    connection = None
+    config = None
+
     try:
         try:
             manager = win32com.client.Dispatch('HNetCfg.HNetShare')
@@ -138,6 +143,10 @@ def _get_ics_classification() -> dict[str, AdapterClassification]:
             elif sharing_type == _ICSSHARINGTYPE_PRIVATE:
                 result[guid] = 'shared'
     finally:
+        config = None
+        connection = None
+        ics_connections = None
+        manager = None
         pythoncom.CoUninitialize()
 
     return result

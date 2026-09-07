@@ -197,7 +197,7 @@ class Packet(NamedTuple):
         payload: bytes | None = None
         if include_payload:
             payload_offset = udp_offset + _UDP_HEADER_LENGTH
-            payload_end = udp_offset + max(_UDP_HEADER_LENGTH, udp_length)
+            payload_end = min(frame_length, udp_offset + max(_UDP_HEADER_LENGTH, udp_length))
             payload = raw_bytes[payload_offset:payload_end]
 
         return cls(
@@ -341,7 +341,7 @@ class PacketCapture:
 
             try:
                 self._capture_and_process()
-            except (CaptureExitError, PcapError) as e:
+            except (CaptureExitError, PcapError, Exception) as e:
                 error_detail = e.cause if isinstance(e, CaptureExitError) and e.cause is not None else e
                 error_string = str(error_detail)
                 has_monitored_adapter_guid = (
@@ -417,7 +417,16 @@ class PacketCapture:
                 if self.config.display_filter_fn is not None and not self.config.display_filter_fn(packet):
                     continue
 
-                self.config.callback(packet)
+                try:
+                    self.config.callback(packet)
+                except Exception:  # pylint: disable=broad-exception-caught
+                    logger.exception(
+                        'Unhandled exception in packet callback for packet from %s:%d to %s:%d',
+                        packet.ip.src,
+                        packet.port.src,
+                        packet.ip.dst,
+                        packet.port.dst,
+                    )
         finally:
             with self._state.control_lock:
                 if self._state.pcap_handle is pcap_handle:

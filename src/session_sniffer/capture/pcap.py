@@ -6,7 +6,8 @@ requiring any third-party packet manipulation frameworks.
 
 import ctypes
 import os
-from ctypes import byref, c_char_p, c_int, c_long, c_ubyte, c_uint, c_uint32, c_void_p, pointer
+import threading
+from ctypes import byref, c_char_p, c_int, c_long, c_ubyte, c_uint, c_uint32, c_void_p
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,14 @@ DLT_RAW = 12
 _PCAP_READ_SUCCESS = 1
 _PCAP_READ_TIMEOUT = 0
 _PCAP_READ_LOOP_BROKEN = -2
+
+
+def _get_pcap_error_message(library: ctypes.CDLL, handle: c_void_p) -> str:
+    """Retrieve and decode the last pcap error message safely."""
+    raw_error: bytes | None = library.pcap_geterr(handle)
+    if not raw_error:
+        return 'Unknown pcap error'
+    return raw_error.decode('utf-8', errors='replace')
 
 
 class BpfProgram(ctypes.Structure):
@@ -150,11 +159,15 @@ class _PcapLibrary:  # pylint: disable=too-few-public-methods
 class PcapHandle:
     """Wrapper managing a live pcap handle lifecycle."""
 
-    def __init__(self, handle: c_void_p, datalink_type: int) -> None:
+    def __init__(self, handle: c_void_p, datalink_type: int, *, snaplen: int = 65535) -> None:
         """Initialize with an open pcap handle pointer."""
         self._handle = handle
         self._datalink_type = datalink_type
+        self._snaplen = snaplen
         self._is_closed = False
+        self._lock = threading.Lock()
+        self._header_pointer = ctypes.POINTER(PcapPkthdr)()
+        self._data_pointer = ctypes.POINTER(c_ubyte)()
 
     @classmethod
     def open_live(
@@ -203,7 +216,7 @@ class PcapHandle:
             library.pcap_setmintocopy(handle, c_int(1))
 
         datalink_type = library.pcap_datalink(handle)
-        return cls(handle, datalink_type)
+        return cls(handle, datalink_type, snaplen=snaplen)
 
     @property
     def datalink_type(self) -> int:
@@ -236,13 +249,13 @@ class PcapHandle:
         )
 
         if compile_result:
-            error_message = library.pcap_geterr(self._handle).decode('utf-8', errors='replace')
+            error_message = _get_pcap_error_message(library, self._handle)
             raise PcapFilterError(filter_string, error_message)
 
         try:
             setfilter_result = library.pcap_setfilter(self._handle, byref(bpf_program))
             if setfilter_result:
-                error_message = library.pcap_geterr(self._handle).decode('utf-8', errors='replace')
+                error_message = _get_pcap_error_message(library, self._handle)
                 raise PcapFilterError(filter_string, error_message)
         finally:
             library.pcap_freecode(byref(bpf_program))
@@ -282,21 +295,30 @@ class PcapHandle:
             return None
 
         library = _PcapLibrary.get()
-        header_pointer = pointer(PcapPkthdr())
-        data_pointer = pointer(c_ubyte())
 
         result = library.pcap_next_ex(
             self._handle,
-            byref(header_pointer),
-            byref(data_pointer),
+            byref(self._header_pointer),
+            byref(self._data_pointer),
         )
 
         if result == _PCAP_READ_SUCCESS:
-            header = header_pointer.contents
+            if not self._header_pointer or not self._data_pointer:
+                return None
+
+            header = self._header_pointer.contents
             captured_length = int(header.caplen)
-            epoch_seconds = float(header.tv_sec) + (float(header.tv_usec) / 1_000_000.0)
-            packet_time = datetime.fromtimestamp(epoch_seconds, tz=LOCAL_TZ)
-            packet_bytes = ctypes.string_at(data_pointer, captured_length)
+            if not 0 < captured_length <= self._snaplen:
+                return None
+
+            try:
+                epoch_seconds = float(header.tv_sec) + (float(header.tv_usec) / 1_000_000.0)
+                packet_time = datetime.fromtimestamp(epoch_seconds, tz=LOCAL_TZ)
+            except (OSError, ValueError, OverflowError):
+                packet_time = datetime.now(tz=LOCAL_TZ)
+
+            packet_bytes = ctypes.string_at(self._data_pointer, captured_length)
+
             return RawCapturedPacket(
                 timestamp=packet_time,
                 data=packet_bytes,
@@ -306,7 +328,7 @@ class PcapHandle:
         if result in (_PCAP_READ_TIMEOUT, _PCAP_READ_LOOP_BROKEN):
             return None
 
-        error_message = library.pcap_geterr(self._handle).decode('utf-8', errors='replace')
+        error_message = _get_pcap_error_message(library, self._handle)
         raise PcapReadError(error_message)
 
     def get_drop_count(self) -> int | None:
@@ -339,16 +361,20 @@ class PcapHandle:
         if self._is_closed:
             raise PcapClosedError
 
+        if not data:
+            return
+
         library = _PcapLibrary.get()
         packet_buffer = (c_ubyte * len(data)).from_buffer_copy(data)
         result = library.pcap_sendpacket(self._handle, packet_buffer, len(data))
         if result:
-            error_message = library.pcap_geterr(self._handle).decode('utf-8', errors='replace')
+            error_message = _get_pcap_error_message(library, self._handle)
             raise PcapSendError(error_message)
 
     def close(self) -> None:
         """Close the underlying pcap handle."""
-        if not self._is_closed:
-            self._is_closed = True
-            library = _PcapLibrary.get()
-            library.pcap_close(self._handle)
+        with self._lock:
+            if not self._is_closed:
+                self._is_closed = True
+                library = _PcapLibrary.get()
+                library.pcap_close(self._handle)

@@ -28,6 +28,7 @@ _ARP_HARDWARE_ADDRESS_LENGTH = 6
 _ARP_PROTOCOL_ADDRESS_LENGTH = 4
 _ARP_OPCODE_REPLY = 2
 _ETHERTYPE_ARP = 0x0806
+_ETHERNET_MINIMUM_FRAME_LENGTH = 60
 
 _BROADCAST_MAC = b'\xff\xff\xff\xff\xff\xff'
 
@@ -162,7 +163,11 @@ def build_arp_reply(
         target_ip_bytes,
     )
 
-    return ethernet_header + arp_payload
+    frame = ethernet_header + arp_payload
+    if len(frame) < _ETHERNET_MINIMUM_FRAME_LENGTH:
+        frame = frame.ljust(_ETHERNET_MINIMUM_FRAME_LENGTH, b'\x00')
+
+    return frame
 
 
 def send_arp_spoof_packets(
