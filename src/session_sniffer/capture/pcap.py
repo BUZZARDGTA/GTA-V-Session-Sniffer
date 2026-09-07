@@ -35,8 +35,8 @@ _PCAP_READ_LOOP_BROKEN = -2
 
 def _get_pcap_error_message(library: ctypes.CDLL, handle: c_void_p) -> str:
     """Retrieve and decode the last pcap error message safely."""
-    raw_error: bytes | None = library.pcap_geterr(handle)
-    if not raw_error:
+    raw_error = library.pcap_geterr(handle)
+    if not isinstance(raw_error, bytes):
         return 'Unknown pcap error'
     return raw_error.decode('utf-8', errors='replace')
 
