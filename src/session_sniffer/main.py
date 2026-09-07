@@ -123,11 +123,12 @@ def main() -> None:
     # Own splash msgboxes so they appear above it without being globally topmost
     msgbox.set_owner_hwnd(splash.winId())
 
-    preload_executor = ThreadPoolExecutor(max_workers=4)
+    preload_executor = ThreadPoolExecutor(max_workers=5)
     update_check_future = preload_executor.submit(check_for_updates, updater_channel=Settings.updater_channel)
     npcap_future = preload_executor.submit(ensure_npcap_installed)
     geolite2_future = preload_executor.submit(update_and_initialize_geolite2_readers)
     mac_lookup_future = preload_executor.submit(MacLookup.load)
+    network_interfaces_future = preload_executor.submit(populate_network_interfaces_info)
 
     if not is_pyinstaller_compiled():
         splash.update_status('Checking Python package versions')
@@ -175,7 +176,7 @@ def main() -> None:
     preload_executor.shutdown(wait=False)
 
     splash.update_status('Network interface selection')
-    splash.run_with_spinner(populate_network_interfaces_info)
+    splash.run_with_spinner(network_interfaces_future.result)
 
     available_interfaces: list[Interface] = []
     capture_interfaces = splash.run_with_spinner(get_filtered_capture_interfaces)
