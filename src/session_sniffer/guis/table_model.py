@@ -99,6 +99,7 @@ GUI_COLUMN_HEADERS_TOOLTIPS = {
     'Pinging': 'Indicates if the player is being actively pinged.',
 }
 
+_ZERO_TD = timedelta(0)
 
 @dataclass(frozen=True, slots=True)
 class _ColumnIndices:
@@ -334,7 +335,7 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
                 self.get_ip_from_data_safely(row): (
                     matched_player.datetime.get_total_session_time()
                     if (matched_player := PlayersRegistry.get_player_by_ip(self.get_ip_from_data_safely(row))) is not None
-                    else timedelta(0)
+                    else _ZERO_TD
                 )
                 for row, _ in combined
             }
@@ -349,7 +350,7 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
                 self.get_ip_from_data_safely(row): (
                     matched_player.datetime.get_session_time()
                     if (matched_player := PlayersRegistry.get_player_by_ip(self.get_ip_from_data_safely(row))) is not None
-                    else timedelta(0)
+                    else _ZERO_TD
                 )
                 for row, _ in combined
             }

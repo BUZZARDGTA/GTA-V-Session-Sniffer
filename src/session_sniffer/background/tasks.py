@@ -67,6 +67,7 @@ _userip_logging_file_write_lock = Lock()
 _VOICE_QUEUE_MAXSIZE = 10
 _INTER_SOUND_PAUSE_SECONDS = 0.5
 _MINUTE_INTERVAL_SECONDS = 60.0
+_ONE_SECOND_TD = timedelta(seconds=1)
 _notification_pool = ThreadPoolExecutor(max_workers=20, thread_name_prefix='Notification')
 _detection_check_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='DetectionCheck')
 
@@ -932,7 +933,7 @@ def player_rates_core() -> None:
         CaptureStats.peak_bpm_rate = max(CaptureStats.peak_bpm_rate, global_bpm_rate)
         CaptureStats.peak_pps_rate = max(CaptureStats.peak_pps_rate, global_pps_rate)
 
-        one_second_ago = datetime.now(tz=LOCAL_TZ) - timedelta(seconds=1)
+        one_second_ago = datetime.now(tz=LOCAL_TZ) - _ONE_SECOND_TD
         recent_latencies = [(timestamp, latency) for timestamp, latency in list(CaptureStats.packets_latencies) if timestamp >= one_second_ago]
         CaptureStats.global_avg_latency_ms = sum(latency.total_seconds() * 1000 for _, latency in recent_latencies) / len(recent_latencies) if recent_latencies else 0.0
 
