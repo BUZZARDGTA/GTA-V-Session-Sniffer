@@ -4,6 +4,7 @@ import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
+from threading import Thread
 from typing import TYPE_CHECKING, ClassVar, override
 
 import requests
@@ -125,11 +126,19 @@ class _CrawlerWatchWorker(CrashingQThread):
         self._active_response: requests.Response | None = None
 
     def cancel(self) -> None:
-        """Interrupt streaming and close the active socket immediately."""
+        """Signal interruption and close the active socket from a daemon thread.
+
+        `requestInterruption()` sets a flag instantly (no I/O).  The socket close
+        is offloaded to a daemon thread because urllib3's streaming response teardown
+        can briefly block — calling it on the GUI thread would freeze the window.
+        """
         self.requestInterruption()
-        if self._active_response is not None:
-            with contextlib.suppress(Exception):
-                self._active_response.close()
+        active_response = self._active_response
+        if active_response is not None:
+            def _close_socket() -> None:
+                with contextlib.suppress(Exception):
+                    active_response.close()
+            Thread(target=_close_socket, name='CrawlerCancel-closeSSE', daemon=True).start()
 
     def _on_response(self, response: requests.Response) -> None:
         self._active_response = response
@@ -178,6 +187,14 @@ class _CrawlerWatchWorker(CrashingQThread):
             failure_message = f'Connection error while watching status: {e}'
             if hasattr(e, 'request') and e.request is not None:
                 logger.debug('Request Headers: %s', dict(e.request.headers))
+        except AttributeError:
+            # Closing the active SSE response socket (via cancel()) while urllib3's iter_lines() is
+            # running on this thread causes an AttributeError: 'NoneType' object has no attribute 'read'
+            # from within http.client internals. This is a known consequence of the forced close, not
+            # an unexpected bug, so treat it as a clean cancellation.
+            if self.isInterruptionRequested():
+                return
+            raise
 
         if self.isInterruptionRequested():
             return
@@ -201,9 +218,10 @@ class _CrawlerWatchWorker(CrashingQThread):
 class _CrawlerRequestDialog(QDialog):
     """Non-modal crawler dialog: sends the instruction (auto-retrying on rate limit) then streams SSE status."""
 
-    # Tracks the currently-open crawler dialogs, keyed by request, so re-invoking the action restores
-    # the existing (possibly minimized) window instead of opening a duplicate and sending a new crawl.
     _open_dialogs: ClassVar[dict[str, _CrawlerRequestDialog]] = {}
+    # Keeps Python references to workers that were cancelled but are still running,
+    # preventing 'QThread: Destroyed while thread is still running' crashes.
+    _detaching_workers: ClassVar[set[_CrawlerSendWorker | _CrawlerWatchWorker]] = set()
 
     def __init__(self, parent: QWidget, request: _CrawlerRequest) -> None:
         super().__init__(parent)
@@ -432,36 +450,47 @@ class _CrawlerRequestDialog(QDialog):
     # Lifetime / cleanup
     # ------------------------------------------------------------------
 
-    def _cancel_workers(self) -> None:
-        """Stop the retry timer and cleanly cancel/wait for any running workers. Idempotent."""
+    def _cancel_workers_async(self) -> None:
+        """Signal workers to stop without blocking the GUI thread.
+
+        Workers that are still running are moved into `_detaching_workers` so the Python
+        object (and its QThread) is not garbage-collected before the thread finishes.
+        Each worker removes itself from the set via its `finished` signal.
+        """
         self._retry_timer.stop()
         if self._watch_worker is not None:
-            if self._watch_worker.isRunning():
-                self._watch_worker.cancel()
-                self._watch_worker.wait(1500)
+            watch_worker = self._watch_worker
             self._watch_worker = None
+            if watch_worker.isRunning():
+                watch_worker.cancel()
+                _CrawlerRequestDialog._detaching_workers.add(watch_worker)
+                watch_worker.finished.connect(lambda detached_worker=watch_worker: _CrawlerRequestDialog._detaching_workers.discard(detached_worker))
         if self._send_worker is not None:
-            if self._send_worker.isRunning():
-                self._send_worker.requestInterruption()
-                self._send_worker.wait(1500)
+            send_worker = self._send_worker
             self._send_worker = None
+            if send_worker.isRunning():
+                send_worker.requestInterruption()
+                _CrawlerRequestDialog._detaching_workers.add(send_worker)
+                send_worker.finished.connect(lambda detached_worker=send_worker: _CrawlerRequestDialog._detaching_workers.discard(detached_worker))
 
     @override
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Cancel the background workers so the dialog closes cleanly."""
+        """Hide the window instantly, then cancel background workers asynchronously."""
+        self.hide()
         _CrawlerRequestDialog._open_dialogs.pop(self._registry_key, None)
-        self._cancel_workers()
+        self._cancel_workers_async()
         super().closeEvent(event)
 
     @override
     def reject(self) -> None:
-        """Cancel the crawler and close (Escape / Cancel button), cleaning up workers first.
+        """Hide the window instantly, then cancel workers asynchronously (Escape / Cancel button).
 
         Calls `super().reject()` (which hides via `done()`), never `self.close()` — closing would
         re-enter `QDialog.closeEvent`, which itself calls `reject()`, causing infinite recursion.
         """
+        self.hide()
         _CrawlerRequestDialog._open_dialogs.pop(self._registry_key, None)
-        self._cancel_workers()
+        self._cancel_workers_async()
         super().reject()
 
 
