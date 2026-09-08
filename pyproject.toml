@@ -48,8 +48,8 @@ dev = [
     "safety",
     "ty",
     "types-pywin32",
-    "types-psutil==7.2.2.20260827",
-    "types-requests==2.33.0.20260712",
+    "types-psutil==7.2.2.20260906",
+    "types-requests==2.33.0.20260906",
     "types-toml==0.10.8.20260518",
     "vulture",
 ]
