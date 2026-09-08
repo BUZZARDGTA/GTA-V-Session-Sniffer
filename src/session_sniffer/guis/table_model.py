@@ -101,6 +101,7 @@ GUI_COLUMN_HEADERS_TOOLTIPS = {
 
 _ZERO_TD = timedelta(0)
 
+
 @dataclass(frozen=True, slots=True)
 class _ColumnIndices:
     """Immutable cache of frequently used column indices."""

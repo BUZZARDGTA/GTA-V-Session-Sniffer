@@ -61,7 +61,7 @@ class _LookyFetchWorker(CrashingQThread):
             elif e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                 message = extract_rate_limit_message(e)
                 wait_seconds = extract_rate_limit_wait_seconds(e)
-                self.fetch_failed.emit(f'Rate limited: {message}. Try again in {wait_seconds} second{pluralize(wait_seconds)}.')
+                self.fetch_failed.emit(f'Rate limited: {message}. Try again in {wait_seconds} second{pluralize(wait_seconds or 0)}.')
             else:
                 status_code = e.response.status_code if e.response is not None else '?'
                 self.fetch_failed.emit(f'Looky System API error: HTTP {status_code}')
