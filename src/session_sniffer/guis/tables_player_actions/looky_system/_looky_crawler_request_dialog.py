@@ -70,7 +70,7 @@ class _CrawlerSendWorker(CrashingQThread):
     """Pre-flight thread: sends the crawler instruction and emits the tracking ID, a rate-limit wait, or an error."""
 
     send_succeeded: Signal = Signal(str)  # tracking_id
-    send_rate_limited: Signal = Signal(int, str)  # (wait_seconds, message)
+    send_rate_limited: Signal = Signal(object, str)  # (wait_seconds: int | None, message)
     send_failed: Signal = Signal(str)  # error message
     log_message: Signal = Signal(str, str)  # (icon, text)
 
@@ -86,7 +86,8 @@ class _CrawlerSendWorker(CrashingQThread):
         except requests.HTTPError as e:
             if not self.isInterruptionRequested():
                 if e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-                    self.send_rate_limited.emit(extract_rate_limit_wait_seconds(e), extract_rate_limit_message(e))
+                    wait_seconds = extract_rate_limit_wait_seconds(e)
+                    self.send_rate_limited.emit(wait_seconds, extract_rate_limit_message(e))
                 else:
                     status_code = e.response.status_code if e.response is not None else '?'
                     self.send_failed.emit(f'API error: HTTP {status_code}')
@@ -169,7 +170,10 @@ class _CrawlerWatchWorker(CrashingQThread):
             if e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                 message = extract_rate_limit_message(e)
                 wait_seconds = extract_rate_limit_wait_seconds(e)
-                failure_message = f'Rate limited during status stream: {message}. Try again in {wait_seconds} second{pluralize(wait_seconds)}.'
+                if wait_seconds is not None:
+                    failure_message = f'Rate limited during status stream: {message}. Try again in {wait_seconds} second{pluralize(wait_seconds)}.'
+                else:
+                    failure_message = f'Rate limited during status stream: {message}.'
             else:
                 status_code = e.response.status_code if e.response is not None else '?'
                 failure_message = f'API error while watching status: HTTP {status_code}'
@@ -262,7 +266,7 @@ class _CrawlerRequestDialog(QDialog):
         if cancel_button:
             cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
             cancel_button.setStyleSheet(LOOKY_ACTION_BUTTON_STYLESHEET)
-            cancel_button.setToolTip('Stop the crawler request and close this window.')
+            cancel_button.setToolTip('Stops local retries only — an already-dispatched bot cannot be recalled.')
             cancel_button.clicked.connect(self.close)
             self._cancel_button = cancel_button
 
@@ -317,7 +321,7 @@ class _CrawlerRequestDialog(QDialog):
         self._widgets.try_again_button.setText('Try Again')
         if self._cancel_button is not None:
             self._cancel_button.setText('Cancel')
-            self._cancel_button.setToolTip('Stop the crawler request and close this window.')
+            self._cancel_button.setToolTip('Stops local retries only — an already-dispatched bot cannot be recalled.')
         worker = _CrawlerSendWorker(self._request.send_fn)
         worker.send_succeeded.connect(self._on_send_succeeded)
         worker.send_rate_limited.connect(self._on_send_rate_limited)
@@ -341,8 +345,14 @@ class _CrawlerRequestDialog(QDialog):
         self._watch_worker = worker
         worker.start()
 
-    def _on_send_rate_limited(self, wait_seconds: int, message: str) -> None:
-        """Rate limited by the server — record the cooldown locally and show a countdown that auto-retries."""
+    def _on_send_rate_limited(self, wait_seconds: int | None, message: str) -> None:
+        """Rate limited by the server — if the server provided a wait time, cache it and show an auto-retry countdown.
+
+        If no wait time was provided by the server, fall back to a manual-retry error state.
+        """
+        if wait_seconds is None:
+            self._show_failed(f'Rate limited: {message}')
+            return
         LookyState.record_crawler_cooldown(wait_seconds)
         self._start_retry_countdown(wait_seconds, f'Rate limited: {message}')
 

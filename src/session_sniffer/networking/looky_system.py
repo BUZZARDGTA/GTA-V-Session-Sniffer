@@ -127,17 +127,16 @@ def is_terminal_failure_instruction_status(status: str) -> bool:
     return status.strip().lower() in _TERMINAL_FAILURE_INSTRUCTION_STATUSES
 
 
-def extract_rate_limit_wait_seconds(exc: requests.HTTPError, default: int = 60) -> int:
-    """Return the number of seconds to wait before retrying after a 429 response.
+def extract_rate_limit_wait_seconds(exc: requests.HTTPError) -> int | None:
+    """Return the number of seconds to wait before retrying after a 429 response, or `None` if not determinable.
 
     Checks in priority order:
     1. `Retry-After` response header (standard HTTP).
     2. Numeric JSON body fields: `retryAfter`, `waitSeconds`, `retry_after`.
     3. First integer found in the JSON `message` field.
-    4. `default` (60 seconds).
     """
     if exc.response is None:
-        return default
+        return None
     retry_after_header = exc.response.headers.get('Retry-After')
     if retry_after_header:
         try:
@@ -147,7 +146,7 @@ def extract_rate_limit_wait_seconds(exc: requests.HTTPError, default: int = 60) 
     try:
         body = exc.response.json()
     except requests.JSONDecodeError:
-        return default
+        return None
     for field in ('retryAfter', 'waitSeconds', 'retry_after'):
         value = body.get(field)
         if isinstance(value, (int, float)) and value > 0:
@@ -156,7 +155,7 @@ def extract_rate_limit_wait_seconds(exc: requests.HTTPError, default: int = 60) 
     match = re.search(r'(\d+)\s+second', str(message))
     if match:
         return max(1, int(match.group(1)))
-    return default
+    return None
 
 
 def verify_token(api_key: str) -> LookyVerifyResponse:
