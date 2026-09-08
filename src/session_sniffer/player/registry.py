@@ -25,6 +25,8 @@ SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS = 200
 SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS = 600
 SESSION_HOST_SEARCH_TIMEOUT_SECONDS = 30
 SESSION_HOST_STARTUP_WINDOW_SECONDS = 1.0
+_SESSION_HOST_AMBIGUITY_MIN_TD = timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS)
+_SESSION_HOST_AMBIGUITY_MAX_TD = timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS)
 
 
 @dataclass(slots=True)
@@ -333,14 +335,14 @@ class SessionHost:
             gap_seconds = time_difference.total_seconds()
             gap_milliseconds = gap_seconds * 1000
             logger.debug('[SessionHost] Two candidates, time_difference=%s', time_difference)
-            if time_difference > timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS):
+            if time_difference > _SESSION_HOST_AMBIGUITY_MAX_TD:
                 rejection_reason = (
                     f'Player {connected_players[0].ip} connected too long before the next player ({gap_seconds:.1f}s gap). '
                     f'Host detection requires players to connect together in a lobby to reliably identify the session host.'
                 )
                 cls.search_player = False
                 cls.search_start_time = None
-            elif time_difference >= timedelta(milliseconds=SESSION_HOST_AMBIGUITY_MIN_THRESHOLD_MS):
+            elif time_difference >= _SESSION_HOST_AMBIGUITY_MIN_TD:
                 logger.debug(
                     '[SessionHost] Gap %.0fms in range [%sms, %sms], selecting candidate[0] as potential host',
                     gap_milliseconds,
