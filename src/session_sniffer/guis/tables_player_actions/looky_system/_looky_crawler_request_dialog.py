@@ -266,7 +266,7 @@ class _CrawlerRequestDialog(QDialog):
         if cancel_button:
             cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
             cancel_button.setStyleSheet(LOOKY_ACTION_BUTTON_STYLESHEET)
-            cancel_button.setToolTip('Stops local retries only — an already-dispatched bot cannot be recalled.')
+            cancel_button.setToolTip('Close this window.\nNote: if a bot was already sent, it may still join your session.')
             cancel_button.clicked.connect(self.close)
             self._cancel_button = cancel_button
 
@@ -321,7 +321,7 @@ class _CrawlerRequestDialog(QDialog):
         self._widgets.try_again_button.setText('Try Again')
         if self._cancel_button is not None:
             self._cancel_button.setText('Cancel')
-            self._cancel_button.setToolTip('Stops local retries only — an already-dispatched bot cannot be recalled.')
+            self._cancel_button.setToolTip('Close this window.\nNote: if a bot was already sent, it may still join your session.')
         worker = _CrawlerSendWorker(self._request.send_fn)
         worker.send_succeeded.connect(self._on_send_succeeded)
         worker.send_rate_limited.connect(self._on_send_rate_limited)
