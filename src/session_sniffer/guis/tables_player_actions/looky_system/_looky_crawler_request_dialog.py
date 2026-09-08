@@ -128,7 +128,7 @@ class _CrawlerWatchWorker(CrashingQThread):
     def cancel(self) -> None:
         """Signal interruption and close the active socket from a daemon thread.
 
-        `requestInterruption()` sets a flag instantly (no I/O).  The socket close
+        `requestInterruption()` sets a flag instantly (no I/O). The socket close
         is offloaded to a daemon thread because urllib3's streaming response teardown
         can briefly block — calling it on the GUI thread would freeze the window.
         """
