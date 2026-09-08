@@ -655,7 +655,7 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
             for checkbox in widget.findChildren(QCheckBox):
                 checkbox.setChecked(checkbox.objectName() in shown_set)
 
-        elif meta.setting_type == SettingType.IP_RANGE_TUPLE:
+        else:  # SettingType.IP_RANGE_TUPLE
             entries: tuple[str, ...] = value if isinstance(value, tuple) else ()
             list_widget = next(iter(widget.findChildren(QListWidget)), None)
             if list_widget is not None:

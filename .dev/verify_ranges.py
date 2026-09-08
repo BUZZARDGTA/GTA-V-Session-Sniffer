@@ -1125,7 +1125,7 @@ def check_range(  # noqa: PLR0913  # pylint: disable=too-many-arguments
                 expandable_ip_addresses.append(ip)
             else:
                 update_status('[green]✓ Boundary OK[/green]')
-                if is_non_failure_fail and message_value is not None:
+                if message_value is not None and is_non_failure_fail:
                     description = message_value.title()
                 else:
                     isp_value = lookup_result.get('isp')

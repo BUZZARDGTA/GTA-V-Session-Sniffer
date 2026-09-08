@@ -19,7 +19,7 @@ TTS_DIR_PATH: Path = RESOURCES_DIR_PATH / 'tts'
 
 
 PYPROJECT_DATA: dict[str, Any] = tomllib.loads(PYPROJECT_PATH.read_text(encoding='utf-8'))
-CURRENT_VERSION: Version = Version(RELEASE_TAG) if RELEASE_TAG != '-' else Version(PYPROJECT_DATA['project']['version'])
+CURRENT_VERSION: Version = Version(str(RELEASE_TAG)) if str(RELEASE_TAG) != '-' else Version(PYPROJECT_DATA['project']['version'])
 VERSION: str = format_project_version(CURRENT_VERSION)
 
 

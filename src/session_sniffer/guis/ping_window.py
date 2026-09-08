@@ -113,7 +113,7 @@ class PingWorkerThread(CrashingQThread):
                 if self._cancel_event.wait(self._interval_seconds):
                     break
 
-        elif self._mode == PingMode.WEB:
+        else:  # PingMode.WEB
             while not self._cancel_event.is_set():
                 results = CheckHostPingEngine.probe(self._target_host, sequence=sequence_number)
                 for probe_result in results:

@@ -3,7 +3,7 @@
 import dataclasses
 import time
 from dataclasses import dataclass
-from threading import Thread
+from threading import Event, Thread
 from typing import TYPE_CHECKING, override
 
 import dns.exception
@@ -170,7 +170,7 @@ class IPLookupDetailsDialog(PlayerInfoDialogMixin):
         set_dialog_window_flags(self)
         self._target: IPLookupTarget = target
         self._rows: list[tuple[QLabel, Callable[[IPLookupTarget], str]]] = []
-        self._is_closed = False
+        self._closed_event = Event()
 
         self.setWindowTitle(f'{TITLE} - IP Lookup Details ({format_player_display(self._target.ip, self._target.usernames)})')
         self.setMinimumSize(scale_by_ui(560), scale_by_ui(420))
@@ -217,7 +217,7 @@ class IPLookupDetailsDialog(PlayerInfoDialogMixin):
 
     def _live_ping_loop(self) -> None:
         """Continuously perform background pings to update ping stats live while dialog is open."""
-        while not self._is_closed:
+        while not self._closed_event.is_set():
             try:
                 ping_result = ping_player(self._target.ip)
                 self._target.ping.update_fields(ping_result._asdict())
@@ -230,7 +230,7 @@ class IPLookupDetailsDialog(PlayerInfoDialogMixin):
 
             # Cooldown between ping checks (interruptible upon dialog close)
             for _ in range(30):
-                if self._is_closed:
+                if self._closed_event.is_set():
                     return
                 time.sleep(0.1)
 
@@ -331,7 +331,7 @@ class IPLookupDetailsDialog(PlayerInfoDialogMixin):
     @override
     def closeEvent(self, event: QCloseEvent) -> None:
         """Stop the refresh timer and live ping worker when the dialog is closed."""
-        self._is_closed = True
+        self._closed_event.set()
         self._timer.stop()
         super().closeEvent(event)
 

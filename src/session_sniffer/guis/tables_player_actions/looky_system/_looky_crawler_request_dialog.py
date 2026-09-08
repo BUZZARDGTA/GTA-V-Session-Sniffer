@@ -162,14 +162,10 @@ class _CrawlerWatchWorker(CrashingQThread):
                 on_reconnect=self.reconnect_triggered.emit,
                 on_response=self._on_response,
             ):
-                if self.isInterruptionRequested():
-                    return
                 last_status = status
                 last_result = result
                 self.status_updated.emit(status, result)
         except requests.HTTPError as e:
-            if self.isInterruptionRequested():
-                return
             if e.response is not None and e.response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
                 message = extract_rate_limit_message(e)
                 wait_seconds = extract_rate_limit_wait_seconds(e)
@@ -182,8 +178,6 @@ class _CrawlerWatchWorker(CrashingQThread):
                     logger.debug('Response Headers: %s', dict(e.response.headers))
                     logger.debug('Request Headers: %s', dict(e.request.headers))
         except requests.RequestException as e:
-            if self.isInterruptionRequested():
-                return
             failure_message = f'Connection error while watching status: {e}'
             if hasattr(e, 'request') and e.request is not None:
                 logger.debug('Request Headers: %s', dict(e.request.headers))
@@ -191,10 +185,10 @@ class _CrawlerWatchWorker(CrashingQThread):
             # Closing the active SSE response socket (via cancel()) while urllib3's iter_lines() is
             # running on this thread causes an AttributeError: 'NoneType' object has no attribute 'read'
             # from within http.client internals. This is a known consequence of the forced close, not
-            # an unexpected bug, so treat it as a clean cancellation.
-            if self.isInterruptionRequested():
-                return
-            raise
+            # an unexpected bug, so treat it as a clean cancellation. If cancellation is not in
+            # progress, re-raise as an unexpected error.
+            if not self.isInterruptionRequested():
+                raise
 
         if self.isInterruptionRequested():
             return
@@ -464,14 +458,20 @@ class _CrawlerRequestDialog(QDialog):
             if watch_worker.isRunning():
                 watch_worker.cancel()
                 _CrawlerRequestDialog._detaching_workers.add(watch_worker)
-                watch_worker.finished.connect(lambda detached_worker=watch_worker: _CrawlerRequestDialog._detaching_workers.discard(detached_worker))
+
+                def _remove_watch_worker(detached_worker: _CrawlerWatchWorker = watch_worker) -> None:
+                    _CrawlerRequestDialog._detaching_workers.discard(detached_worker)
+                watch_worker.finished.connect(_remove_watch_worker)
         if self._send_worker is not None:
             send_worker = self._send_worker
             self._send_worker = None
             if send_worker.isRunning():
                 send_worker.requestInterruption()
                 _CrawlerRequestDialog._detaching_workers.add(send_worker)
-                send_worker.finished.connect(lambda detached_worker=send_worker: _CrawlerRequestDialog._detaching_workers.discard(detached_worker))
+
+                def _remove_send_worker(detached_worker: _CrawlerSendWorker = send_worker) -> None:
+                    _CrawlerRequestDialog._detaching_workers.discard(detached_worker)
+                send_worker.finished.connect(_remove_send_worker)
 
     @override
     def closeEvent(self, event: QCloseEvent) -> None:

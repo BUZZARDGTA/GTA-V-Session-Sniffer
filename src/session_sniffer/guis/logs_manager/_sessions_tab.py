@@ -492,14 +492,12 @@ class SessionsLogTab(QWidget):
         self._search_poll_timer.start()
 
         def worker() -> None:
-            result_lines: list[str] | None = None
-            total_matches = 0
-            files_with_matches = 0
             try:
                 result_lines, total_matches, files_with_matches = self._build_global_search_result(text, selected_column)
-            finally:
-                if result_lines is None:
-                    result_lines = ['Global search failed unexpectedly. Please try again.']
+            except (OSError, ValidationError):
+                result_lines = ['Global search failed unexpectedly. Please try again.']
+                total_matches = 0
+                files_with_matches = 0
             self._global_search_results_queue.put((generation, result_lines, total_matches, files_with_matches))
 
         self._global_search_thread = threading.Thread(target=worker, name=f'SessionsGlobalSearch-{generation}', daemon=True)

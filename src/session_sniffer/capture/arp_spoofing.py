@@ -163,24 +163,23 @@ def arp_spoofing_task(
                 break
 
             # Open a dedicated pcap handle for sending ARP packets
-            if pcap_handle is None:
-                try:
-                    pcap_handle = PcapHandle.open_live(
-                        selected_interface.device_name,
-                        snaplen=64,
-                        promiscuous=False,
-                        timeout_milliseconds=100,
-                        buffer_size=0,
-                    )
-                except (PcapOpenError, OSError) as exception:
-                    report_failure(
-                        'startup failure',
-                        error_details=str(exception),
-                        msgbox_style=msgbox.Style.MB_OK | msgbox.Style.MB_ICONERROR | msgbox.Style.MB_TOPMOST,
-                        spawn_msgbox_thread=False,
-                    )
-                    on_failed()
-                    return
+            try:
+                pcap_handle = PcapHandle.open_live(
+                    selected_interface.device_name,
+                    snaplen=64,
+                    promiscuous=False,
+                    timeout_milliseconds=100,
+                    buffer_size=0,
+                )
+            except (PcapOpenError, OSError) as exception:
+                report_failure(
+                    'startup failure',
+                    error_details=str(exception),
+                    msgbox_style=msgbox.Style.MB_OK | msgbox.Style.MB_ICONERROR | msgbox.Style.MB_TOPMOST,
+                    spawn_msgbox_thread=False,
+                )
+                on_failed()
+                return
 
             # Resolve gateway MAC address
             if gateway_ip is None:

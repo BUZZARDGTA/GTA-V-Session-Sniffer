@@ -8,7 +8,7 @@ import hmac
 import json
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import aiohttp.web
 
@@ -241,7 +241,7 @@ class WebServer:
                     timeout=5.0,
                     last_seen_version=last_version,
                 )
-                if ws.closed:
+                if cast('bool', ws.closed):
                     break
                 if snapshot is None:
                     await ws.send_str(json.dumps({'type': 'keep-alive'}))
