@@ -30,8 +30,6 @@ When replacing, renaming, or removing something:
 - Update every call site.
 - Do not add aliases, migration code, compatibility shims, fallback lookups, transitional validators, or dual code paths.
 
-Old saved data is intentionally treated as obsolete when the existing settings rewrite logic encounters unknown keys.
-
 ## Investigation
 
 For non-trivial changes:
