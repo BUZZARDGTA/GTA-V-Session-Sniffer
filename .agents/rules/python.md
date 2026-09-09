@@ -28,8 +28,7 @@ globs: **/*.py
 * Use precise type hints and prefer existing project types, protocols, models, and type aliases.
 * Use descriptive variable names. Do not use abbreviations such as `res`, `net`, `ips`, `conn`, `msg`, or `err`.
 * Single-letter variables are reserved for `i` and `j` as loop indices, and `e` for exception handling.
-* Do not create shortcut or alias variables for attributes or functions. Access the original attribute or function directly.
-* Exception: when shared state can change between reads and the same value must be used multiple times in one logical operation, snapshot it into a fully descriptive local variable.
+* Access attributes and functions directly; only use local aliases when necessary to preserve a value across changing state.
 
 ## Documentation Style
 
