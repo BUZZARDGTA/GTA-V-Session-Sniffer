@@ -5,9 +5,7 @@ description: Use when working on packet capture, packet parsing, networking, ses
 
 # Networking and Packet Capture Rules
 
-Apply these rules when working on packet capture, packet parsing, networking,
-session detection, connection tracking, IP processing, DNS, pinging, MAC
-vendor lookup, capture filters, or related network functionality.
+Apply these rules when working on packet capture, packet parsing, networking, session detection, connection tracking, IP processing, DNS, pinging, MAC vendor lookup, capture filters, or related network functionality.
 
 ## Packet Capture Architecture
 
@@ -15,8 +13,7 @@ Understand the existing packet-processing pipeline before changing it.
 
 The established flow is:
 
-packet capture → packet callback → player/session registries → rendering
-core → GUI worker signals → Qt models/views
+packet capture → packet callback → player/session registries → rendering core → GUI worker signals → Qt models/views
 
 Preserve the existing separation between:
 
@@ -28,9 +25,7 @@ Preserve the existing separation between:
 
 Do not couple packet capture directly to GUI widgets.
 
-`PacketCapture` is configured through the project's existing immutable
-`CaptureConfig` pattern. Preserve this configuration/state separation rather
-than introducing parallel configuration mechanisms.
+`PacketCapture` is configured through the project's existing immutable `CaptureConfig` pattern. Preserve this configuration/state separation rather than introducing parallel configuration mechanisms.
 
 ## Packet Callback
 
@@ -45,13 +40,11 @@ Do not add:
 * unnecessary allocations,
 * repeated parsing of data that can already be reused.
 
-Follow the existing background-thread architecture for expensive user IP
-processing and other work that should not execute inside the packet callback.
+Follow the existing background-thread architecture for expensive user IP processing and other work that should not execute inside the packet callback.
 
 ## Concurrency
 
-Preserve the project's existing worker, queue, thread, event, and
-synchronization patterns.
+Preserve the project's existing worker, queue, thread, event, and synchronization patterns.
 
 Do not move work between threads without understanding:
 
@@ -74,38 +67,31 @@ Before modifying parsing or detection logic:
 * understand which fields are actually available,
 * preserve handling for existing supported cases.
 
-When adding filters, follow the existing filter construction and ordering
-patterns. Preserve symmetry with the corresponding display-filter behavior
-when an exclusion is involved.
+When adding filters, follow the existing filter construction and ordering patterns. Preserve symmetry with the corresponding display-filter behavior when an exclusion is involved.
 
 ## Session and Player State
 
 Preserve the established registry lifecycle.
 
-Connected/disconnected movement must continue to use the project's existing
-registry methods and `Player.left_event` behavior.
+Connected/disconnected movement must continue to use the project's existing registry methods and `Player.left_event` behavior.
 
 Rejoins should use `mark_as_rejoined`.
 
 Periodic packets should use `mark_as_seen`.
 
-Do not create parallel session-tracking state when the existing registries
-already own that responsibility.
+Do not create parallel session-tracking state when the existing registries already own that responsibility.
 
 ## Networking Operations
 
-Follow existing abstractions for DNS, reverse DNS, MAC vendor lookups,
-pinging, and external IP processing.
+Follow existing abstractions for DNS, reverse DNS, MAC vendor lookups, pinging, and external IP processing.
 
-Before introducing a new network operation, determine whether an existing
-project abstraction already provides the required behavior.
+Before introducing a new network operation, determine whether an existing project abstraction already provides the required behavior.
 
 Avoid adding network requests to latency-sensitive paths.
 
 ## Data Sensitivity
 
-Captured packet information, IP addresses, and session information can be
-sensitive.
+Captured packet information, IP addresses, and session information can be sensitive.
 
 Do not add unnecessary:
 
@@ -115,15 +101,12 @@ Do not add unnecessary:
 * telemetry,
 * diagnostic output containing network data.
 
-Any new external network request must have an explicit purpose and must make
-clear what data is sent and where it is sent.
+Any new external network request must have an explicit purpose and must make clear what data is sent and where it is sent.
 
 ## Changes
 
 Keep networking changes narrowly scoped.
 
-Do not rewrite capture, parsing, or session architecture unless the task
-actually requires it.
+Do not rewrite capture, parsing, or session architecture unless the task actually requires it.
 
-Measure or identify a real bottleneck before making performance-driven
-changes to hot network paths.
+Measure or identify a real bottleneck before making performance-driven changes to hot network paths.

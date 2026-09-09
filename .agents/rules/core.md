@@ -6,12 +6,9 @@ trigger: always_on
 
 ## Project Context
 
-Session Sniffer is a mature Windows-only PySide6 desktop application for
-monitoring and analyzing P2P game network sessions.
+Session Sniffer is a mature Windows-only PySide6 desktop application for monitoring and analyzing P2P network sessions from games and other software.
 
-Treat the existing codebase and architecture as intentional. Before making
-changes, inspect the relevant implementation, callers, data flow, and
-existing patterns.
+Treat the existing codebase and architecture as intentional. Before making changes, inspect the relevant implementation, callers, data flow, and existing patterns.
 
 ## Change Discipline
 
@@ -31,11 +28,9 @@ This project never maintains backward compatibility.
 When replacing, renaming, or removing something:
 - Delete the old implementation outright.
 - Update every call site.
-- Do not add aliases, migration code, compatibility shims, fallback lookups,
-  transitional validators, or dual code paths.
+- Do not add aliases, migration code, compatibility shims, fallback lookups, transitional validators, or dual code paths.
 
-Old saved data is intentionally treated as obsolete when the existing
-settings rewrite logic encounters unknown keys.
+Old saved data is intentionally treated as obsolete when the existing settings rewrite logic encounters unknown keys.
 
 ## Investigation
 
@@ -46,27 +41,23 @@ For non-trivial changes:
 4. Search for existing implementations of similar behavior.
 5. Make the smallest appropriate change.
 
-Do not assume how the application works when the repository can answer the
-question.
+Do not assume how the application works when the repository can answer the question.
 
 ## Verification
 
 Use the project's existing tooling and validation workflow when appropriate.
 
-Do not claim that tests, quality checks, builds, or application launches were
-performed unless they were actually performed.
+Do not claim that tests, quality checks, builds, or application launches were performed unless they were actually performed.
 
 ## Git
 
-Do not create commits, amend commits, reset, rebase, force-push, or otherwise
-rewrite Git history unless explicitly requested.
+Do not create commits, amend commits, reset, rebase, force-push, or otherwise rewrite Git history unless explicitly requested.
 
 Do not discard or revert user changes unless explicitly requested.
 
 ## Communication
 
-If ambiguity materially changes the implementation, ask for clarification.
-Otherwise proceed using the existing project conventions.
+If ambiguity materially changes the implementation, ask for clarification. Otherwise proceed using the existing project conventions.
 
 After completing work, briefly state:
 - what changed,

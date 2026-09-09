@@ -8,9 +8,7 @@ These rules apply to all development work.
 
 ## Sensitive Data
 
-Session Sniffer processes potentially sensitive information including IP
-addresses, packet contents, network metadata, session information, logs, and
-user data.
+Session Sniffer processes potentially sensitive information including IP addresses, packet contents, network metadata, session information, logs, and user data.
 
 Do not unnecessarily:
 
@@ -34,8 +32,7 @@ Never commit or expose:
 * credentials,
 * private configuration containing secrets.
 
-Do not hard-code secrets into source code, tests, configuration, examples, or
-documentation.
+Do not hard-code secrets into source code, tests, configuration, examples, or documentation.
 
 ## External Network Requests
 
@@ -46,8 +43,7 @@ Before adding an external network request, understand:
 * why it is required,
 * whether the request is expected by the existing application design.
 
-Do not add silent telemetry, analytics, tracking, or unrelated external
-requests.
+Do not add silent telemetry, analytics, tracking, or unrelated external requests.
 
 ## Security Controls
 
@@ -62,22 +58,16 @@ Do not weaken or bypass:
 
 merely to make functionality work.
 
-If a security control genuinely needs to change, make the smallest necessary
-change and clearly identify its implications.
+If a security control genuinely needs to change, make the smallest necessary change and clearly identify its implications.
 
 ## Error Handling
 
-Do not hide security-relevant failures with broad exception handling or
-silent fallbacks.
+Do not hide security-relevant failures with broad exception handling or silent fallbacks.
 
-Unexpected failures should remain observable through the project's existing
-logging and exception mechanisms without unnecessarily exposing sensitive
-data.
+Unexpected failures should remain observable through the project's existing logging and exception mechanisms without unnecessarily exposing sensitive data.
 
 ## Dependencies
 
 Treat new dependencies as a security and maintenance consideration.
 
-Prefer existing dependencies or the standard library when appropriate.
-Follow the project's dependency pinning and auditing configuration when a new
-dependency is genuinely required.
+Prefer existing dependencies or the standard library when appropriate. Follow the project's dependency pinning and auditing configuration when a new dependency is genuinely required.

@@ -5,8 +5,7 @@ description: Use when adding, modifying, debugging, reviewing, or validating cod
 
 # Testing and Quality Rules
 
-Apply these rules when adding, modifying, debugging, reviewing, or validating
-code.
+Apply these rules when adding, modifying, debugging, reviewing, or validating code.
 
 ## Validation Strategy
 
@@ -30,13 +29,11 @@ For non-trivial changes, broaden validation when appropriate.
 
 Follow the project's existing tooling and configuration in `pyproject.toml`.
 
-The project uses strict static-analysis and linting configurations including
-Ruff, MyPy, Pyrefly, Pyright, Flake8, Pylint, and Vulture.
+The project uses strict static-analysis and linting configurations including Ruff, MyPy, Pyrefly, Pyright, Flake8, Pylint, and Vulture.
 
 Do not introduce competing validation tools.
 
-Preserve existing intentional suppression lists and disabled diagnostics
-unless the task explicitly requires changing them.
+Preserve existing intentional suppression lists and disabled diagnostics unless the task explicitly requires changing them.
 
 ## Tests
 
@@ -51,15 +48,13 @@ When behavior changes, consider:
 
 Prefer focused tests that directly validate the changed behavior.
 
-Do not add tests that merely duplicate implementation details without
-providing meaningful behavioral coverage.
+Do not add tests that merely duplicate implementation details without providing meaningful behavioral coverage.
 
 ## Existing Behavior
 
 When fixing a bug, verify the actual failure path before changing code.
 
-Do not weaken assertions, type checking, linting, or tests simply to make a
-change pass.
+Do not weaken assertions, type checking, linting, or tests simply to make a change pass.
 
 Fix the underlying problem whenever practical.
 
@@ -67,30 +62,22 @@ Fix the underlying problem whenever practical.
 
 Only report checks that were actually performed.
 
-If a check could not be run, state that clearly rather than implying it
-passed.
+If a check could not be run, state that clearly rather than implying it passed.
 
-Do not claim that the application was launched, tests passed, or a build
-succeeded unless the corresponding operation was actually performed.
+Do not claim that the application was launched, tests passed, or a build succeeded unless the corresponding operation was actually performed.
 
 ## Dependency Changes
 
-If dependencies or `pyproject.toml` are changed, follow the project's
-dependency workflow and run the appropriate dependency installation and
-validation steps.
+If dependencies or `pyproject.toml` are changed, follow the project's dependency workflow and run the appropriate dependency installation and validation steps.
 
 ## Release-Sensitive Changes
 
-If resources or PyInstaller configuration are changed, validate the relevant
-specification and resource inclusion.
+If resources or PyInstaller configuration are changed, validate the relevant specification and resource inclusion.
 
-The release build uses the project's one-file PyInstaller configuration, so
-runtime resources must remain correctly represented in the spec.
+The release build uses the project's one-file PyInstaller configuration, so runtime resources must remain correctly represented in the spec.
 
 ## Quality
 
 Keep diffs focused.
 
-Do not reformat unrelated code or modify unrelated configuration simply
-because a quality tool reports existing issues outside the scope of the
-change.
+Do not reformat unrelated code or modify unrelated configuration simply because a quality tool reports existing issues outside the scope of the change.
