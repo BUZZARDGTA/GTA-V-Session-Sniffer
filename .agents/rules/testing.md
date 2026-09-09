@@ -29,7 +29,7 @@ For non-trivial changes, broaden validation when appropriate.
 
 Follow the project's existing tooling and configuration in `pyproject.toml`.
 
-The project uses strict static-analysis and linting configurations including Ruff, MyPy, Pyrefly, Pyright, Flake8, Pylint, and Vulture.
+The project uses strict static-analysis and linting configurations including Ruff, MyPy, Pyrefly, Pyright, ty, Flake8, Pylint, and Vulture.
 
 Do not introduce competing validation tools.
 
