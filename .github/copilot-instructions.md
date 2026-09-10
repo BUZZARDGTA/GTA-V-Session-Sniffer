@@ -36,7 +36,7 @@ If a user's saved data (e.g. `Settings.ini`) contains a stale key, it is treated
 Session Sniffer stores *all* user read/write data under the user's AppData, via constants in `src/session_sniffer/constants/local.py`.
 
 - Local AppData (`scope='local'`) is for machine-specific and/or potentially large data (logs / databases / caches):
-	- `Debug/` — debug log files (`errors.log`, `warnings.log`)
+	- `Debug/` — debug log file (`debug.log`)
 	- `Logging/` — application CSV logs (`Detection_Logging.csv`, `Protection_Logging.csv`, `UserIP_Logging.csv`) and `Sessions/` subdirectory
 	- `GeoLite2 Databases/`
 - Roaming AppData (`scope='roaming'`) is for user-owned and potentially syncable data (config / user-managed content):
@@ -75,7 +75,7 @@ Ruff / Pyrefly / Pyright / MyPy operate in strict modes; line length is 176; man
 - Logging:
 	- Configure once at startup via `session_sniffer.logging_setup.setup_logging(...)` (imported from `src/session_sniffer/logging_setup.py`; already done in `src/session_sniffer/main.py`).
 	- Obtain loggers via `session_sniffer.logging_setup.get_logger(__name__)` (imported from `src/session_sniffer/logging_setup.py`; idempotent and safe anywhere).
-	- Console output is Rich-formatted; file logging is split into `warnings.log` (WARNING only) and `errors.log` (ERROR+) under LOCALAPPDATA (the app data directory; not the current working directory).
+	- Console output is Rich-formatted; file logging is consolidated into `debug.log` under LOCALAPPDATA (the app data directory; not the current working directory).
 	- Prefer `logger.debug/info/warning/error/exception(...)` over `print()` for diagnostics; use terminal output only for intentional console reporting.
 
 ## Safe Extension Examples

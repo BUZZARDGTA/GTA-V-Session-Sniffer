@@ -72,8 +72,7 @@ Do not consider a settings change complete until the relevant documentation has 
 * Obtain module loggers with `get_logger(__name__)`.
 * Preserve the existing log file behavior:
 
-  * `warnings.log`: WARNING and above.
-  * `errors.log`: ERROR and above.
+  * `debug.log`: consolidated rotating log file under Local AppData (`Debug/debug.log`).
 * Do not create a separate logging configuration for individual features.
 
 Application logs belong under the appropriate Local AppData location rather than the repository or working directory.
