@@ -454,10 +454,11 @@ def main() -> None:
 
         current_selected = capture_holder.config.interface
 
+        current_adapter_guid = current_selected.interface.identity.adapter_guid
+        new_adapter_guid = new_interface.interface.identity.adapter_guid
+
         is_same_adapter = False
         if not new_interface.is_neighbour and not current_selected.is_neighbour:
-            current_adapter_guid = current_selected.interface.identity.adapter_guid
-            new_adapter_guid = new_interface.interface.identity.adapter_guid
             if current_adapter_guid is not None and new_adapter_guid is not None:
                 is_same_adapter = current_adapter_guid == new_adapter_guid
             else:
@@ -466,8 +467,6 @@ def main() -> None:
                     and new_interface.mac_address == current_selected.mac_address
                 )
         elif new_interface.is_neighbour and current_selected.is_neighbour:
-            current_adapter_guid = current_selected.interface.identity.adapter_guid
-            new_adapter_guid = new_interface.interface.identity.adapter_guid
             if current_adapter_guid is not None and new_adapter_guid is not None:
                 is_same_adapter = (
                     current_adapter_guid == new_adapter_guid
@@ -533,11 +532,24 @@ def main() -> None:
                 new_interface.ip_address,
             )
         else:
-            logger.info(
-                'Switching capture interface from "%s" to "%s" — resetting player tables.',
-                current_selected.name,
-                new_interface.name,
-            )
+            is_same_physical_adapter = (
+                current_adapter_guid is not None and new_adapter_guid is not None and current_adapter_guid == new_adapter_guid
+            ) or current_selected.name == new_interface.name
+            if is_same_physical_adapter:
+                old_target = f'neighbour {current_selected.ip_address}' if current_selected.is_neighbour else f'host {current_selected.ip_address}'
+                new_target = f'neighbour {new_interface.ip_address}' if new_interface.is_neighbour else f'host {new_interface.ip_address}'
+                logger.info(
+                    'Switching capture target on "%s" from %s to %s — resetting player tables.',
+                    new_interface.name,
+                    old_target,
+                    new_target,
+                )
+            else:
+                logger.info(
+                    'Switching capture interface from "%s" to "%s" — resetting player tables.',
+                    current_selected.name,
+                    new_interface.name,
+                )
             CaptureStats.reset_on_interface_switch()
             window.reset_players_for_interface_switch()
             window.reset_session_graph()
