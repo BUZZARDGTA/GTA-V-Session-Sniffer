@@ -59,7 +59,7 @@ globs: **/*.py
 
 * Use the project's logging system for diagnostics.
 * Prefer the existing logger methods such as `debug`, `info`, `warning`, `error`, and `exception` over `print`.
-* Use the shared Rich console only for intentional terminal output.
+* Use terminal output only for intentional console reporting.
 * Follow the existing logging setup rather than creating a separate logging system.
 
 ## Dependencies

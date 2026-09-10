@@ -60,7 +60,7 @@ When adding, removing, or changing a default setting, synchronize the project's 
 
 The relevant Wiki repository is:
 
-`d:\Git\Session-Sniffer.wiki`
+`../Session-Sniffer.wiki`
 
 Check the appropriate configuration documentation, particularly `Configuration-Guide.md`, and update setting defaults or setting lists when required.
 

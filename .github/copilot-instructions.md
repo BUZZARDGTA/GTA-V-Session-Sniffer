@@ -76,7 +76,7 @@ Ruff / Pyrefly / Pyright / MyPy operate in strict modes; line length is 176; man
 	- Configure once at startup via `session_sniffer.logging_setup.setup_logging(...)` (imported from `src/session_sniffer/logging_setup.py`; already done in `src/session_sniffer/main.py`).
 	- Obtain loggers via `session_sniffer.logging_setup.get_logger(__name__)` (imported from `src/session_sniffer/logging_setup.py`; idempotent and safe anywhere).
 	- Console output is Rich-formatted; file logging is split into `warnings.log` (WARNING only) and `errors.log` (ERROR+) under LOCALAPPDATA (the app data directory; not the current working directory).
-	- Prefer `logger.debug/info/warning/error/exception(...)` over `print()` for diagnostics; use the shared Rich `console` only for intentional rich terminal output.
+	- Prefer `logger.debug/info/warning/error/exception(...)` over `print()` for diagnostics; use terminal output only for intentional console reporting.
 
 ## Safe Extension Examples
 - Adding a new player column: Append to `Settings.GUI_ALL_CONNECTED_COLUMNS`, add to `GUI_TOGGLEABLE_CONNECTED_COLUMNS` and/or `GUI_TOGGLEABLE_DISCONNECTED_COLUMNS`, update rendering_core mapping, and refresh header texts.
@@ -106,7 +106,7 @@ Provide feedback if any section needs deeper detail (e.g., capture filter extens
 When adding or expanding features, make clean replacements. Replace older usage outright and remove obsolete code. See **No Backward Compatibility — Ever** above.
 
 ## Documentation
-- **Settings Documentation Sync:** If you edit a default setting, introduce a new setting, or remove an existing setting in the project's configuration (e.g. `src/session_sniffer/settings/defaults.py`), you MUST also verify and reflect those changes in the project's Wiki repository (`d:\Git\Session-Sniffer.wiki`), particularly updating the default values and setting lists in `Configuration-Guide.md` or other relevant documentation pages.
+- **Settings Documentation Sync:** If you edit a default setting, introduce a new setting, or remove an existing setting in the project's configuration (e.g. `src/session_sniffer/settings/defaults.py`), you MUST also verify and reflect those changes in the project's Wiki repository (`../Session-Sniffer.wiki`), particularly updating the default values and setting lists in `Configuration-Guide.md` or other relevant documentation pages.
 
 ## AI Agent Instructions Source of Truth
 - This file (`.github/copilot-instructions.md`) is the single source of truth for all AI agent instructions, conventions, and project rules.
