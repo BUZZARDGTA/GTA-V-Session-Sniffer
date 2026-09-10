@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMenu,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
     QWidgetAction,
@@ -801,48 +800,10 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
     @override
     def _redetect_session_host(self) -> None:
-        """Clear the current session host and immediately re-evaluate host detection with notification on failure."""
-        if not Settings.is_session_host_feature_set():
-            QMessageBox.warning(self, TITLE, 'Session Host Detection is not supported for the current game feature set.')
-            return
-
-        if not Settings.gui_session_host_detection:
-            QMessageBox.warning(
-                self,
-                TITLE,
-                'Session Host Detection is disabled in Settings.\n\nPlease enable it in Settings to detect the session host.',
-            )
-            return
-
-        if CaptureState.is_local_capture():
-            if Settings.is_gta5_feature_set() and not CaptureState.gta5_is_running:
-                QMessageBox.warning(self, TITLE, 'Grand Theft Auto V is not currently running.')
-                return
-            if Settings.is_rdr2_feature_set() and not CaptureState.rdr2_is_running:
-                QMessageBox.warning(self, TITLE, 'Red Dead Redemption 2 is not currently running.')
-                return
-
-        connected_players = PlayersRegistry.get_connected_players()
-        if not connected_players:
-            QMessageBox.information(self, TITLE, 'No connected players were found in the current session.')
-            return
-
+        """Clear the current session host and immediately re-trigger host detection."""
         SessionHost.clear_session_host_data()
+        SessionHost.search_player = True
         SessionHost.manual_redetect = True
-
-        host_player, failure_reason = SessionHost.evaluate_host_player_with_reason(connected_players)
-        SessionHost.manual_redetect = False
-        SessionHost.search_player = False
-        SessionHost.search_start_time = None
-
-        if host_player is not None:
-            SessionHost.set_player(host_player)
-        else:
-            QMessageBox.warning(
-                self,
-                TITLE,
-                f'Could not resolve session host:\n\n{failure_reason}',
-            )
 
     def _apply_always_on_top(self) -> None:
         """Apply the always-on-top setting to the main window."""

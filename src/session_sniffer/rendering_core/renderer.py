@@ -518,11 +518,7 @@ def rendering_core(
                 p2p_session_connected = [player for player in session_connected if not is_third_party_server_ip(player.ip)]
                 current_session_host = SessionHost.get_player()
                 if current_session_host is not None and current_session_host.left_event.is_set():
-                    if (
-                        Settings.is_rockstar_feature_set()
-                        and current_session_host.packets.exchanged <= MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST
-                        and _relay_host_logged_ip != current_session_host.ip
-                    ):
+                    if current_session_host.packets.exchanged <= MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST and _relay_host_logged_ip != current_session_host.ip:
                         logger.debug(
                             '[SessionHost] Current host %s disconnected but is relayed (%d packets <= %d), keeping as host until session clears',
                             current_session_host.ip,
@@ -530,7 +526,7 @@ def rendering_core(
                             MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
                         )
                         _relay_host_logged_ip = current_session_host.ip
-                    elif not Settings.is_rockstar_feature_set() or current_session_host.packets.exchanged > MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
+                    elif current_session_host.packets.exchanged > MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
                         logger.debug('[SessionHost] Current host %s left_event is set, clearing host', current_session_host.ip)
                         _relay_host_logged_ip = None
                         SessionHost.set_player(None)
