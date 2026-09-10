@@ -33,7 +33,7 @@ Grab the latest stable release and get started instantly, or build it yourself f
 - **Process ID (PID) Sniffing**: Restrict packet capture exclusively to any target process running on your PC by its PID.
 - **No Mods Required**: Works without mods, no risk of banning.
 - **Advanced Options**: Configuration files for deep customization.
-- **Game Server Scanning**: Includes a setting to scan for game servers.
+- **Server Filtering**: Toggle filters for game and software servers.
 - **Session Logging**: Save session data and logs for future analysis.
 - **IP Protection**: Warns and protects against specific user IPs.
 
