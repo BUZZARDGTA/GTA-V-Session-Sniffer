@@ -110,6 +110,10 @@ def get_stylesheet(ui_scale: float = 1.0) -> str:
         padding: 4px 8px;
     }
 
+    QPlainTextEdit {
+        font-family: Consolas, 'Courier New', 'Lucida Console', monospace;
+    }
+
     QAbstractItemView QLineEdit, QAbstractItemView QSpinBox, QAbstractItemView QDoubleSpinBox, QAbstractItemView QComboBox {
         padding: 0px 4px;
         margin: 0px;
