@@ -1,8 +1,9 @@
 """User-friendly dialog for selecting a running game or application to sniff."""
 
+import re
 from typing import override
 
-from PySide6.QtCore import QFileInfo, QPoint, QSize, Qt
+from PySide6.QtCore import QFileInfo, QPoint, QSignalBlocker, QSize, Qt
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QResizeEvent, QShortcut, QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -150,6 +151,7 @@ class TargetProcessDialog(QDialog):
         self._icon_cache: dict[str, QIcon] = {}
         self._default_file_icon = self._icon_provider.icon(QFileIconProvider.IconType.File)
         self.selected_pid: int = Settings.capture_filter_process_pid
+        self._cached_processes: list[tuple[int, str, str]] = []
         if not CaptureState.is_local_capture():
             self._table.setEnabled(False)
             self._pid_spinbox.setEnabled(False)
@@ -196,67 +198,116 @@ class TargetProcessDialog(QDialog):
         self._icon_cache[exe_path] = icon
         return icon
 
+    @staticmethod
+    def _process_sort_key(item: tuple[int, str, str], normalized_query: str) -> tuple[int, str, int]:
+        """Compute sorting priority and tie-breaker for process matching."""
+        pid, name, _exe_path = item
+        name_lower = name.lower()
+        pid_string = str(pid)
+        if name_lower in (normalized_query, f'{normalized_query}.exe'):
+            priority = 0
+        elif name_lower.startswith(normalized_query):
+            priority = 1
+        elif any(part.startswith(normalized_query) for part in re.split(r'[\s._\-]+', name_lower)):
+            priority = 2
+        elif normalized_query in name_lower:
+            priority = 3
+        elif pid_string.startswith(normalized_query):
+            priority = 4
+        else:
+            priority = 5
+        return (priority, name_lower, pid)
+
     def _populate_process_table(self) -> None:
         """Populate the process table with running applications and games."""
-        self._table.setRowCount(0)
         user_apps_only = self._user_apps_only_checkbox.isChecked()
-        processes = get_running_applications(user_apps_only=user_apps_only)
-
-        self._table.setRowCount(len(processes))
-        selected_row_index: int | None = None
-        current_target_pid = Settings.capture_filter_process_pid
-
-        for row_index, (pid, name, exe_path) in enumerate(processes):
-            name_item = QTableWidgetItem(name)
-            name_item.setData(Qt.ItemDataRole.UserRole, pid)
-            name_item.setIcon(self._get_process_icon(exe_path))
-
-            pid_item = QTableWidgetItem(str(pid))
-            pid_item.setToolTip(f'{name} (PID: {pid})')
-            path_item = QTableWidgetItem(exe_path)
-            if exe_path:
-                path_item.setToolTip(exe_path)
-
-            if pid == current_target_pid:
-                selected_row_index = row_index
-                name_item.setText(f'{name} (Active Target)')
-                name_item.setToolTip(f'{name} (PID: {pid}) - Active Target\n{exe_path}' if exe_path else f'{name} (PID: {pid}) - Active Target')
-            elif exe_path:
-                name_item.setToolTip(f'{name} (PID: {pid})\n{exe_path}')
-            else:
-                name_item.setToolTip(f'{name} (PID: {pid})')
-
-            self._table.setItem(row_index, 0, name_item)
-            self._table.setItem(row_index, 1, pid_item)
-            self._table.setItem(row_index, 2, path_item)
-
-        if selected_row_index is not None:
-            self._table.selectRow(selected_row_index)
-            scroll_target = self._table.item(selected_row_index, 0)
-            if scroll_target is not None:
-                self._table.scrollToItem(scroll_target)
-
+        self._cached_processes = get_running_applications(user_apps_only=user_apps_only)
         self._filter_process_list(self._search_input.text())
         self._reset_column_sizes()
 
     def _filter_process_list(self, filter_text: str) -> None:
-        """Filter table rows according to the search query."""
+        """Filter and sort table rows according to the search query."""
         normalized_query = filter_text.strip().lower()
-        for row_index in range(self._table.rowCount()):
-            if not normalized_query:
-                self._table.showRow(row_index)
-                continue
 
-            name_item = self._table.item(row_index, 0)
-            pid_item = self._table.item(row_index, 1)
+        selected_items = self._table.selectedItems()
+        previously_selected_pid: int | None = None
+        if selected_items:
+            first_selected_item = self._table.item(selected_items[0].row(), 0)
+            if first_selected_item is not None:
+                pid_data = first_selected_item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(pid_data, int):
+                    previously_selected_pid = pid_data
 
-            name_text = name_item.text().lower() if name_item else ''
-            pid_text = pid_item.text().lower() if pid_item else ''
+        if normalized_query:
+            matching_processes: list[tuple[int, str, str]] = [
+                process for process in self._cached_processes if normalized_query in process[1].lower() or normalized_query in str(process[0])
+            ]
+            matching_processes.sort(key=lambda process: self._process_sort_key(process, normalized_query))
+        else:
+            matching_processes = list(self._cached_processes)
 
-            if normalized_query in name_text or normalized_query in pid_text:
-                self._table.showRow(row_index)
+        current_target_pid = Settings.capture_filter_process_pid
+        selected_row_to_restore: int | None = None
+        active_target_row: int | None = None
+
+        self._table.setUpdatesEnabled(False)
+        with QSignalBlocker(self._table):
+            self._table.setRowCount(0)
+            self._table.setRowCount(len(matching_processes))
+
+            for row_index, (pid, name, exe_path) in enumerate(matching_processes):
+                name_item = QTableWidgetItem(name)
+                name_item.setData(Qt.ItemDataRole.UserRole, pid)
+                name_item.setIcon(self._get_process_icon(exe_path))
+
+                pid_item = QTableWidgetItem(str(pid))
+                pid_item.setToolTip(f'{name} (PID: {pid})')
+                path_item = QTableWidgetItem(exe_path)
+                if exe_path:
+                    path_item.setToolTip(exe_path)
+
+                if pid == current_target_pid:
+                    active_target_row = row_index
+                    name_item.setText(f'{name} (Active Target)')
+                    name_item.setToolTip(
+                        f'{name} (PID: {pid}) - Active Target\n{exe_path}' if exe_path else f'{name} (PID: {pid}) - Active Target',
+                    )
+                elif exe_path:
+                    name_item.setToolTip(f'{name} (PID: {pid})\n{exe_path}')
+                else:
+                    name_item.setToolTip(f'{name} (PID: {pid})')
+
+                self._table.setItem(row_index, 0, name_item)
+                self._table.setItem(row_index, 1, pid_item)
+                self._table.setItem(row_index, 2, path_item)
+
+                if previously_selected_pid is not None and pid == previously_selected_pid:
+                    selected_row_to_restore = row_index
+
+            row_to_select = selected_row_to_restore if selected_row_to_restore is not None else active_target_row
+            if row_to_select is not None:
+                self._table.selectRow(row_to_select)
             else:
-                self._table.hideRow(row_index)
+                self._table.clearSelection()
+
+        self._table.setUpdatesEnabled(True)
+
+        if normalized_query:
+            self._table.verticalScrollBar().setValue(0)
+        elif row_to_select is not None:
+            scroll_target = self._table.item(row_to_select, 0)
+            if scroll_target is not None:
+                self._table.scrollToItem(scroll_target)
+
+        has_selection = bool(self._table.selectedItems())
+        self._sniff_selected_button.setEnabled(has_selection)
+        if has_selection:
+            selected_row = self._table.selectedItems()[0].row()
+            selected_name_item = self._table.item(selected_row, 0)
+            if selected_name_item is not None:
+                pid_value = selected_name_item.data(Qt.ItemDataRole.UserRole)
+                if isinstance(pid_value, int):
+                    self._pid_spinbox.setValue(pid_value)
 
         self._table.viewport().update()
 

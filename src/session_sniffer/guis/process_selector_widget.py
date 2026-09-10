@@ -1,8 +1,11 @@
 """User-friendly process selector widget for SettingsDialog."""
 
-from PySide6.QtCore import QFileInfo, QSignalBlocker, Qt
-from PySide6.QtGui import QIcon
+from typing import override
+
+from PySide6.QtCore import QEvent, QFileInfo, QObject, QSignalBlocker, Qt
+from PySide6.QtGui import QIcon, QKeyEvent
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFileIconProvider,
     QHBoxLayout,
@@ -19,6 +22,40 @@ from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import SettingMeta, Settings
 
 
+class _ProcessComboBoxViewFilter(QObject):
+    """Event filter for process combo box popup view that scrolls keyboard search matches to the top."""
+
+    @override
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        """Intercept key presses on the popup view to scroll matching process to top of viewport."""
+        if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
+            text = event.text()
+            if text and text.isprintable() and isinstance(watched, QAbstractItemView):
+                watched.keyPressEvent(event)
+                current_index = watched.currentIndex()
+                if current_index.isValid():
+                    watched.scrollTo(current_index, QAbstractItemView.ScrollHint.PositionAtTop)
+                return True
+        return super().eventFilter(watched, event)
+
+
+class _ProcessComboBox(QComboBox):
+    """Custom combo box preserving native view styling while scrolling active/searched items to top."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._view_filter = _ProcessComboBoxViewFilter(self.view())
+        self.view().installEventFilter(self._view_filter)
+
+    @override
+    def showPopup(self) -> None:
+        """Show popup and scroll active selection to top of viewport."""
+        super().showPopup()
+        current_index = self.view().currentIndex()
+        if current_index.isValid() and current_index.row() > 0:
+            self.view().scrollTo(current_index, QAbstractItemView.ScrollHint.PositionAtTop)
+
+
 class ProcessSelectorWidget(QWidget):
     """Composite widget combining a friendly process dropdown with a browse dialog button."""
 
@@ -31,7 +68,7 @@ class ProcessSelectorWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self._combo = QComboBox(self)
+        self._combo = _ProcessComboBox(self)
         self._combo.setMinimumWidth(240)
         self._combo.currentIndexChanged.connect(self._update_combo_tooltip)
         layout.addWidget(self._combo, 1)
