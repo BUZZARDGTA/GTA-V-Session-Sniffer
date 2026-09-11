@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, cast, override
 
 from PySide6.QtCore import QAbstractItemModel, QEvent, QItemSelection, QItemSelectionModel, QModelIndex, QObject, QPoint, QRect, QSize, Qt
-from PySide6.QtGui import QAction, QClipboard, QHoverEvent, QKeyEvent, QMouseEvent, QResizeEvent
+from PySide6.QtGui import QAction, QClipboard, QFontMetrics, QHoverEvent, QKeyEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QHeaderView,
     QMenu,
@@ -26,7 +26,7 @@ from session_sniffer.guis.stylesheets import CATEGORY_SUBMENU_CHECKBOX_STYLESHEE
 from session_sniffer.guis.table_column_resizing import add_column_sizing_actions, size_all_columns_to_fit, size_column_to_fit
 from session_sniffer.guis.table_model import GUI_COLUMN_HEADERS_TOOLTIPS, SessionTableModel
 from session_sniffer.guis.tables_context_menu_mixin import TableContextMenuMixin
-from session_sniffer.guis.utils import ElidedTextTooltipDelegate, PersistentMenu, setup_static_table_column_resizing
+from session_sniffer.guis.utils import HEADER_SORT_PADDING, ElidedTextTooltipDelegate, PersistentMenu, setup_static_table_column_resizing
 from session_sniffer.player.registry import PlayersRegistry
 from session_sniffer.settings.defaults import SETTING_DEFAULTS
 from session_sniffer.settings.settings import Settings
@@ -103,6 +103,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
         self._saved_selection: list[tuple[str, int]] = []  # (ip, column) pairs for selection preservation
         self._saved_h_scroll: int | None = None
         self._saved_v_scroll: int | None = None
+        self._has_host_crown: bool = False
 
         self.setModel(model)
         self.setMouseTracking(True)  # Track mouse without clicks
@@ -278,15 +279,38 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
     # Custom / internal management methods
     # --------------------------------------------------------------------------
 
+    def _compute_column_base_width(self, font_metrics: QFontMetrics, header_label: str) -> int:
+        base_width = font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
+        if header_label == 'IP Address' and self.model().has_session_host():
+            return base_width + font_metrics.horizontalAdvance(' 👑')
+        return base_width
+
     def setup_static_column_resizing(self) -> None:
         """Set up initial column resizing for the table, fitting columns and distributing extra space to flexible columns."""
-        setup_static_table_column_resizing(self)
+        self._has_host_crown = self.model().has_session_host()
+        setup_static_table_column_resizing(self, compute_base_width=self._compute_column_base_width)
 
     def adjust_username_column_width(self) -> None:
         """Ensure the 'Usernames' column section mode remains Interactive."""
         model = self.model()
         if 0 <= model.username_column_index < model.columnCount():
             self.horizontalHeader().setSectionResizeMode(model.username_column_index, QHeaderView.ResizeMode.Interactive)
+
+    def adjust_ip_column_width(self) -> None:
+        """Adjust the 'IP Address' column width when host crown presence changes."""
+        model = self.model()
+        ip_column_index = model.ip_column_index
+        if ip_column_index < 0 or ip_column_index >= model.columnCount():
+            return
+        if self.horizontalHeader().isSectionHidden(ip_column_index):
+            return
+
+        has_host = model.has_session_host()
+        if has_host == self._has_host_crown:
+            return
+
+        self._has_host_crown = has_host
+        self.setup_static_column_resizing()
 
     def sort_current_column(self) -> None:
         """Sort the table by the currently indicated header column and order, preserving scroll position."""

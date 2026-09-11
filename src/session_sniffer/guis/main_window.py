@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMenu,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
     QWidgetAction,
@@ -35,7 +36,7 @@ from session_sniffer.guis.settings_dialog import SettingsDialog
 from session_sniffer.guis.stylesheets import GTA5_STATUS_LABEL_STYLESHEET, MENU_BAR_STYLESHEET
 from session_sniffer.guis.tables_player_actions.looky_system._looky_crawler_request_dialog import close_all_crawler_dialogs
 from session_sniffer.guis.userip_manager import UserIPDatabasesManager
-from session_sniffer.guis.utils import apply_always_on_top, resize_window_for_screen, scale_by_ui
+from session_sniffer.guis.utils import apply_always_on_top, resize_window_for_screen, scale_by_ui, show_detailed_message
 from session_sniffer.guis.worker_thread import GUIWorkerThread
 from session_sniffer.player.registry import PlayersRegistry, SessionHost
 from session_sniffer.rendering_core.status_bar_renderer import build_gui_status_text
@@ -687,6 +688,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         if self._connected.table_view.isVisible():
             self._connected.table_view.sort_current_column()
             self._connected.table_view.adjust_username_column_width()
+            self._connected.table_view.adjust_ip_column_width()
 
         if disconnected_count_changed:
             self._disconnected.update_current_count(payload.disconnected_count)
@@ -711,6 +713,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         if self._disconnected.table_view.isVisible():
             self._disconnected.table_view.sort_current_column()
             self._disconnected.table_view.adjust_username_column_width()
+            self._disconnected.table_view.adjust_ip_column_width()
 
         self._connected.table_view.restore_selection()
         self._disconnected.table_view.restore_selection()
@@ -800,10 +803,45 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
     @override
     def _redetect_session_host(self) -> None:
-        """Clear the current session host and immediately re-trigger host detection."""
+        """Clear the current session host and immediately re-evaluate host detection with notification on failure."""
+        if not Settings.is_session_host_feature_set():
+            QMessageBox.warning(self, TITLE, 'Session Host Detection is not supported for the current game feature set.')
+            return
+
+        if not Settings.gui_session_host_detection:
+            QMessageBox.warning(self, TITLE, 'Session Host Detection is disabled in Settings.\n\nPlease enable it in Settings to detect the session host.')
+            return
+
+        if CaptureState.is_local_capture():
+            if Settings.is_gta5_feature_set() and not CaptureState.gta5_is_running:
+                QMessageBox.warning(self, TITLE, 'Grand Theft Auto V is not currently running.')
+                return
+            if Settings.is_rdr2_feature_set() and not CaptureState.rdr2_is_running:
+                QMessageBox.warning(self, TITLE, 'Red Dead Redemption 2 is not currently running.')
+                return
+
+        connected_players = PlayersRegistry.get_connected_players()
+        if not connected_players:
+            QMessageBox.information(self, TITLE, 'No connected players were found in the current session.')
+            return
+
         SessionHost.clear_session_host_data()
-        SessionHost.search_player = True
         SessionHost.manual_redetect = True
+
+        host_player = SessionHost.get_host_player(connected_players)
+        SessionHost.manual_redetect = False
+        SessionHost.search_player = False
+        SessionHost.search_start_time = None
+
+        if host_player is not None:
+            text = f'Session host detected:\n\n{host_player.ip}'
+            icon = QMessageBox.Icon.Information
+        else:
+            reason = SessionHost.last_rejection_reason or 'No connected player currently matches the session host criteria.'
+            text = f'Could not resolve session host:\n\n{reason}'
+            icon = QMessageBox.Icon.Warning
+
+        show_detailed_message(self, TITLE, text, detailed_text=SessionHost.last_debug_details, icon=icon)
 
     def _apply_always_on_top(self) -> None:
         """Apply the always-on-top setting to the main window."""

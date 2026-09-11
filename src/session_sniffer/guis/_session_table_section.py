@@ -556,6 +556,7 @@ class SessionTableSection(QWidget):
         self.table_model.reset_columns()
         self._selected_count = 0
         self._update_header_label()
+        self.table_view.setup_static_column_resizing()
 
     def update_columns(self, column_names: list[str]) -> None:
         """Replace the column set at runtime and reconfigure the view."""

@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Utility functions for GUI-related operations."""
 
 from dataclasses import dataclass
@@ -34,12 +35,14 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPushButton,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QToolTip,
     QTreeView,
     QVBoxLayout,
@@ -760,6 +763,42 @@ def create_nonmodal_warning(parent: QWidget | None, text: str) -> QMessageBox:
     dlg.setIcon(QMessageBox.Icon.Warning)
     dlg.setStandardButtons(QMessageBox.StandardButton.Ok)
     return dlg
+
+
+def show_detailed_message(
+    parent: QWidget | None,
+    title: str,
+    text: str,
+    detailed_text: str | None = None,
+    *,
+    icon: QMessageBox.Icon = QMessageBox.Icon.Information,
+) -> QMessageBox.StandardButton:
+    """Display a QMessageBox with an expandable Show More details section."""
+    dialog = QMessageBox(parent)
+    dialog.setWindowTitle(title)
+    dialog.setText(text)
+    dialog.setIcon(icon)
+    dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+    if detailed_text:
+        dialog.setDetailedText(detailed_text)
+        text_edit = dialog.findChild(QTextEdit)
+        if text_edit is not None:
+            text_edit.setMinimumWidth(520)
+            text_edit.setMaximumHeight(16777215)
+            text_edit.setMinimumHeight(min(360, max(220, (detailed_text.count('\n') + 2) * 18)))
+        for button in dialog.findChildren(QPushButton):
+            if 'detail' in button.text().lower():
+                button.setText('Show More')
+
+                def _toggle_details(*_args: object, details_button: QPushButton = button) -> None:
+                    if 'hide' in details_button.text().lower():
+                        details_button.setText('Hide More')
+                    elif 'show' in details_button.text().lower():
+                        details_button.setText('Show More')
+
+                button.clicked.connect(_toggle_details)
+                break
+    return QMessageBox.StandardButton(dialog.exec())
 
 
 def setup_stat_table(table: QTableWidget, layout: QVBoxLayout, *, sorting: bool = True) -> None:

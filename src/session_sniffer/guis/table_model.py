@@ -536,6 +536,13 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
 
         return display_data
 
+    def has_session_host(self) -> bool:
+        """Return whether any row in the table contains the session host crown."""
+        ip_column = self.ip_column_index
+        if ip_column < 0:
+            return False
+        return any(len(row_data) > ip_column and '👑' in row_data[ip_column] for row_data in self._data)
+
     def add_row_without_refresh(self, row_data: list[str], row_colors: list[CellColor]) -> None:
         """Add a new row to the model without notifying the view in real time.
 
