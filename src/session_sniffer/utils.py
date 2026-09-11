@@ -14,8 +14,6 @@ from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
-from win32com.client import Dispatch
-
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.constants.standard import CMD_EXE
 from session_sniffer.error_messages import format_type_error
@@ -397,11 +395,74 @@ def validate_and_strip_balanced_outer_parens(expr: str) -> str:
     return expr
 
 
+# pylint: disable=duplicate-code
+class _Guid(ctypes.Structure):
+    """ctypes definition for GUID structure."""
+
+    _fields_ = [
+        ('Data1', wintypes.DWORD),
+        ('Data2', wintypes.WORD),
+        ('Data3', wintypes.WORD),
+        ('Data4', ctypes.c_ubyte * 8),
+    ]
+# pylint: enable=duplicate-code
+
+
+_CLSID_SHELL_LINK = _Guid(0x00021401, 0x0000, 0x0000, (ctypes.c_ubyte * 8)(0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46))
+_IID_ISHELL_LINK_W = _Guid(0x000214F9, 0x0000, 0x0000, (ctypes.c_ubyte * 8)(0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46))
+_IID_IPERSIST_FILE = _Guid(0x0000010B, 0x0000, 0x0000, (ctypes.c_ubyte * 8)(0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46))
+
+
+def _release_com_interface(pointer: wintypes.LPVOID) -> None:
+    """Releases a COM interface pointer via its IUnknown vtable."""
+    if pointer:
+        vtable = ctypes.cast(pointer, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+        release_function = ctypes.WINFUNCTYPE(wintypes.ULONG, wintypes.LPVOID)(vtable[2])
+        release_function(pointer)
+
+
 def resolve_lnk(shortcut_path: Path) -> Path:
     """Resolves a Windows shortcut (.lnk) to its target path."""
-    winshell = Dispatch('WScript.Shell')
-    shortcut = winshell.CreateShortcut(str(shortcut_path))
-    return Path(shortcut.Targetpath)
+    ole32 = ctypes.windll.ole32
+    hr_init = ole32.CoInitializeEx(None, 2)
+    need_uninit = hr_init in (0, 1)
+
+    shell_link_ptr = wintypes.LPVOID()
+    hr_create = ole32.CoCreateInstance(
+        ctypes.byref(_CLSID_SHELL_LINK),
+        None,
+        1,
+        ctypes.byref(_IID_ISHELL_LINK_W),
+        ctypes.byref(shell_link_ptr),
+    )
+    if hr_create or not shell_link_ptr:
+        if need_uninit:
+            ole32.CoUninitialize()
+        return shortcut_path
+
+    try:
+        link_vtable = ctypes.cast(shell_link_ptr, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+        query_interface = ctypes.WINFUNCTYPE(wintypes.HRESULT, wintypes.LPVOID, ctypes.POINTER(_Guid), ctypes.POINTER(wintypes.LPVOID))(link_vtable[0])
+        get_path = ctypes.WINFUNCTYPE(wintypes.HRESULT, wintypes.LPVOID, wintypes.LPWSTR, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)(link_vtable[3])
+
+        persist_file_ptr = wintypes.LPVOID()
+        if not query_interface(shell_link_ptr, ctypes.byref(_IID_IPERSIST_FILE), ctypes.byref(persist_file_ptr)) and persist_file_ptr:
+            try:
+                persist_vtable = ctypes.cast(persist_file_ptr, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+                load = ctypes.WINFUNCTYPE(wintypes.HRESULT, wintypes.LPVOID, wintypes.LPCWSTR, wintypes.DWORD)(persist_vtable[5])
+
+                if not load(persist_file_ptr, str(shortcut_path), 0):
+                    path_buffer = ctypes.create_unicode_buffer(1024)
+                    if not get_path(shell_link_ptr, path_buffer, 1024, None, 0) and path_buffer.value:
+                        return Path(path_buffer.value)
+            finally:
+                _release_com_interface(persist_file_ptr)
+    finally:
+        _release_com_interface(shell_link_ptr)
+        if need_uninit:
+            ole32.CoUninitialize()
+
+    return shortcut_path
 
 
 def run_cmd_script(script: Path, args: list[str] | None = None) -> None:

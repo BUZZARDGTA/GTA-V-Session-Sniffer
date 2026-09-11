@@ -14,7 +14,6 @@ dependencies = [
     "pydantic==2.13.5",
     "pypresence==4.6.2",
     "PySide6==6.11.2",
-    "pywin32==312; platform_system == 'Windows'",
     "requests==2.34.2",
     "rich==15.0.0",
     "tzlocal==5.4.4",
@@ -46,7 +45,6 @@ dev = [
     "ruff",
     "safety",
     "ty",
-    "types-pywin32",
     "types-requests==2.33.0.20260906",
     "types-toml==0.10.8.20260518",
     "vulture",
@@ -70,9 +68,8 @@ warn_unused_ignores = false
 
 [tool.pylint.master]
 enable = "all"
-extension-pkg-allow-list = ["PySide6", "pythoncom", "shiboken6"]
+extension-pkg-allow-list = ["PySide6", "shiboken6"]
 generated-members = [
-    "pythoncom.*",
     "connect",
     "disconnect",
     "emit",
