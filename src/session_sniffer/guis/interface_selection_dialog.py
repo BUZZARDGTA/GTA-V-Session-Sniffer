@@ -11,7 +11,7 @@ from threading import Thread
 from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import QItemSelectionModel, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QFont, QIcon, QResizeEvent, QShowEvent
+from PySide6.QtGui import QFont, QIcon, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QToolTip,
     QVBoxLayout,
 )
 
@@ -279,9 +278,6 @@ class InterfaceSelectionDialog(QDialog):
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
         self.table.setStyleSheet(interface_table_stylesheet(ui_scale))
-
-        # Connect cell hover to tooltip logic
-        self.table.cellEntered.connect(self.show_tooltip_if_elided)
 
         horizontal_header = self.table.horizontalHeader()
         header_font = QFont()
@@ -808,31 +804,6 @@ class InterfaceSelectionDialog(QDialog):
 
         # Reset selection state
         self.update_select_button_state()
-
-    def show_tooltip_if_elided(self, row: int, column: int) -> None:
-        """Show tooltip if the text in the cell is elided."""
-
-        def is_elided(item: QTableWidgetItem, displayed_text: str) -> bool:
-            """Check if the text in the item is elided (truncated)."""
-            fm = self.table.fontMetrics()
-            rect = self.table.visualItemRect(item)  # Get the cell's rectangle
-
-            # Check if the displayed text's width exceeds the width of the cell
-            return fm.horizontalAdvance(displayed_text) > (rect.width() - 6)  # don't really ask why -6
-
-        item = self.table.item(row, column)
-        if item is None:
-            return
-
-        displayed_text = item.text()
-
-        if not is_elided(item, displayed_text):
-            QToolTip.hideText()
-            return
-
-        # TODO(BUZZARDGTA): Even tho it should works it doesn't always, probably just a Qt bug.
-        QToolTip.showText(QCursor.pos(), '', self.table)  # <-- force refresh tooltip position (see: https://doc.qt.io/qt-6/qtooltip.html#showText)
-        QToolTip.showText(QCursor.pos(), displayed_text, self.table)
 
     def update_select_button_state(self) -> None:
         """Enable the Select button only when a row is selected."""

@@ -72,7 +72,7 @@ warn_unused_ignores = false
 
 [tool.pylint.master]
 enable = "all"
-extension-pkg-allow-list = ["PySide6", "pythoncom"]
+extension-pkg-allow-list = ["PySide6", "pythoncom", "shiboken6"]
 generated-members = [
     "pythoncom.*",
     "connect",
@@ -94,14 +94,12 @@ disable = [
     "consider-using-with",
     "global-statement",
     "locally-disabled",
-    "no-name-in-module",            # TODO (BUZZARDGTA): unsupported in Python 3.14
     "redefined-outer-name",
     "suppressed-message",
     "too-many-branches",
     "too-many-instance-attributes",
     "too-many-locals",
     "too-many-statements",
-    "used-before-assignment",       # TODO (BUZZARDGTA): unsupported in Python 3.14
 ]
 
 [tool.pylint.basic]

@@ -11,8 +11,6 @@ _CHECKBOX_UNCHECKED_PATH = (RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg').a
 # CONTEXT MENU STYLES
 # =============================================================================
 
-# TODO(BUZZARDGTA): Implement a better way to retrieve the default background color for table cells.
-# Currently hardcoded to Gray.B10, which should be the same color for everyone.
 SHARED_QMENU_RIGHT_ARROW_STYLESHEET = """
 QMenu::right-arrow {
     image: url("{chevron_right_path}");

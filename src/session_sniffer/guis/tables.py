@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, cast, override
 
-from PySide6.QtCore import QAbstractItemModel, QEvent, QItemSelection, QItemSelectionModel, QModelIndex, QObject, QPoint, Qt
+from PySide6.QtCore import QAbstractItemModel, QEvent, QItemSelection, QItemSelectionModel, QModelIndex, QObject, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QClipboard, QHoverEvent, QKeyEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -599,14 +599,17 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
 
     def _show_flag_tooltip(self, event: QHoverEvent, index: QModelIndex, player: Player) -> None:
         """Show tooltip only if hovering exactly over the flag."""
-        # TODO(BUZZARDGTA): Make the tooltip appear precisely when hovering over the flag, using the pixmap or QIcon object if possible.
-        cell_rect = self.visualRect(index)  # Get cell rectangle
-        flag_x_start = cell_rect.left() + 4  # Assuming flag starts with a 4px horizontal padding
-        flag_x_end = flag_x_start + 14  # Assuming flag ends with a 14px horizontal padding
-        flag_y_start = cell_rect.top() + 10  # Assuming flag starts with a 10px vertical padding
-        flag_y_end = flag_y_start + 10  # Assuming flag ends with a 10px vertical padding
-        # Check if the mouse is over the flag both horizontally and vertically
-        if flag_x_start <= event.position().toPoint().x() <= flag_x_end and flag_y_start <= event.position().toPoint().y() <= flag_y_end:
+        cell_rect = self.visualRect(index)
+        icon_size = self.iconSize()
+        if not icon_size.isValid():
+            icon_size = QSize(16, 16)
+        flag_rect = QRect(
+            cell_rect.left() + 6,
+            cell_rect.top() + (cell_rect.height() - icon_size.height()) // 2,
+            icon_size.width(),
+            icon_size.height(),
+        )
+        if flag_rect.contains(event.position().toPoint()):
             QToolTip.showText(event.globalPosition().toPoint(), player.iplookup.geolite2.country, self)
         else:
             QToolTip.hideText()

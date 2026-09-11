@@ -531,7 +531,7 @@ def rendering_core(
                         _relay_host_logged_ip = None
                         SessionHost.set_player(None)
                         SessionHost.search_player = False
-                # TODO(BUZZARDGTA): We should also potentially needs to check that not more then 1s passed before each disconnected
+                # Trigger search once every pending player has completed disconnection
                 if SessionHost.players_pending_for_disconnection and all(player.left_event.is_set() for player in SessionHost.players_pending_for_disconnection):
                     if SessionHost.has_player():
                         logger.debug(

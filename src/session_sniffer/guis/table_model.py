@@ -421,7 +421,7 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
         }:
             # Sort by string representation of the column value
             combined.sort(
-                key=lambda row: str(row[0][column]).casefold(),
+                key=lambda row: row[0][column].casefold(),
                 reverse=sort_order_bool,
             )
         else:

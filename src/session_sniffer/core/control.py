@@ -54,11 +54,6 @@ def terminate_script(
     exception_info: ExceptionInfo | None = None,
 ) -> None:
     """Terminate the application and optionally display crash information."""
-
-    def should_terminate_gracefully() -> bool:
-        # TODO(BUZZARDGTA): Gracefully exit the script even when the `capture` module is running.
-        return False
-
     GTASuspendManager.shutdown()
 
     ScriptControl.set_crashed()
@@ -85,10 +80,6 @@ def terminate_script(
         need_sleep = False
     if need_sleep:
         time.sleep(3)
-
-    if should_terminate_gracefully():
-        exit_code = 1 if terminate_method == 'THREAD_RAISED' else 0
-        sys.exit(exit_code)
 
     terminate_process_tree()
 
