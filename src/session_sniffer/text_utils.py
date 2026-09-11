@@ -4,9 +4,29 @@ Keep this module dependency-free and safe to import from anywhere.
 """
 
 import textwrap
+from datetime import timedelta
 from typing import Literal
 
 DEFAULT_MANUAL_SUSPEND_DURATION_SECONDS = 60
+_ONE_MS = timedelta(milliseconds=1)
+
+
+def format_elapsed_time(duration: timedelta) -> str:
+    """Format a timedelta duration into a compact human-readable string."""
+    total_ms = duration // _ONE_MS
+    hours, remainder = divmod(total_ms, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    seconds, milliseconds = divmod(remainder, 1_000)
+
+    if hours:
+        return f'{hours:02}h {minutes:02}m {seconds:02}s'
+    if minutes:
+        return f'{minutes:02}m {seconds:02}s'
+    if seconds:
+        return f'{seconds:02}s'
+    if milliseconds:
+        return f'{milliseconds:03}ms'
+    return '000ms'
 
 
 def pluralize(count: int, singular: str = '', plural: str = 's') -> str:

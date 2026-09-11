@@ -1,7 +1,7 @@
 """Session table snapshot rendering helpers."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PySide6.QtGui import QColor
@@ -13,6 +13,7 @@ from session_sniffer.models.player import Player, PlayerBandwidth
 from session_sniffer.player.registry import SessionHost
 from session_sniffer.rendering_core.types import CellColor, SessionTableSnapshot
 from session_sniffer.settings import Settings
+from session_sniffer.text_utils import format_elapsed_time
 
 PPS_MAX_THRESHOLD = 10
 PPM_MAX_THRESHOLD = PPS_MAX_THRESHOLD * 60
@@ -20,29 +21,10 @@ BPS_MAX_THRESHOLD = 1024
 BPM_MAX_THRESHOLD = BPS_MAX_THRESHOLD * 60
 HARDCODED_DEFAULT_TABLE_BACKGROUND_CELL_COLOR = None
 
-_ONE_MS = timedelta(milliseconds=1)
 _CONNECTED_TEXT_COLOR = QColor(TableColors.CONNECTED_TEXT)
 _CONNECTED_USERIP_TEXT_COLOR = QColor(TableColors.CONNECTED_USERIP_TEXT)
 _DISCONNECTED_TEXT_COLOR = QColor(TableColors.DISCONNECTED_TEXT)
 _DISCONNECTED_USERIP_TEXT_COLOR = QColor(TableColors.DISCONNECTED_USERIP_TEXT)
-
-
-def format_elapsed_time(duration: timedelta) -> str:
-    """Format a timedelta duration into a compact human-readable string."""
-    total_ms = duration // _ONE_MS
-    hours, remainder = divmod(total_ms, 3_600_000)
-    minutes, remainder = divmod(remainder, 60_000)
-    seconds, milliseconds = divmod(remainder, 1_000)
-
-    if hours:
-        return f'{hours:02}h {minutes:02}m {seconds:02}s'
-    if minutes:
-        return f'{minutes:02}m {seconds:02}s'
-    if seconds:
-        return f'{seconds:02}s'
-    if milliseconds:
-        return f'{milliseconds:03}ms'
-    return '000ms'
 
 
 def format_player_usernames(player: Player) -> str:

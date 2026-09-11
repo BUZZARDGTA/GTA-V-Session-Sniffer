@@ -8,7 +8,7 @@ from PySide6.QtGui import QAction, QIcon, QPixmap
 from session_sniffer.constants.external import LOCAL_TZ
 from session_sniffer.guis._combo_rule_editor import AVAILABLE_FLAG_CODES, COUNTRY_FLAGS_DIR
 from session_sniffer.player.registry import PlayersRegistry, SessionHost
-from session_sniffer.rendering_core.session_table_renderer import format_elapsed_time
+from session_sniffer.text_utils import format_elapsed_time
 
 if TYPE_CHECKING:
     from collections.abc import Callable

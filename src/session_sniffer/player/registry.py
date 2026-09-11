@@ -11,6 +11,7 @@ from session_sniffer.constants.external import LOCAL_TZ
 from session_sniffer.exceptions import PlayerAlreadyExistsError, PlayerNotFoundInRegistryError, UnexpectedPlayerCountError
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.networking.third_party_servers import is_third_party_server_ip
+from session_sniffer.text_utils import format_elapsed_time
 
 if TYPE_CHECKING:
     from session_sniffer.models.player import Player
@@ -282,30 +283,35 @@ def _format_host_debug_details(
             )
         lines.extend(timing_lines)
     elif len(candidates) == 1:
-        lines.extend([
-            '',
-            '--- Timing Analysis ---',
-            '- Sole P2P Player: Only 1 non-server player was present, so timing comparison was skipped.',
-        ])
+        lines.extend(
+            [
+                '',
+                '--- Timing Analysis ---',
+                '- Sole P2P Player: Only 1 non-server player was present, so timing comparison was skipped.',
+            ]
+        )
 
     if candidates:
-        lines.extend([
-            '',
-            '--- Evaluated Candidates ---',
-        ])
+        lines.extend(
+            [
+                '',
+                '--- Evaluated Candidates ---',
+            ]
+        )
         for index, player in enumerate(candidates, start=1):
             rejoin_time = player.datetime.last_rejoin.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            rejoin_ago = format_elapsed_time(datetime.now(tz=LOCAL_TZ) - player.datetime.last_rejoin)
             if player.packets.exchanged < MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
                 packets_status = 'Not enough'
             elif player.packets.exchanged > SESSION_HOST_MAX_PACKETS_FOR_DETECTION:
                 packets_status = 'Exceeds maximum'
             else:
                 packets_status = 'Enough'
-            username_suffix = f" ({', '.join(player.usernames)})" if player.usernames else ''
+            username_suffix = f' ({", ".join(player.usernames)})' if player.usernames else ''
             candidate_lines = [
                 f'Candidate #{index}:',
                 f'  IP Address: {player.ip}{username_suffix}',
-                f'  Last Rejoin: {rejoin_time}',
+                f'  Last Rejoin: {rejoin_time} ({rejoin_ago} ago)',
                 f'  Packets Exchanged: {player.packets.exchanged} ({packets_status})',
             ]
             if player in SessionHost.players_pending_for_disconnection:
@@ -546,8 +552,7 @@ class SessionHost:
                     SESSION_HOST_MAX_PACKETS_FOR_DETECTION,
                 )
                 cls.last_rejection_reason = (
-                    f'Candidate player {potential_session_host_player.ip} has already exchanged too many packets '
-                    'to determine if they originally hosted the session.'
+                    f'Candidate player {potential_session_host_player.ip} has already exchanged too many packets to determine if they originally hosted the session.'
                 )
                 cls.last_debug_details = _format_host_debug_details(
                     session_connected,

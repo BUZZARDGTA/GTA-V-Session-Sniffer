@@ -40,7 +40,6 @@ from session_sniffer.rendering_core.modmenu_logs_parser import ModMenuLogsParser
 from session_sniffer.rendering_core.session_table_renderer import (
     SessionTableRenderContext,
     build_session_table_snapshot,
-    format_elapsed_time,
     format_player_ip,
     format_player_middle_ports,
     format_player_usernames,
@@ -60,7 +59,7 @@ from session_sniffer.rendering_core.userip_ini_parser import parse_userip_ini_fi
 from session_sniffer.rendering_core.webhook_text_renderer import build_webhook_mobile_text, build_webhook_table_text
 from session_sniffer.settings import Settings
 from session_sniffer.text_templates import DEFAULT_USERIP_FILES_SETTINGS_INI, USERIP_DEFAULT_DB_FOOTER_TEMPLATE, USERIP_DEFAULT_DB_HEADER_TEMPLATE
-from session_sniffer.text_utils import format_triple_quoted_text, pluralize
+from session_sniffer.text_utils import format_elapsed_time, format_triple_quoted_text, pluralize
 from session_sniffer.utils import cleanup_session_logs, dedup_preserve_order, get_session_log_path
 
 if TYPE_CHECKING:

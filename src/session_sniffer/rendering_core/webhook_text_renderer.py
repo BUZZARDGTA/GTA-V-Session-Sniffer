@@ -8,10 +8,10 @@ from prettytable import PrettyTable, TableStyle
 from session_sniffer.constants.external import LOCAL_TZ
 from session_sniffer.models.player import Player, PlayerBandwidth
 from session_sniffer.rendering_core.session_table_renderer import (
-    format_elapsed_time,
     format_player_middle_ports,
     format_player_usernames,
 )
+from session_sniffer.text_utils import format_elapsed_time
 
 if TYPE_CHECKING:
     from collections.abc import Callable
