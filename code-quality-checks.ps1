@@ -1,5 +1,10 @@
 #!/usr/bin/env pwsh
 
+param(
+    [switch]$IncludeAll,
+    [switch]$SkipSlowSecurity
+)
+
 # Activate virtual environment
 & "${PSScriptRoot}\.venv\Scripts\Activate.ps1"
 
@@ -130,6 +135,13 @@ $QualityTools = @(
         Category = "SECURITY"
     }
 )
+
+# Omit safety and snyk when running under an AI agent to prevent hanging on interactive/network security checks
+$isAiAgent = [bool]($env:ANTIGRAVITY_AGENT -or $env:AI_AGENT -or $env:AGENT)
+if (($isAiAgent -or $SkipSlowSecurity) -and -not $IncludeAll) {
+    Write-Host "[INFO] AI agent detected: omitting safety and snyk security checks." -ForegroundColor Yellow
+    $QualityTools = @($QualityTools | Where-Object { $_.ToolName -notin @("safety", "snyk") })
+}
 
 # Execute each quality tool
 $TotalSteps = $QualityTools.Count
