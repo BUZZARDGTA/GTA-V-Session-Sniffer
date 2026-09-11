@@ -1,15 +1,16 @@
 """Capture statistics window."""
 
+import os
 import time
 from collections import deque
 from typing import override
 
-import psutil
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from session_sniffer.capture.arp_spoofing import ArpSpoofingController
+from session_sniffer.capture.process import get_process_creation_time
 from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis.player_rate_graph import DEFAULT_MAX_HISTORY, HISTORY_OPTIONS, VISIBLE_WINDOW
 from session_sniffer.guis.rate_graph_widget import RateGraphTheme, RateGraphWidget
@@ -100,7 +101,7 @@ class CaptureStatisticsWindow(RateGraphWindowMixin):
         stability_form.addRow('Packets Dropped:', self._label_packets_dropped)
         left_column_a.addWidget(stability_group)
 
-        self._process_started_at: float = psutil.Process().create_time()
+        self._process_started_at: float = get_process_creation_time(os.getpid()) or time.time()
 
         performance_group = QGroupBox('Performance')
         performance_form = QFormLayout(performance_group)

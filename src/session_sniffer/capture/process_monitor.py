@@ -6,18 +6,14 @@ on state changes, and logs meaningful transitions via `_log_process_status_trans
 
 from threading import Thread
 from threading import enumerate as enumerate_threads
-from typing import TYPE_CHECKING
 
 from session_sniffer.background.events import gui_closed__event
-from session_sniffer.capture.process import TargetProcessStatus, inspect_target_process
+from session_sniffer.capture.process import ProcessInfo, TargetProcessStatus, inspect_target_process
 from session_sniffer.gta5.process import GTA5Status, find_running_gta5_path
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.rdr2.process import RDR2Status, find_running_rdr2_path
 from session_sniffer.rendering_core.types import CaptureState
 from session_sniffer.settings import Settings
-
-if TYPE_CHECKING:
-    import psutil
 
 logger = get_logger(__name__)
 
@@ -52,9 +48,9 @@ def _process_monitor() -> None:
     last_process_status = TargetProcessStatus()
     last_gta5_status = GTA5Status(path=None)
     last_rdr2_status = RDR2Status(path=None)
-    cached_process: psutil.Process | None = None
-    cached_gta5_process: psutil.Process | None = None
-    cached_rdr2_process: psutil.Process | None = None
+    cached_process: ProcessInfo | None = None
+    cached_gta5_process: ProcessInfo | None = None
+    cached_rdr2_process: ProcessInfo | None = None
 
     while not gui_closed__event.is_set():
         target_pid = Settings.capture_filter_process_pid

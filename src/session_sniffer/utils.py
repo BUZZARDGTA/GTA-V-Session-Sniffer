@@ -3,17 +3,17 @@
 This module contains a variety of helper functions and custom exceptions used across the project.
 """
 
+import ctypes
 import json
 import os
 import subprocess
 import sys
 import winreg
-from contextlib import suppress
+from ctypes import wintypes
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
-import psutil
 from win32com.client import Dispatch
 
 from session_sniffer.constants.standalone import TITLE
@@ -208,33 +208,69 @@ def write_lines_to_file(file: Path, mode: Literal['w', 'x', 'a'], lines: list[st
         opened_file.writelines(content)
 
 
+class ProcessEntry32W(ctypes.Structure):
+    """ctypes definition for PROCESSENTRY32W structure."""
+
+    _fields_ = [
+        ('dwSize', wintypes.DWORD),
+        ('cntUsage', wintypes.DWORD),
+        ('th32ProcessID', wintypes.DWORD),
+        ('th32DefaultHeapID', ctypes.c_size_t),
+        ('th32ModuleID', wintypes.DWORD),
+        ('cntThreads', wintypes.DWORD),
+        ('th32ParentProcessID', wintypes.DWORD),
+        ('pcPriClassBase', wintypes.LONG),
+        ('dwFlags', wintypes.DWORD),
+        ('szExeFile', wintypes.WCHAR * 260),
+    ]
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize the PROCESSENTRY32W structure with its byte size."""
+        super().__init__(*args, **kwargs)
+        self.dwSize = ctypes.sizeof(self)
+
+
 def terminate_process_tree(pid: int | None = None) -> None:
     """Terminates the process with the given PID and all its child processes.
 
     Defaults to the current process if no PID is specified.
     """
-    try:
-        parent = psutil.Process(pid)
-    except psutil.NoSuchProcess:
-        return  # Process already terminated
-
-    try:
-        children = parent.children(recursive=True)
-    except psutil.NoSuchProcess:
+    target_pid = pid if pid is not None else os.getpid()
+    if target_pid <= 0:
         return
 
-    for child in children:
-        with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-            child.terminate()
+    kernel32 = ctypes.windll.kernel32
+    snapshot_handle = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+    if snapshot_handle and snapshot_handle != wintypes.HANDLE(-1).value:
+        try:
+            entry = ProcessEntry32W()
+            if kernel32.Process32FirstW(snapshot_handle, ctypes.byref(entry)):
+                children_by_parent: dict[int, list[int]] = {}
+                while True:
+                    children_by_parent.setdefault(entry.th32ParentProcessID, []).append(entry.th32ProcessID)
+                    if not kernel32.Process32NextW(snapshot_handle, ctypes.byref(entry)):
+                        break
 
-    with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-        psutil.wait_procs(children, timeout=3)
+                descendant_pids: list[int] = []
+                queue: list[int] = [target_pid]
+                while queue:
+                    parent_pid = queue.pop(0)
+                    for child_pid in children_by_parent.get(parent_pid, []):
+                        descendant_pids.append(child_pid)
+                        queue.append(child_pid)
 
-    with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-        parent.terminate()
+                for child_pid in reversed(descendant_pids):
+                    child_handle = kernel32.OpenProcess(0x0001, False, child_pid)  # noqa: FBT003
+                    if child_handle:
+                        kernel32.TerminateProcess(child_handle, 1)
+                        kernel32.CloseHandle(child_handle)
+        finally:
+            kernel32.CloseHandle(snapshot_handle)
 
-    with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-        parent.wait(3)
+    target_handle = kernel32.OpenProcess(0x0001, False, target_pid)  # noqa: FBT003
+    if target_handle:
+        kernel32.TerminateProcess(target_handle, 1)
+        kernel32.CloseHandle(target_handle)
 
 
 def check_case_insensitive_and_exact_match(input_value: str, custom_values_tuple: tuple[str, ...]) -> tuple[bool, str]:

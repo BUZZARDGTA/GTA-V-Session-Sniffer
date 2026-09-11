@@ -1,13 +1,17 @@
 """Status bar section rendering helpers for the GUI."""
 
 import enum
+import os
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import psutil
-
 from session_sniffer.capture.arp_spoofing import ArpSpoofingController
+from session_sniffer.capture.process import (
+    get_current_process_cpu_time,
+    get_current_process_io_bytes,
+    get_current_process_memory_mb,
+)
 from session_sniffer.guis.colors import StatusBarColors, ThresholdColors
 from session_sniffer.player.userip import UserIPDatabases
 from session_sniffer.rendering_core.types import CaptureState, CaptureStats
@@ -15,14 +19,20 @@ from session_sniffer.settings import Settings
 
 _BYTES_PER_MB = 1024**2
 
-_PROCESS = psutil.Process()
-_CPU_COUNT: int = psutil.cpu_count() or 1
+_CPU_COUNT: int = os.cpu_count() or 1
 _LATENCY_DISPLAY_WINDOW_SECONDS = 60
 
 
 @dataclass(slots=True)
+class _CPUState:
+    last_cpu_time: float = field(default_factory=get_current_process_cpu_time)
+    last_timestamp: float = field(default_factory=time.monotonic)
+
+
+@dataclass(slots=True)
 class _IOState:
-    counters: _pio = field(default_factory=_PROCESS.io_counters)
+    read_bytes: int = 0
+    write_bytes: int = 0
     timestamp: float = field(default_factory=time.monotonic)
 
 
@@ -32,12 +42,12 @@ class _LatencyState:
     last_nonzero_ts: float = 0.0
 
 
-_IO_STATE = _IOState()
+_initial_io_bytes = get_current_process_io_bytes()
+_CPU_STATE = _CPUState()
+_IO_STATE = _IOState(read_bytes=_initial_io_bytes[0], write_bytes=_initial_io_bytes[1])
 _LATENCY_STATE = _LatencyState()
 
 if TYPE_CHECKING:
-    from psutil._ntuples import pio as _pio
-
     from session_sniffer.capture.packet_capture import PacketCapture
     from session_sniffer.discord.rpc import DiscordRPC
 
@@ -116,22 +126,20 @@ class StatusBarThresholds(enum.IntEnum):
 
 def _compute_disk_io_rates() -> None:
     """Compute per-direction disk I/O rates and totals, updating `CaptureStats` in place."""
-    try:
-        io = _PROCESS.io_counters()
-    except psutil.AccessDenied:
-        return
-    CaptureStats.app_disk_read_total_mb = io.read_bytes / _BYTES_PER_MB
-    CaptureStats.app_disk_write_total_mb = io.write_bytes / _BYTES_PER_MB
+    read_bytes, write_bytes = get_current_process_io_bytes()
+    CaptureStats.app_disk_read_total_mb = read_bytes / _BYTES_PER_MB
+    CaptureStats.app_disk_write_total_mb = write_bytes / _BYTES_PER_MB
     now = time.monotonic()
-    dt = now - _IO_STATE.timestamp
-    if dt <= 0.0:
+    delta_time = now - _IO_STATE.timestamp
+    if delta_time <= 0.0:
         return
-    delta_read = io.read_bytes - _IO_STATE.counters.read_bytes
-    delta_write = io.write_bytes - _IO_STATE.counters.write_bytes
-    _IO_STATE.counters = io
+    delta_read = read_bytes - _IO_STATE.read_bytes
+    delta_write = write_bytes - _IO_STATE.write_bytes
+    _IO_STATE.read_bytes = read_bytes
+    _IO_STATE.write_bytes = write_bytes
     _IO_STATE.timestamp = now
-    CaptureStats.app_disk_read_rate_mb = max(0.0, delta_read) / dt / _BYTES_PER_MB
-    CaptureStats.app_disk_write_rate_mb = max(0.0, delta_write) / dt / _BYTES_PER_MB
+    CaptureStats.app_disk_read_rate_mb = max(0.0, delta_read) / delta_time / _BYTES_PER_MB
+    CaptureStats.app_disk_write_rate_mb = max(0.0, delta_write) / delta_time / _BYTES_PER_MB
 
 
 def _capture_global_state(capture: PacketCapture, discord_rpc_manager: DiscordRPC | None) -> StatusBarSnapshot:
@@ -140,8 +148,16 @@ def _capture_global_state(capture: PacketCapture, discord_rpc_manager: DiscordRP
     if Settings.discord_presence:
         discord_rpc_connected = discord_rpc_manager.connection_status.is_set() if discord_rpc_manager is not None else CaptureState.discord_rpc_connected
 
-    CaptureStats.app_cpu_percent = _PROCESS.cpu_percent(interval=None) / _CPU_COUNT
-    CaptureStats.app_memory_mb = _PROCESS.memory_info().rss / _BYTES_PER_MB
+    now = time.monotonic()
+    current_cpu_time = get_current_process_cpu_time()
+    delta_cpu = current_cpu_time - _CPU_STATE.last_cpu_time
+    delta_time = now - _CPU_STATE.last_timestamp
+    _CPU_STATE.last_cpu_time = current_cpu_time
+    _CPU_STATE.last_timestamp = now
+    if delta_time > 0.0:
+        CaptureStats.app_cpu_percent = (max(0.0, delta_cpu) / delta_time / _CPU_COUNT) * 100.0
+
+    CaptureStats.app_memory_mb = get_current_process_memory_mb()
     _compute_disk_io_rates()
     CaptureStats.packets_dropped = capture.get_pcap_drop_count() or 0
 

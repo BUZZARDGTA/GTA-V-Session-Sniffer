@@ -11,8 +11,7 @@ from dataclasses import dataclass, field
 from threading import Condition, Event, Thread
 from typing import ClassVar, Literal
 
-import psutil
-
+from session_sniffer.capture.process import resume_process, suspend_process
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.rendering_core.types import CaptureState
 
@@ -341,24 +340,24 @@ class RDR2SuspendManager:
         return max(0.01, earliest) if earliest is not None else 0.2
 
     # ------------------------------------------------------------
-    # psutil wrappers
+    # Process suspension wrappers
     # ------------------------------------------------------------
 
     @staticmethod
     def _try_suspend_pid(pid: int, reason: str) -> bool:
         try:
-            psutil.Process(pid).suspend()
+            suspend_process(pid)
 
-        except psutil.NoSuchProcess:
+        except ProcessLookupError:
             logger.warning('Suspend failed PID %d: process no longer exists', pid)
             return False
 
-        except psutil.AccessDenied:
+        except PermissionError:
             logger.warning('Suspend failed PID %d: access denied', pid)
             return False
 
-        except psutil.Error as e:
-            logger.warning('Suspend failed PID %d: psutil error: %s', pid, e)
+        except OSError as e:
+            logger.warning('Suspend failed PID %d: error: %s', pid, e)
             return False
 
         logger.info('Suspended PID %d (%s)', pid, reason)
@@ -367,18 +366,18 @@ class RDR2SuspendManager:
     @staticmethod
     def _try_resume_pid(pid: int) -> bool:
         try:
-            psutil.Process(pid).resume()
+            resume_process(pid)
 
-        except psutil.NoSuchProcess:
+        except ProcessLookupError:
             logger.info('Resume skipped PID %d: process already exited', pid)
             return True
 
-        except psutil.AccessDenied:
+        except PermissionError:
             logger.warning('Resume failed PID %d: access denied', pid)
             return False
 
-        except psutil.Error as e:
-            logger.warning('Resume failed PID %d: psutil error: %s', pid, e)
+        except OSError as e:
+            logger.warning('Resume failed PID %d: error: %s', pid, e)
             return False
 
         logger.info('Resumed PID %d', pid)
