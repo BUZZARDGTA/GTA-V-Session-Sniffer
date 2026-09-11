@@ -1,5 +1,6 @@
 """ARP spoofing background task utilities."""
 
+import socket
 import time
 from dataclasses import dataclass
 from threading import Event, Thread
@@ -7,8 +8,16 @@ from typing import TYPE_CHECKING, ClassVar
 
 from session_sniffer import msgbox
 from session_sniffer.background.events import gui_closed__event
-from session_sniffer.capture.arp import ArpSpoofTargets, resolve_mac_address, send_arp_restore_packets, send_arp_spoof_packets
-from session_sniffer.capture.exceptions import ArpResolutionError, PcapOpenError, PcapSendError
+from session_sniffer.capture.arp import (
+    ArpSpoofTargets,
+    build_arp_spoof_bpf_filter,
+    forward_intercepted_frame,
+    mac_string_to_bytes,
+    resolve_mac_address,
+    send_arp_restore_packets,
+    send_arp_spoof_packets,
+)
+from session_sniffer.capture.exceptions import ArpResolutionError, PcapFilterError, PcapOpenError, PcapReadError, PcapSendError
 from session_sniffer.capture.pcap import PcapHandle
 from session_sniffer.error_messages import format_arp_spoofing_failed_message
 from session_sniffer.logging_setup import get_logger
@@ -162,14 +171,14 @@ def arp_spoofing_task(
             if _should_exit():
                 break
 
-            # Open a dedicated pcap handle for sending ARP packets
+            # Open a dedicated pcap handle for sending ARP packets and forwarding intercepted traffic
             try:
                 pcap_handle = PcapHandle.open_live(
                     selected_interface.device_name,
-                    snaplen=64,
-                    promiscuous=False,
-                    timeout_milliseconds=100,
-                    buffer_size=0,
+                    snaplen=65535,
+                    promiscuous=True,
+                    timeout_milliseconds=20,
+                    buffer_size=33_554_432,
                 )
             except (PcapOpenError, OSError) as exception:
                 report_failure(
@@ -212,18 +221,58 @@ def arp_spoofing_task(
                 f' (gateway: {gateway_ip})' if gateway_ip else '',
             )
 
-            # Send spoofed ARP replies while capture is running
-            while capture_holder.is_running() and not _should_exit():
+            host_mac_bytes: bytes | None = None
+            target_mac_bytes: bytes | None = None
+            gateway_mac_bytes: bytes | None = None
+            target_ip_bytes: bytes | None = None
+
+            if targets is not None:
+                host_mac_bytes = mac_string_to_bytes(host_mac)
+                target_mac_bytes = mac_string_to_bytes(targets.target_mac)
+                gateway_mac_bytes = mac_string_to_bytes(targets.gateway_mac)
+                target_ip_bytes = socket.inet_aton(targets.target_ip)
+
+                bpf_filter = build_arp_spoof_bpf_filter(host_mac, targets)
                 try:
-                    if targets is not None:
+                    pcap_handle.set_filter(bpf_filter)
+                    logger.debug('Applied ARP spoof BPF filter: %s', bpf_filter)
+                except PcapFilterError as exception:
+                    logger.warning('Failed to compile/set ARP spoof BPF filter, falling back to software filtering: %s', exception)
+
+            next_spoof_timestamp = 0.0
+
+            # Forward packets and periodically refresh spoofed ARP replies while capture is running
+            while capture_holder.is_running() and not _should_exit():
+                if targets is None or host_mac_bytes is None or target_mac_bytes is None or gateway_mac_bytes is None or target_ip_bytes is None:
+                    time.sleep(0.5)
+                    continue
+
+                current_time = time.monotonic()
+                if current_time >= next_spoof_timestamp:
+                    try:
                         send_arp_spoof_packets(
                             pcap_handle,
                             host_mac=host_mac,
                             targets=targets,
                         )
-                except PcapSendError as exception:
+                        next_spoof_timestamp = current_time + _ARP_SPOOF_INTERVAL_SECONDS
+                    except PcapSendError as exception:
+                        report_failure(
+                            'unexpected packet injection error',
+                            error_details=str(exception),
+                            msgbox_style=msgbox.Style.MB_OK | msgbox.Style.MB_ICONWARNING | msgbox.Style.MB_TOPMOST,
+                            spawn_msgbox_thread=False,
+                        )
+                        on_failed()
+                        return
+
+                try:
+                    raw_frame = pcap_handle.next_raw_frame()
+                except PcapReadError as exception:
+                    if not capture_holder.is_running() or _should_exit():
+                        break
                     report_failure(
-                        'unexpected packet injection error',
+                        'capture read error',
                         error_details=str(exception),
                         msgbox_style=msgbox.Style.MB_OK | msgbox.Style.MB_ICONWARNING | msgbox.Style.MB_TOPMOST,
                         spawn_msgbox_thread=False,
@@ -231,11 +280,21 @@ def arp_spoofing_task(
                     on_failed()
                     return
 
-                # Wait before sending the next round of spoofed packets
-                elapsed = 0.0
-                while elapsed < _ARP_SPOOF_INTERVAL_SECONDS and not _should_exit() and capture_holder.is_running():
-                    time.sleep(0.1)
-                    elapsed += 0.1
+                if raw_frame is None:
+                    continue
+
+                rewritten_frame = forward_intercepted_frame(
+                    raw_frame,
+                    host_mac_bytes=host_mac_bytes,
+                    target_mac_bytes=target_mac_bytes,
+                    target_ip_bytes=target_ip_bytes,
+                    gateway_mac_bytes=gateway_mac_bytes,
+                )
+                if rewritten_frame is not None:
+                    try:
+                        pcap_handle.send_packet(rewritten_frame)
+                    except PcapSendError as exception:
+                        logger.debug('Failed to forward frame: %s', exception)
 
             # Capture stopped; restore ARP tables and close handle
             if targets is not None:

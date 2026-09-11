@@ -331,6 +331,44 @@ class PcapHandle:
         error_message = _get_pcap_error_message(library, self._handle)
         raise PcapReadError(error_message)
 
+    def next_raw_frame(self) -> bytes | None:
+        """Read the next packet data from the capture handle without metadata overhead.
+
+        Returns:
+            The complete raw frame bytes if a packet was captured, or `None` if read timed out or loop was broken.
+
+        Raises:
+            PcapReadError: If a non-recoverable capture read error occurs.
+        """
+        if self._is_closed:
+            return None
+
+        library = _PcapLibrary.get()
+
+        result = library.pcap_next_ex(
+            self._handle,
+            byref(self._header_pointer),
+            byref(self._data_pointer),
+        )
+
+        if result == _PCAP_READ_SUCCESS:
+            if not self._header_pointer or not self._data_pointer:
+                return None
+
+            header = self._header_pointer.contents
+            captured_length = int(header.caplen)
+            total_length = int(header.len)
+            if captured_length != total_length or not 0 < captured_length <= self._snaplen:
+                return None
+
+            return ctypes.string_at(self._data_pointer, captured_length)
+
+        if result in (_PCAP_READ_TIMEOUT, _PCAP_READ_LOOP_BROKEN):
+            return None
+
+        error_message = _get_pcap_error_message(library, self._handle)
+        raise PcapReadError(error_message)
+
     def get_drop_count(self) -> int | None:
         """Return cumulative packet drop statistics (`ps_drop` + `ps_ifdrop`)."""
         if self._is_closed:

