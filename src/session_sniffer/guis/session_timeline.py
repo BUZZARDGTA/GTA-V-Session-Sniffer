@@ -55,7 +55,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
             message = 'Failed to get horizontal header'
             raise RuntimeError(message)
         # Use Interactive so column widths are not recalculated on every cell update;
-        # resizeSections() is called once after a full repopulate instead.
+        # _reset_column_sizes() is called once after a full repopulate instead.
         for column in range(len(_HEADERS)):
             h_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
         h_header.setStretchLastSection(False)
@@ -71,7 +71,8 @@ class SessionTimelineWindow(StatTableWindowMixin):
         for column in (_COLUMN_STATUS, _COLUMN_FIRST_SEEN, _COLUMN_LAST_REJOIN, _COLUMN_LAST_SEEN, _COLUMN_SESSION_TIME, _COLUMN_TOTAL_TIME, _COLUMN_REJOINS):
             self._table.resizeColumnToContents(column)
         other_widths = sum(self._table.columnWidth(column) for column in range(1, len(_HEADERS)))
-        available_width = self._table.viewport().width() if self._table.viewport() else self._table.width()
+        viewport = self._table.viewport()
+        available_width = viewport.width() if viewport and viewport.width() > 0 else self._table.width()
         player_width = max(180, available_width - other_widths)
         self._table.setColumnWidth(_COLUMN_PLAYER, player_width)
 
@@ -136,9 +137,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     self._table.setItem(row, column, item)
 
-            h_header = self._table.horizontalHeader()
-            if h_header:
-                h_header.resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+            self._reset_column_sizes()
             self._last_player_ips = current_ips
             # Re-enable sorting once — triggers a single sort, acceptable after a structural change.
             self._table.setSortingEnabled(True)
