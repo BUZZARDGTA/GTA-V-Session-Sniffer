@@ -1,10 +1,11 @@
-"""Main window implementation for Session Sniffer."""
+"""Main window implementation for Session Sniffer."""  # pylint: disable=too-many-lines
 
+import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QShowEvent
+from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QKeySequence, QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -116,6 +117,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         self.setWindowTitle(TITLE)
         self.setMinimumSize(scale_by_ui(1024), scale_by_ui(600))
         resize_window_for_screen(self, screen_size)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinMaxButtonsHint | Qt.WindowType.WindowCloseButtonHint)
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
@@ -144,6 +146,14 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         change_interface_action.setToolTip('Stop capture, select a different network interface, and restart capture')
         change_interface_action.triggered.connect(on_change_interface)
         capture_menu.addAction(change_interface_action)
+
+        capture_menu.addSeparator()
+
+        exit_action = QAction('❌ Exit', self)
+        exit_action.setToolTip('Close Session Sniffer and stop capture')
+        exit_action.setShortcut(QKeySequence('Ctrl+Q'))
+        exit_action.triggered.connect(self.close)
+        capture_menu.addAction(exit_action)
 
         gta5_menu = menu_bar.addMenu('GTA V')
         if not gta5_menu:
@@ -598,7 +608,8 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
     def _start_window_move(self) -> None:
         """Apply transparency when window movement/dragging starts."""
         self._state.window_being_moved = True
-        self.setWindowOpacity(0.85)
+        if sys.platform == 'win32':
+            self.setWindowOpacity(0.85)
         self._header.setEnabled(False)
         self._connected.set_all_enabled(enabled=False)
         self._disconnected.set_all_enabled(enabled=False)
@@ -611,7 +622,8 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
     def _end_window_move(self) -> None:
         """Restore opacity and re-enable UI elements after window movement/dragging ends."""
         self._state.window_being_moved = False
-        self.setWindowOpacity(1.0)
+        if sys.platform == 'win32':
+            self.setWindowOpacity(1.0)
         self._header.setEnabled(True)
         self._connected.set_all_enabled(enabled=True)
         self._disconnected.set_all_enabled(enabled=True)

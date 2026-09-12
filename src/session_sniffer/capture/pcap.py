@@ -5,7 +5,9 @@ requiring any third-party packet manipulation frameworks.
 """
 
 import ctypes
+import ctypes.util
 import os
+import sys
 import threading
 from ctypes import byref, c_char_p, c_int, c_long, c_ubyte, c_uint, c_uint32, c_void_p
 from dataclasses import dataclass
@@ -92,18 +94,34 @@ class _PcapLibrary:  # pylint: disable=too-few-public-methods
         if cls._instance is not None:
             return cls._instance
 
-        system_root = os.environ.get('WINDIR', 'C:\\Windows')
-        npcap_directory = Path(system_root) / 'System32' / 'Npcap'
+        if sys.platform == 'win32':
+            system_root = os.environ.get('WINDIR', 'C:\\Windows')
+            npcap_directory = Path(system_root) / 'System32' / 'Npcap'
 
-        if npcap_directory.is_dir():
-            ctypes.windll.kernel32.SetDllDirectoryW(str(npcap_directory))
-            packet_path = npcap_directory / 'Packet.dll'
-            wpcap_path = npcap_directory / 'wpcap.dll'
-            if packet_path.is_file():
-                ctypes.cdll.LoadLibrary(str(packet_path))
-            library = ctypes.cdll.LoadLibrary(str(wpcap_path))
+            if npcap_directory.is_dir():
+                ctypes.windll.kernel32.SetDllDirectoryW(str(npcap_directory))
+                packet_path = npcap_directory / 'Packet.dll'
+                wpcap_path = npcap_directory / 'wpcap.dll'
+                if packet_path.is_file():
+                    ctypes.cdll.LoadLibrary(str(packet_path))
+                library = ctypes.cdll.LoadLibrary(str(wpcap_path))
+            else:
+                library = ctypes.CDLL('wpcap.dll')
         else:
-            library = ctypes.CDLL('wpcap.dll')
+            library = None
+            for lib_name in ('libpcap.so.0.8', 'libpcap.so.1', 'libpcap.so'):
+                try:
+                    library = ctypes.cdll.LoadLibrary(lib_name)
+                    break
+                except OSError:
+                    continue
+            if library is None:
+                pcap_path = ctypes.util.find_library('pcap')
+                if pcap_path:
+                    library = ctypes.cdll.LoadLibrary(pcap_path)
+                else:
+                    error_message = 'libpcap library not found on the system'
+                    raise OSError(error_message)
 
         # Define function signatures
         library.pcap_open_live.argtypes = [c_char_p, c_int, c_int, c_int, c_char_p]
@@ -153,6 +171,15 @@ class _PcapLibrary:  # pylint: disable=too-few-public-methods
 
         cls._instance = library
         return library
+
+
+def is_pcap_library_available() -> bool:
+    """Return `True` if the underlying pcap library can be loaded successfully."""
+    try:
+        _PcapLibrary.get()
+    except (OSError, RuntimeError):
+        return False
+    return True
 
 
 @final
@@ -207,6 +234,12 @@ class PcapHandle:
 
         if not handle:
             error_message = error_buffer.value.decode('utf-8', errors='replace')
+            if sys.platform != 'win32' and ('Operation not permitted' in error_message or 'permission' in error_message.lower()):
+                permission_hint = (
+                    ' (Session Sniffer requires root privileges or CAP_NET_RAW capability: '
+                    'try running with sudo or setcap cap_net_raw,cap_net_admin=eip on the python executable)'
+                )
+                error_message += permission_hint
             raise PcapOpenError(device_name, error_message)
 
         if buffer_size > 0 and hasattr(library, 'pcap_setbuff'):

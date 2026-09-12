@@ -1,5 +1,6 @@
 """Discord intro popup dialog and clickable label widgets."""
 
+import sys
 import webbrowser
 from typing import TYPE_CHECKING, override
 
@@ -56,11 +57,11 @@ class DiscordIntro(QDialog):
         # the same borderless custom-chrome look without the owner-window side effect.
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)  # | Qt.WindowType.WindowStaysOnTopHint
 
-        self.setWindowOpacity(0)
+        if sys.platform == 'win32':
+            self.setWindowOpacity(0)
+            self.fade_out = QPropertyAnimation(self, b'windowOpacity')
 
         self.setStyleSheet(DISCORD_POPUP_MAIN_STYLESHEET)
-
-        self.fade_out = QPropertyAnimation(self, b'windowOpacity')
 
         self.exit_button = QPushButton('x', self)
         self.exit_button.setFixedSize(16, 16)
@@ -109,12 +110,13 @@ class DiscordIntro(QDialog):
         self.show()
         self.center_window()
 
-        self.fade_in = QPropertyAnimation(self, b'windowOpacity')
-        self.fade_in.setDuration(1000)
-        self.fade_in.setStartValue(0)
-        self.fade_in.setEndValue(1)
-        self.fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.fade_in.start()
+        if sys.platform == 'win32':
+            self.fade_in = QPropertyAnimation(self, b'windowOpacity')
+            self.fade_in.setDuration(1000)
+            self.fade_in.setStartValue(0)
+            self.fade_in.setEndValue(1)
+            self.fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.fade_in.start()
 
         self.raise_()
         self.activateWindow()
@@ -183,6 +185,9 @@ class DiscordIntro(QDialog):
 
     def close_popup(self) -> None:
         """Fade out and close the Discord popup dialog."""
+        if sys.platform != 'win32' or not hasattr(self, 'fade_out'):
+            self.close()
+            return
         self.fade_out.setDuration(500)
         self.fade_out.setStartValue(1)
         self.fade_out.setEndValue(0)

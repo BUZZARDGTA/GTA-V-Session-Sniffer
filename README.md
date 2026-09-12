@@ -19,9 +19,9 @@
 
 ## ⬇️ Download
 
-Grab the latest stable release and get started instantly, or build it yourself from source.
+Grab the latest stable release executable for Windows, or run from source on Windows and Linux.
 
-[![Download Latest Release](https://img.shields.io/badge/Download%20Latest%20Release-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/BUZZARDGTA/Session-Sniffer/releases/latest/download/Session_Sniffer.exe)
+[![Download Latest Release (Windows)](https://img.shields.io/badge/Download%20Latest%20Release%20(Windows)-%23007ACC?style=for-the-badge&logo=github&logoColor=white)](https://github.com/BUZZARDGTA/Session-Sniffer/releases/latest/download/Session_Sniffer.exe)
 
 🔨 Prefer to run or build from source? See the step-by-step guide on the [**Building from Source**](https://github.com/BUZZARDGTA/Session-Sniffer/wiki/Building-from-Source) wiki page.
 
@@ -139,8 +139,10 @@ Session Sniffer supports resolving and displaying player usernames through sever
 
 ## ⚙️ Requirements
 
-- **OS**: [Windows](https://www.microsoft.com/windows) 10 or 11 (x64)
-- **Network Driver**: [Npcap](https://nmap.org/npcap/)
+- **OS**: [Windows](https://www.microsoft.com/windows) 10 or 11 (x64) or [Linux](https://ubuntu.com) (Ubuntu 22.04+ / Debian-based x64)
+- **Capture Driver / Library**:
+  - **Windows**: [Npcap](https://nmap.org/npcap/)
+  - **Linux**: `libpcap` (e.g. `sudo apt install libpcap-dev`) and capture capabilities granted to Python (`sudo setcap cap_net_raw,cap_net_admin=eip $(readlink -f .venv/bin/python)`)
 - **Optional**: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data/)
 
 ---

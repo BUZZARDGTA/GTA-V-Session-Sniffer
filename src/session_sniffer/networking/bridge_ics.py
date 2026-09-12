@@ -10,11 +10,17 @@ the classification rather than raising.
 """
 
 import ctypes
-import winreg
+import sys
 from ctypes import wintypes
+from pathlib import Path
 from typing import Literal, cast
 
-from session_sniffer.logging_setup import get_logger
+if sys.platform == 'win32':
+    import winreg  # pylint: disable=import-error
+else:
+    winreg = None  # type: ignore[assignment]  # pylint: disable=invalid-name
+
+from session_sniffer.logging_setup import get_logger  # pylint: disable=wrong-import-position
 
 logger = get_logger(__name__)
 
@@ -331,6 +337,19 @@ def _get_ics_classification() -> dict[str, AdapterClassification]:
     return result
 
 
+def _get_linux_bridge_classification() -> dict[str, AdapterClassification]:
+    """Detect bridged interfaces on Linux via sysfs."""
+    classification: dict[str, AdapterClassification] = {}
+    net_path = Path('/sys/class/net')
+    try:
+        for entry in net_path.iterdir():
+            if (entry / 'brport').exists() or (entry / 'bridge').exists():
+                classification[entry.name] = 'bridged'
+    except OSError:
+        pass
+    return classification
+
+
 def get_adapter_classification() -> dict[str, AdapterClassification]:
     """Return a mapping of adapter GUID -> classification.
 
@@ -340,6 +359,9 @@ def get_adapter_classification() -> dict[str, AdapterClassification]:
 
     When an adapter qualifies for multiple classifications, bridge membership wins.
     """
+    if sys.platform != 'win32':
+        return _get_linux_bridge_classification()
+
     classification: dict[str, AdapterClassification] = {}
 
     try:

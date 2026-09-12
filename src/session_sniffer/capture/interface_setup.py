@@ -1,5 +1,7 @@
 """Network interface population, capture interface discovery, and interface refresh logic."""
 
+import sys
+
 from session_sniffer.networking.bridge_ics import get_adapter_classification
 from session_sniffer.networking.ctypes_adapters_info import get_adapters_info
 from session_sniffer.networking.interface import (
@@ -88,19 +90,19 @@ def populate_network_interfaces_info() -> None:
 
 
 def get_filtered_capture_interfaces() -> list[tuple[str, str]]:
-    r"""Build the list of capture-capable interfaces from Windows API data.
-
-    Uses the GUID already stored in `AllInterfaces` (populated by
-    `populate_network_interfaces_info`) to construct the NPF device path
-    (`\Device\NPF_{GUID}`) directly.
+    r"""Build the list of capture-capable interfaces from OS network data.
 
     Returns:
         A list of `(device_name, friendly_name)` tuples where `device_name` is
-        the NPF device path (e.g. `\Device\NPF_{GUID}`) and `friendly_name`
-        is the Windows adapter name.
+        the capture device identifier and `friendly_name` is the display adapter name.
     """
     result: list[tuple[str, str]] = []
     for interface in AllInterfaces.iterate():
+        if sys.platform != 'win32':
+            if interface.identity.name != 'lo' and interface.identity.name not in EXCLUDED_CAPTURE_NETWORK_INTERFACES:
+                result.append((interface.identity.name, interface.identity.name))
+            continue
+
         if interface.identity.adapter_guid is None:
             continue
         # Strip enclosing braces if present, then rebuild to normalise form.
@@ -114,7 +116,7 @@ def get_filtered_capture_interfaces() -> list[tuple[str, str]]:
 def refresh_available_interfaces() -> list[Interface]:
     """Re-query the OS for network adapters and return capture-capable interfaces.
 
-    Clears the AllInterfaces registry, re-populates it from the Windows API,
+    Clears the AllInterfaces registry, re-populates it from the network adapter APIs,
     then populates device names.
 
     Returns:

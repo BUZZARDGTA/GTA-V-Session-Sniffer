@@ -3,12 +3,14 @@
 This module contains a variety of helper functions and custom exceptions used across the project.
 """
 
+import contextlib
 import ctypes
 import json
 import os
+import shutil
+import signal
 import subprocess
 import sys
-import winreg
 from ctypes import wintypes
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -59,7 +61,10 @@ def resource_path(relative_path: Path) -> Path:
 
 
 def get_documents_dir() -> Path:
-    """Retrieve the Path object to the current user's "Documents" directory by querying the Windows registry.
+    """Retrieve the Path object to the current user's "Documents" directory.
+
+    On Windows, this queries the Windows registry shell folders key.
+    On non-Windows platforms, this defaults to `Path.home() / 'Documents'`.
 
     Returns:
         A `Path` object pointing to the user's "Documents" folder.
@@ -67,18 +72,19 @@ def get_documents_dir() -> Path:
     Raises:
         TypeError: If the retrieved path is not a string.
     """
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, USER_SHELL_FOLDERS__REG_KEY) as key:
-        documents_path, _ = winreg.QueryValueEx(key, 'Personal')
-        if not isinstance(documents_path, str):
-            raise TypeError(format_type_error(documents_path, str))
+    if sys.platform == 'win32':
+        import winreg  # noqa: PLC0415  # pylint: disable=import-error,import-outside-toplevel
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, USER_SHELL_FOLDERS__REG_KEY) as key:
+            documents_path, _ = winreg.QueryValueEx(key, 'Personal')
+            if not isinstance(documents_path, str):
+                raise TypeError(format_type_error(documents_path, str))
+        return Path(documents_path)
 
-    return Path(documents_path)
+    return Path.home() / 'Documents'
 
 
 def get_app_dir(*, scope: Literal['roaming', 'local']) -> Path:
     """Return the per-user application data directory.
-
-    Session Sniffer is Windows-only.
 
     Use `scope='roaming'` for user-owned, syncable data that should follow the user profile
     between machines (when applicable), such as:
@@ -91,17 +97,23 @@ def get_app_dir(*, scope: Literal['roaming', 'local']) -> Path:
     - Logs (e.g., `warnings.log`, `errors.log`, session logs)
     - Large databases/caches (e.g., GeoLite2 databases)
 
-    This function prefers the Windows environment variables (`APPDATA` and `LOCALAPPDATA`)
-    to support redirected profiles (common in corporate environments). If the variables are
-    missing, it falls back to the default `Path.home() / 'AppData' / ...` layout.
+    On Windows, this uses `APPDATA` and `LOCALAPPDATA`.
+    On Linux, this adheres to the XDG Base Directory Specification:
+    `XDG_CONFIG_HOME` for roaming (defaults to `~/.config`) and `XDG_DATA_HOME` for local
+    (defaults to `~/.local/share`).
 
     Args:
-        scope: Which AppData base to use: `roaming` or `local`.
+        scope: Which application directory base to use: `roaming` or `local`.
     """
-    if scope == 'roaming':
-        base = Path(os.getenv('APPDATA', str(Path.home() / 'AppData' / 'Roaming')))
+    if sys.platform == 'win32':
+        if scope == 'roaming':
+            base = Path(os.getenv('APPDATA', str(Path.home() / 'AppData' / 'Roaming')))
+        else:
+            base = Path(os.getenv('LOCALAPPDATA', str(Path.home() / 'AppData' / 'Local')))
+    elif scope == 'roaming':
+        base = Path(os.getenv('XDG_CONFIG_HOME', str(Path.home() / '.config')))
     else:
-        base = Path(os.getenv('LOCALAPPDATA', str(Path.home() / 'AppData' / 'Local')))
+        base = Path(os.getenv('XDG_DATA_HOME', str(Path.home() / '.local' / 'share')))
 
     app_dir = base / TITLE
     app_dir.mkdir(parents=True, exist_ok=True)
@@ -235,6 +247,36 @@ def terminate_process_tree(pid: int | None = None) -> None:
     """
     target_pid = pid if pid is not None else os.getpid()
     if target_pid <= 0:
+        return
+
+    if sys.platform != 'win32':
+        children_by_parent: dict[int, list[int]] = {}
+        proc_path = Path('/proc')
+        if proc_path.is_dir():
+            for proc_entry in proc_path.iterdir():
+                if proc_entry.name.isdigit():
+                    try:
+                        stat_content = (proc_entry / 'stat').read_text().split()
+                        parent_process_id = int(stat_content[3])
+                        child_pid = int(proc_entry.name)
+                        children_by_parent.setdefault(parent_process_id, []).append(child_pid)
+                    except (OSError, ValueError, IndexError):
+                        continue
+
+        descendant_pids: list[int] = []
+        queue: list[int] = [target_pid]
+        while queue:
+            parent_pid = queue.pop(0)
+            for child_pid in children_by_parent.get(parent_pid, []):
+                descendant_pids.append(child_pid)
+                queue.append(child_pid)
+
+        for child_pid in reversed(descendant_pids):
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.kill(child_pid, signal.SIGKILL)
+
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.kill(target_pid, signal.SIGKILL)
         return
 
     kernel32 = ctypes.windll.kernel32
@@ -423,6 +465,9 @@ def _release_com_interface(pointer: wintypes.LPVOID) -> None:
 
 def resolve_lnk(shortcut_path: Path) -> Path:
     """Resolves a Windows shortcut (.lnk) to its target path."""
+    if sys.platform != 'win32':
+        return shortcut_path
+
     ole32 = ctypes.windll.ole32
     hr_init = ole32.CoInitializeEx(None, 2)
     need_uninit = hr_init in (0, 1)
@@ -466,11 +511,22 @@ def resolve_lnk(shortcut_path: Path) -> Path:
 
 
 def run_cmd_script(script: Path, args: list[str] | None = None) -> None:
-    """Executes a script with the given arguments in a new CMD terminal window."""
-    full_command = [str(CMD_EXE), '/K']
-
+    """Executes a script with the given arguments in a new terminal window."""
     if script.suffix.casefold() == '.lnk':
         script = resolve_lnk(script)
+
+    if sys.platform != 'win32':
+        command = [sys.executable, str(script)] if script.suffix.casefold() == '.py' else [str(script)]
+        if args is not None:
+            command.extend(args)
+        terminal_emulator = shutil.which('x-terminal-emulator') or shutil.which('gnome-terminal') or shutil.which('xterm')
+        if terminal_emulator:
+            subprocess.run([terminal_emulator, '-e', *command], check=False)
+        else:
+            subprocess.Popen(command)
+        return
+
+    full_command = [str(CMD_EXE), '/K']
 
     if script.suffix.casefold() == '.py':
         full_command.append('py')

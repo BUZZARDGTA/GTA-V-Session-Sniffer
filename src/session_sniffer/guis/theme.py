@@ -1,10 +1,31 @@
 """Custom sleek dark theme for Session Sniffer."""
 
+from PySide6.QtGui import QColor, QPalette
+
 from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis.stylesheets._menus import SHARED_QMENU_RIGHT_ARROW_STYLESHEET
 
 _SCALE_THRESHOLD_LARGE = 0.85
 _SCALE_THRESHOLD_MEDIUM = 0.75
+
+
+def get_dark_palette() -> QPalette:
+    """Return a unified dark QPalette for Qt widgets and window decorations."""
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor('#1e1e1e'))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor('#e0e0e0'))
+    palette.setColor(QPalette.ColorRole.Base, QColor('#121212'))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor('#252526'))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor('#1e1e1e'))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor('#e0e0e0'))
+    palette.setColor(QPalette.ColorRole.Text, QColor('#e0e0e0'))
+    palette.setColor(QPalette.ColorRole.Button, QColor('#2d2d30'))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor('#ffffff'))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor('#ffffff'))
+    palette.setColor(QPalette.ColorRole.Link, QColor('#007acc'))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor('#007acc'))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor('#ffffff'))
+    return palette
 
 
 def get_stylesheet(ui_scale: float = 1.0) -> str:

@@ -1,7 +1,11 @@
-"""Target process inspection and UDP port resolution via Win32 IP Helper and Windows APIs."""
+"""Target process inspection and UDP port resolution via Win32 IP Helper and Windows APIs on Windows, or procfs on Linux."""
 
 import ctypes
+import os
+import signal
 import socket
+import sys
+import time
 from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,11 +28,17 @@ _WINDOWS_EPOCH_DELTA_100NS = 116444736000000000
 _BYTES_PER_MB = 1024**2
 _CREATION_TIME_TOLERANCE_SECONDS = 0.05
 _ERROR_ACCESS_DENIED = 5
+_PROC_NET_UDP_MIN_FIELDS = 10
+_AF_INET = 2
+_UDP_TABLE_OWNER_PID = 1
+_ERROR_INSUFFICIENT_BUFFER = 122
+_ERROR_SUCCESS = 0
 
-_kernel32 = ctypes.windll.kernel32
-_ntdll = ctypes.windll.ntdll
-_psapi = ctypes.windll.psapi
-_iphlpapi = ctypes.windll.iphlpapi
+if sys.platform == 'win32':
+    _kernel32 = ctypes.windll.kernel32
+    _ntdll = ctypes.windll.ntdll
+    _psapi = ctypes.windll.psapi
+    _iphlpapi = ctypes.windll.iphlpapi
 
 
 class _MibUdpRowOwnerPid(ctypes.Structure):
@@ -75,86 +85,82 @@ class _ProcessMemoryCounters(ctypes.Structure):
         self.cb = ctypes.sizeof(self)
 
 
-_kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-_kernel32.OpenProcess.restype = wintypes.HANDLE
+if sys.platform == 'win32':
+    _kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _kernel32.OpenProcess.restype = wintypes.HANDLE
 
-_kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-_kernel32.CloseHandle.restype = wintypes.BOOL
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _kernel32.CloseHandle.restype = wintypes.BOOL
 
-_kernel32.GetCurrentProcess.argtypes = []
-_kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    _kernel32.GetCurrentProcess.argtypes = []
+    _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
 
-_kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
-_kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    _kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    _kernel32.GetExitCodeProcess.restype = wintypes.BOOL
 
-_kernel32.GetProcessTimes.argtypes = [
-    wintypes.HANDLE,
-    ctypes.POINTER(wintypes.FILETIME),
-    ctypes.POINTER(wintypes.FILETIME),
-    ctypes.POINTER(wintypes.FILETIME),
-    ctypes.POINTER(wintypes.FILETIME),
-]
-_kernel32.GetProcessTimes.restype = wintypes.BOOL
+    _kernel32.GetProcessTimes.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    ]
+    _kernel32.GetProcessTimes.restype = wintypes.BOOL
 
-_kernel32.QueryFullProcessImageNameW.argtypes = [
-    wintypes.HANDLE,
-    wintypes.DWORD,
-    wintypes.LPWSTR,
-    ctypes.POINTER(wintypes.DWORD),
-]
-_kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    _kernel32.QueryFullProcessImageNameW.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.LPWSTR,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    _kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
 
-_kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-_kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    _kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    _kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
 
-_kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
-_kernel32.Process32FirstW.restype = wintypes.BOOL
+    _kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
+    _kernel32.Process32FirstW.restype = wintypes.BOOL
 
-_kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
-_kernel32.Process32NextW.restype = wintypes.BOOL
+    _kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
+    _kernel32.Process32NextW.restype = wintypes.BOOL
 
-_kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
-_kernel32.TerminateProcess.restype = wintypes.BOOL
+    _kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    _kernel32.TerminateProcess.restype = wintypes.BOOL
 
-_kernel32.GetProcessIoCounters.argtypes = [wintypes.HANDLE, ctypes.POINTER(_IOCounters)]
-_kernel32.GetProcessIoCounters.restype = wintypes.BOOL
+    _kernel32.GetProcessIoCounters.argtypes = [wintypes.HANDLE, ctypes.POINTER(_IOCounters)]
+    _kernel32.GetProcessIoCounters.restype = wintypes.BOOL
 
-_psapi.GetProcessMemoryInfo.argtypes = [
-    wintypes.HANDLE,
-    ctypes.POINTER(_ProcessMemoryCounters),
-    wintypes.DWORD,
-]
-_psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+    _psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(_ProcessMemoryCounters),
+        wintypes.DWORD,
+    ]
+    _psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
 
-_ntdll.NtSuspendProcess.argtypes = [wintypes.HANDLE]
-_ntdll.NtSuspendProcess.restype = wintypes.LONG
+    _ntdll.NtSuspendProcess.argtypes = [wintypes.HANDLE]
+    _ntdll.NtSuspendProcess.restype = wintypes.LONG
 
-_ntdll.NtResumeProcess.argtypes = [wintypes.HANDLE]
-_ntdll.NtResumeProcess.restype = wintypes.LONG
+    _ntdll.NtResumeProcess.argtypes = [wintypes.HANDLE]
+    _ntdll.NtResumeProcess.restype = wintypes.LONG
 
-_ntdll.NtQuerySystemInformation.argtypes = [
-    wintypes.ULONG,
-    ctypes.c_void_p,
-    wintypes.ULONG,
-    ctypes.POINTER(wintypes.ULONG),
-]
-_ntdll.NtQuerySystemInformation.restype = wintypes.LONG
+    _ntdll.NtQuerySystemInformation.argtypes = [
+        wintypes.ULONG,
+        ctypes.c_void_p,
+        wintypes.ULONG,
+        ctypes.POINTER(wintypes.ULONG),
+    ]
+    _ntdll.NtQuerySystemInformation.restype = wintypes.LONG
 
-_AF_INET = 2
-_UDP_TABLE_OWNER_PID = 1
-_ERROR_INSUFFICIENT_BUFFER = 122
-_ERROR_SUCCESS = 0
-
-_GetExtendedUdpTable = _iphlpapi.GetExtendedUdpTable
-_GetExtendedUdpTable.argtypes = [
-    ctypes.c_void_p,
-    ctypes.POINTER(wintypes.DWORD),
-    wintypes.BOOL,
-    wintypes.ULONG,
-    ctypes.c_int,
-    wintypes.ULONG,
-]
-_GetExtendedUdpTable.restype = wintypes.DWORD
+    _GetExtendedUdpTable = _iphlpapi.GetExtendedUdpTable
+    _GetExtendedUdpTable.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.BOOL,
+        wintypes.ULONG,
+        ctypes.c_int,
+        wintypes.ULONG,
+    ]
+    _GetExtendedUdpTable.restype = wintypes.DWORD
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +205,11 @@ def get_process_creation_time(pid: int) -> float | None:
     """Return the creation time of the process in seconds since Unix epoch, or None if unavailable."""
     if pid <= 0:
         return None
+    if sys.platform != 'win32':
+        try:
+            return Path(f'/proc/{pid}').stat().st_ctime
+        except OSError:
+            return None
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)  # noqa: FBT003
     if not handle:
         return None
@@ -206,6 +217,16 @@ def get_process_creation_time(pid: int) -> float | None:
         return _get_creation_time_from_handle(handle)
     finally:
         _kernel32.CloseHandle(handle)
+
+
+def _is_process_running_linux(pid: int, creation_time: float | None) -> bool:
+    """Check if process is running on Linux."""
+    if not Path(f'/proc/{pid}').exists():
+        return False
+    if creation_time is not None:
+        actual_creation_time = get_process_creation_time(pid)
+        return not (actual_creation_time is None or abs(actual_creation_time - creation_time) > _CREATION_TIME_TOLERANCE_SECONDS)
+    return True
 
 
 def is_process_running(target: int | ProcessInfo, creation_time: float | None = None) -> bool:
@@ -219,19 +240,20 @@ def is_process_running(target: int | ProcessInfo, creation_time: float | None = 
 
     if pid <= 0:
         return False
+
+    if sys.platform != 'win32':
+        return _is_process_running_linux(pid, creation_time)
+
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)  # noqa: FBT003
     if not handle:
         return False
     try:
         exit_code = wintypes.DWORD()
-        if not _kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-            return False
-        if exit_code.value != _STILL_ACTIVE:
+        if not _kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)) or exit_code.value != _STILL_ACTIVE:
             return False
         if creation_time is not None:
             actual_creation_time = _get_creation_time_from_handle(handle)
-            if actual_creation_time is None or abs(actual_creation_time - creation_time) > _CREATION_TIME_TOLERANCE_SECONDS:
-                return False
+            return not (actual_creation_time is None or abs(actual_creation_time - creation_time) > _CREATION_TIME_TOLERANCE_SECONDS)
         return True
     finally:
         _kernel32.CloseHandle(handle)
@@ -241,6 +263,11 @@ def get_process_image_path(pid: int) -> Path | None:
     """Return the resolved executable file path for the given PID, or `None` if inaccessible."""
     if pid <= 0:
         return None
+    if sys.platform != 'win32':
+        try:
+            return Path(f'/proc/{pid}/exe').resolve()
+        except OSError:
+            return None
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)  # noqa: FBT003
     if not handle:
         return None
@@ -256,6 +283,23 @@ def get_process_image_path(pid: int) -> Path | None:
 
 def iter_running_processes() -> list[tuple[int, str]]:
     """Return a snapshot list of `(pid, name)` for all running processes."""
+    if sys.platform != 'win32':
+        processes: list[tuple[int, str]] = []
+        proc_dir = Path('/proc')
+        try:
+            for entry in proc_dir.iterdir():
+                if entry.name.isdigit():
+                    pid = int(entry.name)
+                    comm_file = entry / 'comm'
+                    try:
+                        name = comm_file.read_text(encoding='utf-8', errors='replace').strip()
+                    except OSError:
+                        name = ''
+                    processes.append((pid, name))
+        except OSError:
+            pass
+        return processes
+
     snapshot_handle = _kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
     if not snapshot_handle or snapshot_handle == wintypes.HANDLE(-1).value:
         return []
@@ -274,10 +318,14 @@ def iter_running_processes() -> list[tuple[int, str]]:
 
 
 def suspend_process(pid: int) -> None:
-    """Suspend execution of the process with the given PID via `NtSuspendProcess`."""
+    """Suspend execution of the process with the given PID."""
     if pid <= 0:
         error_message = f'Invalid process ID: {pid}'
         raise ProcessLookupError(error_message)
+    if sys.platform != 'win32':
+        os.kill(pid, signal.SIGSTOP)
+        return
+
     handle = _kernel32.OpenProcess(_PROCESS_SUSPEND_RESUME | _PROCESS_QUERY_LIMITED_INFORMATION, False, pid)  # noqa: FBT003
     if not handle:
         last_error = _kernel32.GetLastError()
@@ -299,10 +347,14 @@ def suspend_process(pid: int) -> None:
 
 
 def resume_process(pid: int) -> None:
-    """Resume execution of the process with the given PID via `NtResumeProcess`."""
+    """Resume execution of the process with the given PID."""
     if pid <= 0:
         error_message = f'Invalid process ID: {pid}'
         raise ProcessLookupError(error_message)
+    if sys.platform != 'win32':
+        os.kill(pid, signal.SIGCONT)
+        return
+
     handle = _kernel32.OpenProcess(_PROCESS_SUSPEND_RESUME | _PROCESS_QUERY_LIMITED_INFORMATION, False, pid)  # noqa: FBT003
     if not handle:
         last_error = _kernel32.GetLastError()
@@ -323,10 +375,25 @@ def resume_process(pid: int) -> None:
         _kernel32.CloseHandle(handle)
 
 
+def _is_process_suspended_linux(pid: int) -> bool:
+    """Check if process is suspended on Linux."""
+    try:
+        with Path(f'/proc/{pid}/status').open(encoding='ascii') as status_file:
+            for line in status_file:
+                if line.startswith('State:'):
+                    return 'T (stopped)' in line or 'T (tracing stop)' in line
+    except OSError:
+        pass
+    return False
+
+
 def is_process_suspended(pid: int) -> bool:
-    """Check whether all threads in the target process are in the Waiting/Suspended state."""
+    """Check whether the target process is in a suspended/stopped state."""
     if pid <= 0:
         return False
+    if sys.platform != 'win32':
+        return _is_process_suspended_linux(pid)
+
     buffer_size = wintypes.ULONG(0x100000)
     while True:
         process_info_buffer = ctypes.create_string_buffer(buffer_size.value)
@@ -354,13 +421,11 @@ def is_process_suspended(pid: int) -> bool:
             if not number_of_threads:
                 return False
             threads_base_address = current_address + 256
-            for i in range(number_of_threads):
-                thread_address = threads_base_address + i * 80
-                thread_state = wintypes.ULONG.from_address(thread_address + 68).value
-                wait_reason = wintypes.ULONG.from_address(thread_address + 72).value
-                if thread_state != _THREAD_STATE_WAITING or wait_reason != _WAIT_REASON_SUSPENDED:
-                    return False
-            return True
+            return all(
+                wintypes.ULONG.from_address(threads_base_address + i * 80 + 68).value == _THREAD_STATE_WAITING
+                and wintypes.ULONG.from_address(threads_base_address + i * 80 + 72).value == _WAIT_REASON_SUSPENDED
+                for i in range(number_of_threads)
+            )
 
         if not next_entry_offset:
             break
@@ -371,14 +436,39 @@ def is_process_suspended(pid: int) -> bool:
 
 def get_current_process_memory_mb() -> float:
     """Return the RSS memory usage of the current process in megabytes."""
+    if sys.platform != 'win32':
+        try:
+            with Path('/proc/self/status').open(encoding='ascii') as status_file:
+                for line in status_file:
+                    if line.startswith('VmRSS:'):
+                        fields = line.split()
+                        return float(fields[1]) / 1024.0
+        except OSError:
+            pass
+        return 0.0
+
     memory_counters = _ProcessMemoryCounters()
-    if not _psapi.GetProcessMemoryInfo(_kernel32.GetCurrentProcess(), ctypes.byref(memory_counters), memory_counters.cb):
+    if not _psapi.GetProcessMemoryInfo(_kernel32.GetCurrentProcess(), ctypes.byref(memory_counters), ctypes.sizeof(memory_counters)):
         return 0.0
     return float(memory_counters.WorkingSetSize) / _BYTES_PER_MB
 
 
 def get_current_process_io_bytes() -> tuple[int, int]:
     """Return `(read_bytes, write_bytes)` for the current process."""
+    if sys.platform != 'win32':
+        read_bytes = 0
+        write_bytes = 0
+        try:
+            with Path('/proc/self/io').open(encoding='ascii') as io_file:
+                for line in io_file:
+                    if line.startswith('read_bytes:'):
+                        read_bytes = int(line.split()[1])
+                    elif line.startswith('write_bytes:'):
+                        write_bytes = int(line.split()[1])
+        except OSError:
+            pass
+        return (read_bytes, write_bytes)
+
     io_counters = _IOCounters()
     if not _kernel32.GetProcessIoCounters(_kernel32.GetCurrentProcess(), ctypes.byref(io_counters)):
         return (0, 0)
@@ -387,6 +477,9 @@ def get_current_process_io_bytes() -> tuple[int, int]:
 
 def get_current_process_cpu_time() -> float:
     """Return total CPU time (kernel + user) in seconds for the current process."""
+    if sys.platform != 'win32':
+        return time.process_time()
+
     creation_time = wintypes.FILETIME()
     exit_time = wintypes.FILETIME()
     kernel_time = wintypes.FILETIME()
@@ -406,6 +499,37 @@ def get_current_process_cpu_time() -> float:
 
 def get_process_udp_ports(target_pid: int) -> frozenset[int]:
     """Return the set of local UDP ports currently bound by the target PID via Win32 IP Helper API."""
+    if sys.platform != 'win32':
+        inode_to_port: dict[str, int] = {}
+        for udp_table_path in ('/proc/net/udp', '/proc/net/udp6'):
+            try:
+                with Path(udp_table_path).open(encoding='ascii') as udp_file:
+                    for line in udp_file.readlines()[1:]:
+                        fields = line.strip().split()
+                        if len(fields) >= _PROC_NET_UDP_MIN_FIELDS:
+                            port_hex = fields[1].split(':')[1]
+                            port = int(port_hex, 16)
+                            inode = fields[9]
+                            inode_to_port[inode] = port
+            except OSError:
+                pass
+
+        ports: set[int] = set()
+        fd_dir = Path(f'/proc/{target_pid}/fd')
+        try:
+            for entry in fd_dir.iterdir():
+                try:
+                    target = str(entry.readlink())
+                    if target.startswith('socket:[') and target.endswith(']'):
+                        inode = target[8:-1]
+                        if inode in inode_to_port:
+                            ports.add(inode_to_port[inode])
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        return frozenset(ports)
+
     buffer_size = wintypes.DWORD(0)
     result = _GetExtendedUdpTable(None, ctypes.byref(buffer_size), 0, _AF_INET, _UDP_TABLE_OWNER_PID, 0)
 

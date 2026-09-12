@@ -93,7 +93,7 @@ def main() -> None:
 
     os.chdir(SCRIPT_DIR)
 
-    if sys.platform != 'win32':
+    if sys.platform not in ('win32', 'linux'):
         raise UnsupportedPlatformError(sys.platform)
 
     Settings.load_from_settings_file(SETTINGS_PATH)
@@ -171,7 +171,7 @@ def main() -> None:
         splash.lower_to_back()
         pending_download()
 
-    splash.update_status('Verifying Npcap driver')
+    splash.update_status('Verifying capture driver' if sys.platform != 'win32' else 'Verifying Npcap driver')
     splash.run_with_spinner(npcap_future.result)
 
     splash.update_status('Initializing GeoLite2 databases')
@@ -700,7 +700,6 @@ def main() -> None:
                 target_ip_address = matching_adapter.ipv4_addresses[0]
                 previous_ip_address = current_selected.ip_address
                 _adapter_lost_event.clear()
-                _adapter_lost_attempts = 0
 
                 if previous_ip_address != target_ip_address:
                     logger.info(
@@ -780,7 +779,7 @@ def main() -> None:
         for ≥8 seconds (packet drought), call `get_adapters_info()` once to check whether the
         interface IP actually changed.  If it did → queue a restart.  If the IP is unchanged the
         drought is just normal idle time (no game running) and nothing is done.  This avoids calling
-        the Windows adapter API on every iteration while also preventing false restarts when the
+        the network adapter API on every iteration while also preventing false restarts when the
         user simply isn't in a session.
         """
         last_packet_count = CaptureStats.total_packets_captured

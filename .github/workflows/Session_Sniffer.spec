@@ -2,14 +2,14 @@
 
 
 a = Analysis(
-    ['..\\..\\src\\session_sniffer\\main.py'],
-    pathex=['..\\..\\src'],
+    ['../../src/session_sniffer/main.py'],
+    pathex=['../../src'],
     binaries=[],
     datas=[
-        ('..\\..\\pyproject.toml', '.'),
-        ('..\\..\\resources', 'resources'),
-        ('..\\..\\scripts', 'scripts'),
-        ('..\\..\\src\\session_sniffer\\webserver\\static', 'session_sniffer\\webserver\\static'),
+        ('../../pyproject.toml', '.'),
+        ('../../resources', 'resources'),
+        ('../../scripts', 'scripts'),
+        ('../../src/session_sniffer/webserver/static', 'session_sniffer/webserver/static'),
     ],
     hiddenimports=[],
     hookspath=[],

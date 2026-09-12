@@ -2,6 +2,7 @@
 
 import ctypes
 import ctypes.wintypes
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -83,13 +84,15 @@ _WINTRUST_ACTION_GENERIC_VERIFY_V2 = _Guid(
     (ctypes.c_ubyte * 8)(0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE),
 )
 
-_WinVerifyTrust = ctypes.windll.wintrust.WinVerifyTrust
-_WinVerifyTrust.argtypes = [
-    ctypes.wintypes.HWND,
-    ctypes.POINTER(_Guid),
-    ctypes.c_void_p,
-]
-_WinVerifyTrust.restype = ctypes.c_long
+
+if sys.platform == 'win32':
+    _WinVerifyTrust = ctypes.windll.wintrust.WinVerifyTrust
+    _WinVerifyTrust.argtypes = [
+        ctypes.wintypes.HWND,
+        ctypes.POINTER(_Guid),
+        ctypes.c_void_p,
+    ]
+    _WinVerifyTrust.restype = ctypes.c_long
 
 
 def has_valid_authenticode_signature(path: Path) -> bool:
@@ -98,8 +101,10 @@ def has_valid_authenticode_signature(path: Path) -> bool:
     Uses the Windows `WinVerifyTrust` API to cryptographically validate the
     Authenticode signature embedded in the PE binary.  A fake executable that
     merely reuses a legitimate name will have no valid signature and will
-    therefore return `False`.
+    therefore return `False`. On non-Windows platforms, returns `True`.
     """
+    if sys.platform != 'win32':
+        return True
     file_info = _WintrustFileInfo(str(path))
     trust_data = _WintrustData(file_info)
 

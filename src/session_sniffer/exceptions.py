@@ -50,7 +50,7 @@ class PlayerDateTimeCorruptionError(Exception):
 
 
 class UnsupportedPlatformError(RuntimeError):
-    """Raised when attempting to run Session Sniffer on a non-Windows platform."""
+    """Raised when attempting to run Session Sniffer on an unsupported platform."""
 
     def __init__(self, platform: str) -> None:
         """Initialize the exception with the detected platform.
@@ -58,4 +58,4 @@ class UnsupportedPlatformError(RuntimeError):
         Args:
             platform: The current platform name.
         """
-        super().__init__(f'This application only supports Windows (current platform: {platform}).')
+        super().__init__(f'This application only supports Windows and Linux (current platform: {platform}).')

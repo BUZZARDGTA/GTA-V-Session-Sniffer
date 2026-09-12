@@ -1,8 +1,10 @@
-"""The script retrieves network adapter information on Windows."""
+"""Network adapter information retrieval for Windows and Linux."""
 
 import ctypes
 import socket
+import sys
 from ctypes import wintypes
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from session_sniffer.networking.adapter_types import AdapterData, AdapterIdentity, AdapterStatus, AdapterTraffic, GetAdaptersAddressesError
@@ -35,6 +37,9 @@ IF_OPER_STATUS_NOT_PRESENT = 6  # Interface is not present
 MEDIA_CONNECT_STATE_UNKNOWN = 0  # Unknown connection state
 MEDIA_CONNECT_STATE_CONNECTED = 1  # Media is connected
 MEDIA_CONNECT_STATE_DISCONNECTED = 2  # Media is disconnected
+
+_ARP_MIN_FIELD_COUNT = 6
+_ROUTE_MIN_FIELD_COUNT = 3
 
 # Windows Network Adapter State constant
 # https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/hh968170(v=vs.85)
@@ -188,20 +193,21 @@ class SOCKADDR_IN(ctypes.Structure):
     ]
 
 
-# Windows API
-GetAdaptersAddresses = ctypes.windll.iphlpapi.GetAdaptersAddresses
-GetAdaptersAddresses.argtypes = [
-    wintypes.ULONG,
-    wintypes.ULONG,
-    ctypes.c_void_p,
-    LP_IP_ADAPTER_ADDRESSES,
-    ctypes.POINTER(wintypes.ULONG),
-]
-GetAdaptersAddresses.restype = wintypes.ULONG
+if sys.platform == 'win32':
+    # Windows API
+    GetAdaptersAddresses = ctypes.windll.iphlpapi.GetAdaptersAddresses
+    GetAdaptersAddresses.argtypes = [
+        wintypes.ULONG,
+        wintypes.ULONG,
+        ctypes.c_void_p,
+        LP_IP_ADAPTER_ADDRESSES,
+        ctypes.POINTER(wintypes.ULONG),
+    ]
+    GetAdaptersAddresses.restype = wintypes.ULONG
 
-GetIfEntry2 = ctypes.windll.Iphlpapi.GetIfEntry2
-GetIfEntry2.argtypes = [ctypes.POINTER(MIB_IF_ROW2)]
-GetIfEntry2.restype = wintypes.ULONG
+    GetIfEntry2 = ctypes.windll.Iphlpapi.GetIfEntry2
+    GetIfEntry2.argtypes = [ctypes.POINTER(MIB_IF_ROW2)]
+    GetIfEntry2.restype = wintypes.ULONG
 
 
 # =========================
@@ -221,10 +227,11 @@ class MIB_IPNETROW(ctypes.Structure):
     ]
 
 
-# GetIpNetTable returns a buffer with a DWORD count followed by an array of MIB_IPNETROW
-GetIpNetTable = ctypes.windll.iphlpapi.GetIpNetTable
-GetIpNetTable.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.ULONG), wintypes.BOOL]
-GetIpNetTable.restype = wintypes.ULONG
+if sys.platform == 'win32':
+    # GetIpNetTable returns a buffer with a DWORD count followed by an array of MIB_IPNETROW
+    GetIpNetTable = ctypes.windll.iphlpapi.GetIpNetTable
+    GetIpNetTable.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.ULONG), wintypes.BOOL]
+    GetIpNetTable.restype = wintypes.ULONG
 
 
 def _get_ip_net_table(buf: object, size_ptr: object) -> int:
@@ -256,13 +263,33 @@ def _sockaddr_to_ipv4(sockaddr_ptr: int) -> str | None:
 def iterate_ipv4_neighbors() -> Iterator[tuple[int, str | None, str | None]]:
     """Yield IPv4 neighbor entries (interface index, IPv4, link-layer MAC).
 
-    This uses Windows IP Helper API `GetIpNetTable` and returns tuples of:
+    This uses Windows IP Helper API `GetIpNetTable` on Windows or `/proc/net/arp` on Linux
+    and returns tuples of:
         - InterfaceIndex (int)
         - IPv4Address (str | None)
         - MacAddress (str | None)
 
     Returns an empty iterator if the table cannot be retrieved.
     """
+    if sys.platform != 'win32':
+        try:
+            with Path('/proc/net/arp').open(encoding='ascii') as arp_file:
+                arp_lines = arp_file.readlines()
+        except OSError:
+            return
+
+        for line in arp_lines[1:]:
+            parts = line.split()
+            if len(parts) >= _ARP_MIN_FIELD_COUNT:
+                ip_address, _hw_type, flags, mac_address, _mask, device_name = parts[:6]
+                if flags != '0x0' and mac_address != '00:00:00:00:00:00':
+                    try:
+                        interface_index = socket.if_nametoindex(device_name)
+                    except OSError:
+                        interface_index = 0
+                    yield interface_index, ip_address, mac_address.upper()
+        return
+
     size = wintypes.ULONG(0)
     ret = _get_ip_net_table(None, ctypes.byref(size))
     if ret not in (ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS):
@@ -299,12 +326,150 @@ def iterate_ipv4_neighbors() -> Iterator[tuple[int, str | None, str | None]]:
         yield int(row.dwIndex), ipv4, mac_address
 
 
+def _read_sys_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding='ascii').strip()
+    except OSError:
+        return ''
+
+
+def _read_sys_int(path: Path) -> int:
+    try:
+        return int(path.read_text(encoding='ascii').strip())
+    except (OSError, ValueError):
+        return 0
+
+
+class _LinuxSockaddr(ctypes.Structure):
+    _fields_ = [('sa_family', ctypes.c_ushort), ('sa_data', ctypes.c_char * 14)]
+
+
+class _LinuxSockaddrIn(ctypes.Structure):
+    _fields_ = [('sin_family', ctypes.c_ushort), ('sin_port', ctypes.c_ushort), ('sin_addr', ctypes.c_uint32)]
+
+
+class _LinuxIfAddrs(ctypes.Structure):
+    pass
+
+
+# pylint: disable=protected-access
+_LinuxIfAddrs._fields_ = [
+    ('ifa_next', ctypes.POINTER(_LinuxIfAddrs)),
+    ('ifa_name', ctypes.c_char_p),
+    ('ifa_flags', ctypes.c_uint),
+    ('ifa_addr', ctypes.POINTER(_LinuxSockaddr)),
+    ('ifa_netmask', ctypes.POINTER(_LinuxSockaddr)),
+    ('ifa_ifu', ctypes.c_void_p),
+    ('ifa_data', ctypes.c_void_p),
+]
+
+
+def _get_linux_adapters_info() -> Iterator[AdapterData]:
+    """Retrieve network adapter information on Linux systems."""
+    neighbors_by_interface_index: dict[int, list[tuple[str | None, str | None]]] = {}
+    for interface_index, ip_address, mac_address in iterate_ipv4_neighbors():
+        neighbors_by_interface_index.setdefault(interface_index, []).append((ip_address, mac_address))
+
+    gateways_by_interface_name: dict[str, list[str]] = {}
+    try:
+        with Path('/proc/net/route').open(encoding='ascii') as route_file:
+            for line in route_file.readlines()[1:]:
+                fields = line.strip().split()
+                if len(fields) >= _ROUTE_MIN_FIELD_COUNT and fields[1] == '00000000':
+                    gateway_hex = fields[2]
+                    try:
+                        gateway_integer = int(gateway_hex, 16)
+                        if gateway_integer:
+                            gateway_ip = socket.inet_ntoa(gateway_integer.to_bytes(4, 'little'))
+                            gateways_by_interface_name.setdefault(fields[0], []).append(gateway_ip)
+                    except (ValueError, OSError):
+                        pass
+    except OSError:
+        pass
+
+    ipv4_by_interface_name: dict[str, list[str]] = {}
+    try:
+        libc = ctypes.CDLL(None)
+        libc.getifaddrs.argtypes = [ctypes.POINTER(ctypes.POINTER(_LinuxIfAddrs))]
+        libc.getifaddrs.restype = ctypes.c_int
+        libc.freeifaddrs.argtypes = [ctypes.POINTER(_LinuxIfAddrs)]
+        libc.freeifaddrs.restype = None
+
+        ifaddrs_pointer = ctypes.POINTER(_LinuxIfAddrs)()
+        if not libc.getifaddrs(ctypes.byref(ifaddrs_pointer)):
+            current_address = ifaddrs_pointer
+            while current_address:
+                address_entry = current_address.contents
+                if address_entry.ifa_name:
+                    interface_name_str = address_entry.ifa_name.decode('utf-8', errors='replace')
+                    if address_entry.ifa_addr and address_entry.ifa_addr.contents.sa_family == socket.AF_INET:
+                        sockaddr_in = ctypes.cast(address_entry.ifa_addr, ctypes.POINTER(_LinuxSockaddrIn)).contents
+                        ip_string = socket.inet_ntoa(sockaddr_in.sin_addr.to_bytes(4, 'little'))
+                        ipv4_by_interface_name.setdefault(interface_name_str, []).append(ip_string)
+                current_address = address_entry.ifa_next
+            libc.freeifaddrs(ifaddrs_pointer)
+    except (OSError, AttributeError):
+        pass
+
+    try:
+        interface_list = socket.if_nameindex()
+    except OSError:
+        return
+
+    net_path = Path('/sys/class/net')
+    for interface_index, interface_name in interface_list:
+        interface_sys_dir = net_path / interface_name
+
+        mac_text = _read_sys_file(interface_sys_dir / 'address')
+        mac_address = mac_text.upper() if mac_text and mac_text != '00:00:00:00:00:00' else None
+
+        operstate = _read_sys_file(interface_sys_dir / 'operstate').lower()
+        is_up = operstate == 'up'
+
+        packets_sent = _read_sys_int(interface_sys_dir / 'statistics' / 'tx_packets')
+        packets_recv = _read_sys_int(interface_sys_dir / 'statistics' / 'rx_packets')
+        link_speed_mbps = _read_sys_int(interface_sys_dir / 'speed')
+        link_speed_bps = link_speed_mbps * 1_000_000 if link_speed_mbps > 0 else 0
+
+        interface_ipv4_list = ipv4_by_interface_name.get(interface_name, [])
+        interface_gateways = gateways_by_interface_name.get(interface_name, [])
+        interface_neighbors = neighbors_by_interface_index.get(interface_index, [])
+
+        yield AdapterData(
+            identity=AdapterIdentity(
+                interface_index=interface_index,
+                friendly_name=interface_name,
+                description=interface_name,
+                mac_address=mac_address,
+                adapter_guid=interface_name,
+            ),
+            status=AdapterStatus(
+                operational_status=IF_OPER_STATUS_UP if is_up else IF_OPER_STATUS_NOT_PRESENT,
+                ip_enabled=bool(interface_ipv4_list),
+                media_connect_state=MEDIA_CONNECT_STATE_CONNECTED if is_up else MEDIA_CONNECT_STATE_DISCONNECTED,
+            ),
+            traffic=AdapterTraffic(
+                packets_sent=packets_sent,
+                packets_recv=packets_recv,
+                transmit_link_speed=link_speed_bps,
+                receive_link_speed=link_speed_bps,
+            ),
+            ipv4_addresses=interface_ipv4_list,
+            gateway_addresses=interface_gateways,
+            neighbors=interface_neighbors,
+        )
+
+
 def get_adapters_info() -> Iterator[AdapterData]:
     """Retrieves information for all network adapters.
 
     Returns:
         An iterator of `AdapterData` objects containing network adapter information.
     """
+    if sys.platform != 'win32':
+        yield from _get_linux_adapters_info()
+        return
+
     # Build neighbor map once to attach per adapter
     neighbors_by_if: dict[int, list[tuple[str | None, str | None]]] = {}
 

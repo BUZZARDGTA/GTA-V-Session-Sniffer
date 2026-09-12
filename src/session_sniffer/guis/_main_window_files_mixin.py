@@ -1,10 +1,10 @@
 """File, folder, and URL open helpers mixin for `MainWindow`."""
 
-import os
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -100,16 +100,16 @@ class FilesMixin(QMainWindow):
 
     @staticmethod
     def open_directory(directory_path: Path) -> None:
-        """Ensure a directory exists and open it in Windows Explorer."""
+        """Ensure a directory exists and open it in the default file manager."""
         directory_path.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(directory_path))
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory_path)))
 
     @staticmethod
     def open_file(file_path: Path) -> None:
-        """Ensure a file path exists and open the file using the default Windows association."""
+        """Ensure a file path exists and open the file using the default association."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.touch(exist_ok=True)
-        os.startfile(str(file_path))
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(file_path)))
 
     def _open_local_appdata_folder(self) -> None:
         """Open the Local AppData Session Sniffer directory."""

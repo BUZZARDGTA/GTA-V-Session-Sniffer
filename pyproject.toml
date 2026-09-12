@@ -52,6 +52,7 @@ dev = [
 
 [tool.mypy]
 python_version = "3.14"
+platform = "win32"
 check_untyped_defs = true
 ignore_missing_imports = true
 strict = true
@@ -194,8 +195,9 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "typing.NamedTuple"]
 
 [tool.pyrefly]
 python_version = "3.14"
+python-platform = "win32"
 min-severity = "warn"
-site-package-path = [".venv/Lib/site-packages"]
+site-package-path = [".venv/Lib/site-packages", ".venv/lib/python3.14/site-packages"]
 
 [tool.pyrefly.errors]
 bad-assignment = "ignore"

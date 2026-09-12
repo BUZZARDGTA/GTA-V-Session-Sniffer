@@ -5,9 +5,11 @@ import ctypes.wintypes
 import enum
 import math
 import socket
+import struct
+import sys
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Final, Self, cast
+from typing import TYPE_CHECKING, Any, Final, Self, cast
 
 from session_sniffer.logging_setup import get_logger
 from session_sniffer.networking.endpoint_ping_manager import PingResult, fetch_and_parse_ping
@@ -137,32 +139,46 @@ class PingStatistics:
 
 
 class IcmpEchoEngine:
-    """Native Windows ICMP echo pinger using Win32 IcmpSendEcho."""
+    """Native ICMP echo pinger using Win32 IcmpSendEcho on Windows or ICMP datagram sockets on Linux."""
 
     def __init__(self) -> None:
-        """Initialize the Win32 ICMP handle."""
-        self._iphlpapi = ctypes.windll.iphlpapi
-        self._iphlpapi.IcmpCreateFile.restype = ctypes.c_void_p
-        self._iphlpapi.IcmpCloseHandle.argtypes = [ctypes.c_void_p]
-        self._iphlpapi.IcmpSendEcho.restype = ctypes.wintypes.DWORD
-        self._iphlpapi.IcmpSendEcho.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_ulong,
-            ctypes.c_char_p,
-            ctypes.c_ushort,
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-            ctypes.wintypes.DWORD,
-            ctypes.wintypes.DWORD,
-        ]
-        self._handle: int | None = self._iphlpapi.IcmpCreateFile()
-        if not self._handle or self._handle == -1:
-            self._handle = None
-            logger.error('Failed to create Win32 ICMP handle')
+        """Initialize the native ICMP engine."""
+        self._is_windows = sys.platform == 'win32'
+        self._iphlpapi: Any = None
+        self._handle: int | None = None
+        self._linux_socket: socket.socket | None = None
+
+        if self._is_windows:
+            self._iphlpapi = ctypes.windll.iphlpapi
+            self._iphlpapi.IcmpCreateFile.restype = ctypes.c_void_p
+            self._iphlpapi.IcmpCloseHandle.argtypes = [ctypes.c_void_p]
+            self._iphlpapi.IcmpSendEcho.restype = ctypes.wintypes.DWORD
+            self._iphlpapi.IcmpSendEcho.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_ulong,
+                ctypes.c_char_p,
+                ctypes.c_ushort,
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                ctypes.wintypes.DWORD,
+                ctypes.wintypes.DWORD,
+            ]
+            self._handle = self._iphlpapi.IcmpCreateFile()
+            if not self._handle or self._handle == -1:
+                self._handle = None
+                logger.error('Failed to create Win32 ICMP handle')
+        else:
+            try:
+                self._linux_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_ICMP)
+                if hasattr(socket, 'IP_RECVTTL'):
+                    self._linux_socket.setsockopt(socket.IPPROTO_IP, socket.IP_RECVTTL, 1)
+            except OSError as e:
+                logger.warning('Failed to create unprivileged ICMP socket on Linux: %s', e)
+                self._linux_socket = None
 
     def is_available(self) -> bool:
-        """Return True if the native ICMP handle is valid."""
-        return self._handle is not None
+        """Return True if the native ICMP handle or socket is valid."""
+        return (self._handle is not None) if self._is_windows else (self._linux_socket is not None)
 
     def __enter__(self) -> Self:
         """Support context manager entry."""
@@ -178,10 +194,98 @@ class IcmpEchoEngine:
         self.close()
 
     def close(self) -> None:
-        """Close the native ICMP handle."""
-        if self._handle is not None:
-            self._iphlpapi.IcmpCloseHandle(self._handle)
-            self._handle = None
+        """Close the native ICMP handle or socket."""
+        if self._is_windows:
+            if self._handle is not None and self._iphlpapi is not None:
+                self._iphlpapi.IcmpCloseHandle(self._handle)
+                self._handle = None
+        elif self._linux_socket is not None:
+            self._linux_socket.close()
+            self._linux_socket = None
+
+    def _ping_linux(
+        self,
+        target_ip: str,
+        *,
+        timeout_seconds: float,
+        sequence: int,
+        payload_data: bytes,
+    ) -> PingProbeResult:
+        if self._linux_socket is None:
+            return PingProbeResult(
+                sequence=sequence,
+                target_host=target_ip,
+                target_ip=target_ip,
+                port=None,
+                is_successful=False,
+                round_trip_time_ms=None,
+                time_to_live=None,
+                status_message='ICMP socket unavailable',
+            )
+
+        try:
+            resolved_ip = socket.gethostbyname(target_ip)
+        except OSError as e:
+            return PingProbeResult(
+                sequence=sequence,
+                target_host=target_ip,
+                target_ip=target_ip,
+                port=None,
+                is_successful=False,
+                round_trip_time_ms=None,
+                time_to_live=None,
+                status_message=f'Invalid host or IP address: {e}',
+            )
+
+        identifier = sequence & 0xFFFF
+        header = struct.pack('!BBHHH', 8, 0, 0, identifier, sequence & 0xFFFF)
+        packet = header + payload_data
+
+        self._linux_socket.settimeout(timeout_seconds)
+        start_time = time.perf_counter()
+        try:
+            self._linux_socket.sendto(packet, (resolved_ip, 0))
+            receive_message_function = getattr(self._linux_socket, 'recvmsg')  # noqa: B009
+            _packet_data, ancillary_data, _message_flags, _peer_address = receive_message_function(1024, 1024)
+            round_trip_time_ms = (time.perf_counter() - start_time) * 1000.0
+
+            time_to_live: int | None = None
+            for cmsg_level, cmsg_type, cmsg_data in ancillary_data:
+                if cmsg_level == socket.IPPROTO_IP and cmsg_type == socket.IP_TTL:
+                    time_to_live = struct.unpack('i', cmsg_data)[0]
+
+            return PingProbeResult(
+                sequence=sequence,
+                target_host=target_ip,
+                target_ip=resolved_ip,
+                port=None,
+                is_successful=True,
+                round_trip_time_ms=round_trip_time_ms,
+                time_to_live=time_to_live,
+                status_message='Success',
+            )
+        except TimeoutError:
+            return PingProbeResult(
+                sequence=sequence,
+                target_host=target_ip,
+                target_ip=resolved_ip,
+                port=None,
+                is_successful=False,
+                round_trip_time_ms=None,
+                time_to_live=None,
+                status_message='Request timed out',
+            )
+        except OSError as e:
+            return PingProbeResult(
+                sequence=sequence,
+                target_host=target_ip,
+                target_ip=resolved_ip,
+                port=None,
+                is_successful=False,
+                round_trip_time_ms=None,
+                time_to_live=None,
+                status_message=str(e),
+            )
 
     def ping(
         self,
@@ -192,6 +296,14 @@ class IcmpEchoEngine:
         payload_data: bytes = b'SessionSnifferEcho',
     ) -> PingProbeResult:
         """Send a single ICMP echo probe to target_ip."""
+        if not self._is_windows:
+            return self._ping_linux(
+                target_ip,
+                timeout_seconds=timeout_seconds,
+                sequence=sequence,
+                payload_data=payload_data,
+            )
+
         if self._handle is None:
             return PingProbeResult(
                 sequence=sequence,

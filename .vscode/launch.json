@@ -8,12 +8,26 @@
             "module": "session_sniffer",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
             "justMyCode": true,
             "stopOnEntry": false,
             "subProcess": true,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/src"
+            "windows": {
+                "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/src"
+                }
+            },
+            "linux": {
+                "python": "${workspaceFolder}/.venv/bin/python",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/src"
+                }
+            },
+            "osx": {
+                "python": "${workspaceFolder}/.venv/bin/python",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/src"
+                }
             }
         }
     ]

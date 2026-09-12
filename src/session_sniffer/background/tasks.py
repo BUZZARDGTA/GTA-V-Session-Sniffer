@@ -2,8 +2,10 @@
 
 import contextlib
 import csv
+import shutil
+import subprocess
+import sys
 import time
-import winsound
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -141,6 +143,14 @@ class _DeduplicatedQueue:
 _voice_notification_queue = _DeduplicatedQueue(maxsize=_VOICE_QUEUE_MAXSIZE)
 
 
+def _play_wav_linux(wav_path: str) -> None:
+    """Play a WAV audio file on Linux using available audio player (pw-play, aplay, or paplay)."""
+    player = shutil.which('pw-play') or shutil.which('aplay') or shutil.which('paplay')
+    if player is not None:
+        with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+            subprocess.run([player, wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10.0, check=False)
+
+
 def _voice_notification_worker() -> None:
     """Singleton worker that plays queued voice notification WAV files sequentially.
 
@@ -151,8 +161,12 @@ def _voice_notification_worker() -> None:
         wav_path = _voice_notification_queue.get(timeout=0.1)
         if wav_path is None:
             continue
-        with contextlib.suppress(RuntimeError):
-            winsound.PlaySound(wav_path, winsound.SND_FILENAME | winsound.SND_NODEFAULT)
+        if sys.platform == 'win32':
+            import winsound  # noqa: PLC0415  # pylint: disable=import-error,import-outside-toplevel
+            with contextlib.suppress(RuntimeError):
+                winsound.PlaySound(wav_path, winsound.SND_FILENAME | winsound.SND_NODEFAULT)
+        else:
+            _play_wav_linux(wav_path)
         gui_closed__event.wait(_INTER_SOUND_PAUSE_SECONDS)
         _voice_notification_queue.acknowledge(wav_path)
 

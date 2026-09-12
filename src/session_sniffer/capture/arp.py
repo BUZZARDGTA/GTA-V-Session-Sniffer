@@ -1,12 +1,14 @@
-"""ARP packet construction and MAC address resolution via Windows SendARP API.
+"""ARP packet construction and MAC address resolution.
 
 This module provides low-level ARP operations for crafting spoofed ARP reply
-frames and resolving IP addresses to MAC addresses using the Windows `iphlpapi.dll`.
+frames and resolving IP addresses to MAC addresses using SendARP on Windows or
+the ARP cache on Linux.
 """
 
 import ctypes
 import socket
 import struct
+import sys
 import time
 from ctypes import wintypes
 from dataclasses import dataclass
@@ -57,8 +59,31 @@ def _mac_bytes_to_string(mac_bytes: bytes) -> str:
     return ':'.join(f'{byte:02x}' for byte in mac_bytes)
 
 
+def _resolve_mac_address_linux(ip_address: str) -> str:
+    """Resolve an IPv4 address to its MAC address on Linux."""
+    for _interface_index, cached_ip, cached_mac in iterate_ipv4_neighbors():
+        if cached_ip == ip_address and cached_mac and cached_mac.upper() not in {'00:00:00:00:00:00', 'FF:FF:FF:FF:FF:FF'}:
+            return cached_mac.lower()
+
+    try:
+        probe_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe_socket.settimeout(0.5)
+        probe_socket.sendto(b'', (ip_address, 80))
+        probe_socket.close()
+    except OSError:
+        pass
+
+    time.sleep(0.1)
+
+    for _interface_index, cached_ip, cached_mac in iterate_ipv4_neighbors():
+        if cached_ip == ip_address and cached_mac and cached_mac.upper() not in {'00:00:00:00:00:00', 'FF:FF:FF:FF:FF:FF'}:
+            return cached_mac.lower()
+
+    raise ArpResolutionError(ip_address, 'Host not found in Linux ARP table')
+
+
 def resolve_mac_address(ip_address: str, source_ip: str | None = None) -> str:
-    """Resolve an IPv4 address to its MAC address using the Windows SendARP API.
+    """Resolve an IPv4 address to its MAC address using SendARP on Windows or the ARP table on Linux.
 
     Args:
         ip_address: The target IPv4 address to resolve.
@@ -70,6 +95,8 @@ def resolve_mac_address(ip_address: str, source_ip: str | None = None) -> str:
     Raises:
         ArpResolutionError: If the MAC address cannot be resolved.
     """
+    if sys.platform != 'win32':
+        return _resolve_mac_address_linux(ip_address)
     try:
         destination_ip = wintypes.DWORD(struct.unpack('<I', socket.inet_aton(ip_address))[0])
     except OSError as exception:

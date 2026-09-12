@@ -1,4 +1,4 @@
-"""The module provides a wrapper for the Windows MessageBox API using ctypes.
+"""Message box utilities using native Windows MessageBox API or Qt QMessageBox fallback on Linux.
 
 It defines two main components:
 - msgbox.ReturnValues: Enum class representing the possible return values from a MessageBox.
@@ -10,8 +10,12 @@ The msgbox.show() method can be used to display a message box with custom button
 
 import ctypes
 import enum
+import sys
+
+from PySide6.QtWidgets import QMessageBox
 
 from session_sniffer.error_messages import ensure_instance
+from session_sniffer.guis.app import app
 
 
 # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messageboxw#parameters
@@ -83,6 +87,52 @@ def set_owner_hwnd(hwnd: int) -> None:
     _state['owner_hwnd'] = hwnd
 
 
+_QT_BUTTON_TO_RETURN_VALUE: dict[QMessageBox.StandardButton, ReturnValues] = {
+    QMessageBox.StandardButton.Ok: ReturnValues.IDOK,
+    QMessageBox.StandardButton.Cancel: ReturnValues.IDCANCEL,
+    QMessageBox.StandardButton.Yes: ReturnValues.IDYES,
+    QMessageBox.StandardButton.No: ReturnValues.IDNO,
+    QMessageBox.StandardButton.Retry: ReturnValues.IDRETRY,
+    QMessageBox.StandardButton.Abort: ReturnValues.IDABORT,
+    QMessageBox.StandardButton.Ignore: ReturnValues.IDIGNORE,
+}
+
+
+def _show_qt(title: str, text: str, style: Style) -> ReturnValues:
+    """Display a Qt QMessageBox for non-Windows platforms."""
+    _ = app
+
+    box = QMessageBox()
+    box.setWindowTitle(title)
+    box.setText(text)
+
+    if style & Style.MB_ICONSTOP:
+        box.setIcon(QMessageBox.Icon.Critical)
+    elif style & Style.MB_ICONEXCLAMATION:
+        box.setIcon(QMessageBox.Icon.Warning)
+    elif style & Style.MB_ICONQUESTION:
+        box.setIcon(QMessageBox.Icon.Question)
+    elif style & Style.MB_ICONINFORMATION:
+        box.setIcon(QMessageBox.Icon.Information)
+
+    button_flags = style & 0x0000000F
+    if button_flags == Style.MB_OKCANCEL:
+        box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+    elif button_flags == Style.MB_YESNO:
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    elif button_flags == Style.MB_YESNOCANCEL:
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+    elif button_flags == Style.MB_RETRYCANCEL:
+        box.setStandardButtons(QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel)
+    elif button_flags == Style.MB_ABORTRETRYIGNORE:
+        box.setStandardButtons(QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Ignore)
+    else:
+        box.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+    result = box.exec()
+    return _QT_BUTTON_TO_RETURN_VALUE.get(QMessageBox.StandardButton(result), ReturnValues.IDOK)
+
+
 def show(title: str, text: str, style: Style) -> ReturnValues:
     """Display a message box with the specified title, text, and style.
 
@@ -97,5 +147,8 @@ def show(title: str, text: str, style: Style) -> ReturnValues:
     Raises:
         TypeError: If the return value from the MessageBox is not an integer.
     """
+    if sys.platform != 'win32':
+        return _show_qt(title, text, style)
+
     result = ctypes.windll.user32.MessageBoxW(_state['owner_hwnd'], text, title, style)
     return ReturnValues(ensure_instance(result, int))

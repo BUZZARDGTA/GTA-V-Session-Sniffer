@@ -1,11 +1,13 @@
-"""Utilities to repopulate the Windows ARP cache via ICMP probes.
+"""Utilities to repopulate the ARP cache via ICMP probes.
 
 The Interface Selection dialog uses these helpers to give the user a "Refresh
 ARP Table" action that wakes up devices on the local subnet(s) so that
 recently plugged-in or idle devices show up as ARP neighbors.
 """
 
+import shutil
 import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
 from ipaddress import AddressValueError, IPv4Address, IPv4Network
@@ -25,9 +27,9 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-
+_IS_WINDOWS = sys.platform == 'win32'
 _SYSTEM32_DIR = get_system32_dir()
-_PING_PATH = str(_SYSTEM32_DIR / 'PING.EXE')
+_PING_PATH = str(_SYSTEM32_DIR / 'PING.EXE') if _IS_WINDOWS else (shutil.which('ping') or '/bin/ping')
 
 _PING_TIMEOUT_MS = 50
 _PING_FANOUT_WORKERS = 64
@@ -41,13 +43,19 @@ def _ping_host(ip_address: str) -> None:
     except AddressValueError:
         return
     with suppress(OSError, subprocess.TimeoutExpired):
+        if _IS_WINDOWS:
+            command = [_PING_PATH, '-n', '1', '-w', str(_PING_TIMEOUT_MS), ip_address]
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        else:
+            command = [_PING_PATH, '-c', '1', '-W', '1', ip_address]
+            creationflags = 0
         subprocess.run(
-            [_PING_PATH, '-n', '1', '-w', str(_PING_TIMEOUT_MS), ip_address],
+            command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=_SUBPROCESS_TIMEOUT_S,
             check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=creationflags,
         )
 
 

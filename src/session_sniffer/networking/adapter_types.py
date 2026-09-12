@@ -1,4 +1,4 @@
-"""Data types and exceptions for Windows network adapter information."""
+"""Data types and exceptions for network adapter information."""
 
 from dataclasses import field
 
@@ -45,7 +45,7 @@ class AdapterTraffic:
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class AdapterData:
-    """Represent Windows network adapter details used by the sniffer."""
+    """Represent network adapter details used by the sniffer."""
 
     identity: AdapterIdentity
     status: AdapterStatus
