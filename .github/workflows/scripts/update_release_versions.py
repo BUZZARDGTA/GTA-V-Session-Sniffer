@@ -49,6 +49,9 @@ def main() -> None:
     parser.add_argument('--download-url', required=True, help='The direct download URL for the release executable')
     parser.add_argument('--sha256', required=True, type=validate_sha256, help='The SHA-256 hash of the release executable (lowercase hex)')
     parser.add_argument('--file-size', required=True, type=int, help='The size of the release executable in bytes')
+    parser.add_argument('--linux-download-url', help='The direct download URL for the Linux release binary')
+    parser.add_argument('--linux-sha256', type=validate_sha256, help='The SHA-256 hash of the Linux release binary (lowercase hex)')
+    parser.add_argument('--linux-file-size', type=int, help='The size of the Linux release binary in bytes')
 
     args = parser.parse_args()
 
@@ -79,6 +82,9 @@ def main() -> None:
         'download_url': args.download_url,
         'sha256': args.sha256,
         'file_size': args.file_size,
+        'linux_download_url': args.linux_download_url,
+        'linux_sha256': args.linux_sha256,
+        'linux_file_size': args.linux_file_size,
         'is_devrelease': version.is_devrelease,
         'is_postrelease': version.is_postrelease,
         'is_prerelease': version.is_prerelease,

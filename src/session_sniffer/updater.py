@@ -166,6 +166,8 @@ def _apply_update(new_exe: Path) -> None:
 
     try:
         shutil.copy2(new_exe, current_exe)
+        if sys.platform != 'win32':
+            current_exe.chmod(0o755)
     except OSError as e:
         # Restore the original exe so the user can still run the app
         try:
@@ -210,11 +212,11 @@ def _apply_update(new_exe: Path) -> None:
 
 def _resolve_candidate_file_size(candidate_info: VersionInfo) -> int | None:
     """Resolve the candidate binary file size in bytes."""
-    if candidate_info.file_size is not None:
-        return candidate_info.file_size
+    if candidate_info.platform_file_size is not None:
+        return candidate_info.platform_file_size
 
     try:
-        response = session.head(candidate_info.download_url, allow_redirects=True, timeout=5)
+        response = session.head(candidate_info.platform_download_url, allow_redirects=True, timeout=5)
         if response.status_code == requests.codes.ok and 'Content-Length' in response.headers:
             return int(response.headers['Content-Length'])
     except requests.exceptions.RequestException:
@@ -230,7 +232,7 @@ def _is_running_executable_identical(candidate_info: VersionInfo) -> bool:
     if not current_executable_path.is_file():
         return False
     current_executable_sha256 = hashlib.sha256(current_executable_path.read_bytes()).hexdigest()
-    return current_executable_sha256.lower() == candidate_info.sha256.lower()
+    return current_executable_sha256.lower() == candidate_info.platform_sha256.lower()
 
 
 def _download_and_apply(
@@ -240,13 +242,14 @@ def _download_and_apply(
     is_prerelease: bool,
 ) -> None:
     """Download the update exe, verify its SHA-256 hash, and apply it."""
-    with tempfile.NamedTemporaryFile(suffix='.exe', prefix='Session_Sniffer_', delete=False) as tmp:
+    file_suffix = '.exe' if sys.platform == 'win32' else ''
+    with tempfile.NamedTemporaryFile(suffix=file_suffix, prefix='Session_Sniffer_', delete=False) as tmp:
         dest = Path(tmp.name)
 
     candidate = UpdateCandidate(
-        download_url=candidate_info.download_url,
+        download_url=candidate_info.platform_download_url,
         version_label=version_str,
-        sha256_hash=candidate_info.sha256,
+        sha256_hash=candidate_info.platform_sha256,
         size_bytes=_resolve_candidate_file_size(candidate_info),
         is_prerelease=is_prerelease,
         release_url=candidate_info.release_url,
@@ -315,8 +318,12 @@ def _handle_update_decision(
     if candidate <= CURRENT_VERSION:
         return (UpdateCheckOutcome.PROCEED, None)
 
+    if sys.platform.startswith('linux') and not candidate_info.linux_download_url:
+        logger.info('Update available (%s) but no Linux binary was published; skipping update.', format_project_version(candidate))
+        return (UpdateCheckOutcome.PROCEED, None)
+
     if _is_running_executable_identical(candidate_info):
-        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.sha256)
+        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.platform_sha256)
         return (UpdateCheckOutcome.PROCEED, None)
 
     is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
@@ -358,11 +365,15 @@ def _handle_prerelease_update_decision(
     else:
         candidate_info = latest_prerelease_info
 
-    if _is_running_executable_identical(candidate_info):
-        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.sha256)
+    candidate = Version(candidate_info.version)
+    if sys.platform.startswith('linux') and not candidate_info.linux_download_url:
+        logger.info('Pre-release build found newer %s but no Linux binary was published; skipping update.', format_project_version(candidate))
         return (UpdateCheckOutcome.PROCEED, None)
 
-    candidate = Version(candidate_info.version)
+    if _is_running_executable_identical(candidate_info):
+        logger.info('Running executable SHA-256 matches candidate release (%s); already up to date.', candidate_info.platform_sha256)
+        return (UpdateCheckOutcome.PROCEED, None)
+
     is_candidate_prerelease = candidate.is_prerelease or candidate_info.is_prerelease
     logger.info(
         'Pre-release build found newer %s: %s -> %s',

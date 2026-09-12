@@ -15,16 +15,22 @@ concurrency:
   group: release-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
-env:
-  ASSET_NAME: Session_Sniffer.exe
-
 jobs:
   build:
-    runs-on: windows-latest
-    name: Build Windows x64
-    defaults:
-      run:
-        shell: pwsh
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows x64
+            asset_name: Session_Sniffer.exe
+            venv_python: .venv/Scripts/python
+          - os: ubuntu-24.04
+            name: Linux x64
+            asset_name: Session_Sniffer
+            venv_python: .venv/bin/python
+    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.name }}
     steps:
       - name: Checkout release source
         uses: actions/checkout@v7.0.1
@@ -46,109 +52,30 @@ jobs:
       - name: Install build dependencies
         working-directory: .github/workflows
         run: |
-          .venv/Scripts/python -m pip install '../..'
-          .venv/Scripts/python -m pip install pyinstaller
+          ${{ matrix.venv_python }} -m pip install '../..'
+          ${{ matrix.venv_python }} -m pip install pyinstaller
 
       - name: Bake build metadata
         env:
           COMMIT_SHA: ${{ github.sha }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_DATE: ${{ github.event.release.published_at }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $env:COMMIT_DATE = (git show -s --format=%cI $env:COMMIT_SHA).Trim()
-          if (-not $env:COMMIT_DATE) {
-            throw "Failed to resolve commit date for $env:COMMIT_SHA."
-          }
-
-          .github/workflows/.venv/Scripts/python -c @'
-          import os
-          import platform
-          import re
-          import tomllib
-          from pathlib import Path
-
-          from packaging.requirements import Requirement
-
-          pyproject_path = Path('pyproject.toml')
-          pyproject_text = pyproject_path.read_text(encoding='utf-8')
-          updated_pyproject_text = re.sub(
-              r'(?m)^version\s*=\s*".*?"',
-              f'version = "{os.environ["RELEASE_TAG"]}"',
-              pyproject_text,
-              count=1,
-          )
-          pyproject_path.write_text(updated_pyproject_text, encoding='utf-8')
-          pyproject_data = tomllib.loads(updated_pyproject_text)
-          dependencies = pyproject_data['project']['dependencies']
-
-          pyside6_version = None
-          for dependency in dependencies:
-              requirement = Requirement(dependency)
-              if requirement.name.lower() == 'pyside6':
-                  for specifier in requirement.specifier:
-                      if specifier.operator == '==':
-                          pyside6_version = specifier.version
-                          break
-                  break
-          if pyside6_version is None:
-              raise RuntimeError(f'PySide6 dependency is missing from {pyproject_path}.')
-
-          machine = platform.machine()
-          arch = 'x64' if machine in ('AMD64', 'x86_64') else machine
-          os_info = f'{os.environ.get("OS", platform.system())} {arch} {platform.version()}'
-
-          path = Path('src/session_sniffer/constants/_build_info.py')
-          path.write_text(
-              '"""Build-time metadata frozen by the CI workflow."""\n'
-              f'RELEASE_TAG: str = {os.environ["RELEASE_TAG"]!r}\n'
-              f'RELEASE_DATE: str = {os.environ["RELEASE_DATE"]!r}\n'
-              f'COMMIT_SHA: str = {os.environ["COMMIT_SHA"]!r}\n'
-              f'COMMIT_DATE: str = {os.environ["COMMIT_DATE"]!r}\n'
-              f'PYSIDE6_VERSION: str = {pyside6_version!r}\n'
-              f'OS_INFO: str = {os_info!r}\n',
-              encoding='utf-8',
-          )
-          '@
-
-          Get-Content 'src/session_sniffer/constants/_build_info.py'
-
-      - name: Verify baked build metadata
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $content = Get-Content 'src/session_sniffer/constants/_build_info.py' -Raw
-
-          foreach ($bad in @('import ', 'subprocess', '_git', 'Unknown')) {
-            if ($content -match [regex]::Escape($bad)) {
-              throw "Build metadata still contains development/runtime value: $bad"
-            }
-          }
-
-          foreach ($required in @('RELEASE_TAG', 'RELEASE_DATE', 'COMMIT_SHA', 'COMMIT_DATE', 'PYSIDE6_VERSION', 'OS_INFO')) {
-            if ($content -notmatch "$required`: str =") {
-              throw "Build metadata is missing $required."
-            }
-          }
-
-          .github/workflows/.venv/Scripts/python -m py_compile 'src/session_sniffer/constants/_build_info.py'
+        run: ${{ matrix.venv_python }} '.github/workflows/scripts/bake_build_metadata.py'
 
       - name: Build executable with PyInstaller
         working-directory: .github/workflows
-        run: .venv/Scripts/python -m PyInstaller 'Session_Sniffer.spec'
+        run: ${{ matrix.venv_python }} -m PyInstaller 'Session_Sniffer.spec'
 
       - name: Verify built executable
         working-directory: .github/workflows
         run: |
-          $ErrorActionPreference = 'Stop'
-          if (-not (Test-Path "dist/${{ env.ASSET_NAME }}")) {
-            throw "Built executable is missing: dist/${{ env.ASSET_NAME }}"
-          }
+          ${{ matrix.venv_python }} -c "import os, sys; path = 'dist/${{ matrix.asset_name }}'; sys.exit(0 if os.path.isfile(path) else f'Missing: {path}')"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: ${{ env.ASSET_NAME }}
-          path: .github/workflows/dist/${{ env.ASSET_NAME }}
+          name: ${{ matrix.asset_name }}
+          path: .github/workflows/dist/${{ matrix.asset_name }}
           if-no-files-found: error
 
   upload-release-artifact:
@@ -159,14 +86,17 @@ jobs:
       sha256: ${{ steps.release_asset.outputs.sha256 }}
       file_size: ${{ steps.release_asset.outputs.file_size }}
       download_url: ${{ steps.release_asset.outputs.download_url }}
+      linux_sha256: ${{ steps.release_asset.outputs.linux_sha256 }}
+      linux_file_size: ${{ steps.release_asset.outputs.linux_file_size }}
+      linux_download_url: ${{ steps.release_asset.outputs.linux_download_url }}
     steps:
-      - name: Download workflow artifact
+      - name: Download workflow artifacts
         uses: actions/download-artifact@v8.0.1
         with:
-          name: ${{ env.ASSET_NAME }}
           path: artifacts
+          merge-multiple: true
 
-      - name: Upload asset and compute release info
+      - name: Upload assets and compute release info
         id: release_asset
         env:
           GH_TOKEN: ${{ github.token }}
@@ -175,36 +105,49 @@ jobs:
         run: |
           set -euo pipefail
 
-          exe_path="artifacts/$ASSET_NAME"
+          exe_path="artifacts/Session_Sniffer.exe"
+          linux_path="artifacts/Session_Sniffer"
+
           if [[ ! -f "$exe_path" ]]; then
-            echo "Expected release asset is missing: $exe_path"
+            echo "Expected Windows release asset is missing: $exe_path" >&2
+            exit 1
+          fi
+
+          if [[ ! -f "$linux_path" ]]; then
+            echo "Expected Linux release asset is missing: $linux_path" >&2
             exit 1
           fi
 
           sha256=$(sha256sum "$exe_path" | cut -d ' ' -f 1)
-          if [[ -z "$sha256" ]]; then
-            echo "Failed to calculate SHA-256 for $exe_path." >&2
-            exit 1
-          fi
-
           file_size=$(stat -c%s "$exe_path")
-          if [[ -z "$file_size" ]]; then
-            echo "Failed to calculate file size for $exe_path." >&2
-            exit 1
-          fi
 
-          gh release upload "$RELEASE_TAG" "$exe_path" --repo "$GH_REPO" --clobber
+          linux_sha256=$(sha256sum "$linux_path" | cut -d ' ' -f 1)
+          linux_file_size=$(stat -c%s "$linux_path")
+
+          gh release upload "$RELEASE_TAG" "$exe_path" "$linux_path" --repo "$GH_REPO" --clobber
+
           download_url=$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" \
-            --jq ".assets | map(select(.name == \"$ASSET_NAME\")) | if length == 1 then .[0].browser_download_url else empty end")
+            --jq '.assets | map(select(.name == "Session_Sniffer.exe")) | if length == 1 then .[0].browser_download_url else empty end')
 
           if [[ -z "$download_url" ]]; then
-            echo "Failed to resolve unique $ASSET_NAME download URL." >&2
+            echo "Failed to resolve unique Session_Sniffer.exe download URL." >&2
+            exit 1
+          fi
+
+          linux_download_url=$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" \
+            --jq '.assets | map(select(.name == "Session_Sniffer")) | if length == 1 then .[0].browser_download_url else empty end')
+
+          if [[ -z "$linux_download_url" ]]; then
+            echo "Failed to resolve unique Session_Sniffer download URL." >&2
             exit 1
           fi
 
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
           echo "file_size=$file_size" >> "$GITHUB_OUTPUT"
           echo "download_url=$download_url" >> "$GITHUB_OUTPUT"
+          echo "linux_sha256=$linux_sha256" >> "$GITHUB_OUTPUT"
+          echo "linux_file_size=$linux_file_size" >> "$GITHUB_OUTPUT"
+          echo "linux_download_url=$linux_download_url" >> "$GITHUB_OUTPUT"
 
   update-version-info:
     needs: [upload-release-artifact]
@@ -241,6 +184,9 @@ jobs:
           DOWNLOAD_URL: ${{ needs.upload-release-artifact.outputs.download_url }}
           SHA256: ${{ needs.upload-release-artifact.outputs.sha256 }}
           FILE_SIZE: ${{ needs.upload-release-artifact.outputs.file_size }}
+          LINUX_DOWNLOAD_URL: ${{ needs.upload-release-artifact.outputs.linux_download_url }}
+          LINUX_SHA256: ${{ needs.upload-release-artifact.outputs.linux_sha256 }}
+          LINUX_FILE_SIZE: ${{ needs.upload-release-artifact.outputs.linux_file_size }}
         run: |
           set -euo pipefail
 
@@ -285,7 +231,10 @@ jobs:
             --release-url "$RELEASE_URL" \
             --download-url "$DOWNLOAD_URL" \
             --sha256 "$SHA256" \
-            --file-size "$FILE_SIZE"
+            --file-size "$FILE_SIZE" \
+            --linux-download-url "$LINUX_DOWNLOAD_URL" \
+            --linux-sha256 "$LINUX_SHA256" \
+            --linux-file-size "$LINUX_FILE_SIZE"
 
           rm -rf .github
 
