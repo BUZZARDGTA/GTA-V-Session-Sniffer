@@ -30,7 +30,7 @@ Use the existing `Settings` architecture.
 
 Settings are loaded through `Settings.load_from_settings_file`.
 
-After changing persistent in-memory settings, call `Settings.reconstruct_settings()` once after the complete batch of changes.
+After changing persistent in-memory settings, call `Settings.rewrite_settings_file()` once after the complete batch of changes.
 
 Do not repeatedly reconstruct settings for individual changes when several changes can be persisted together.
 

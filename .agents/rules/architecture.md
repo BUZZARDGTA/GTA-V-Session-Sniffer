@@ -77,7 +77,7 @@ Do not duplicate state that is already owned by an existing registry, configurat
 
 Follow the project's existing settings architecture.
 
-Settings are loaded through the existing `Settings` mechanisms and persistent changes are reconstructed through the established `Settings.reconstruct_settings()` flow.
+Settings are loaded through the existing `Settings` mechanisms and persistent changes are reconstructed through the established `Settings.rewrite_settings_file()` flow.
 
 Do not introduce a parallel configuration or persistence mechanism.
 
