@@ -448,9 +448,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
         hide_column_action = QAction(hide_label, menu)
         hide_column_action.setEnabled(clicked_column_name is not None and clicked_column_name in toggleable_columns)
         hide_column_action.setToolTip(
-            f"Hide the '{clicked_column_name}' column from the table."
-            if clicked_column_name
-            else 'Hide the selected column from the table.',
+            f"Hide the '{clicked_column_name}' column from the table." if clicked_column_name else 'Hide the selected column from the table.',
         )
         if clicked_column_name is not None:
             hide_column_action.triggered.connect(
@@ -568,10 +566,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
 
         # Preserve ordering from the toggleable columns tuple
         new_shown = tuple(
-            column for column in (
-                Settings.GUI_TOGGLEABLE_CONNECTED_COLUMNS if self.is_connected_table
-                else Settings.GUI_TOGGLEABLE_DISCONNECTED_COLUMNS
-            ) if column in shown
+            column for column in (Settings.GUI_TOGGLEABLE_CONNECTED_COLUMNS if self.is_connected_table else Settings.GUI_TOGGLEABLE_DISCONNECTED_COLUMNS) if column in shown
         )
 
         if self.is_connected_table:
@@ -619,10 +614,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
 
         shown.update(columns)
         new_shown = tuple(
-            column for column in (
-                Settings.GUI_TOGGLEABLE_CONNECTED_COLUMNS if self.is_connected_table
-                else Settings.GUI_TOGGLEABLE_DISCONNECTED_COLUMNS
-            ) if column in shown
+            column for column in (Settings.GUI_TOGGLEABLE_CONNECTED_COLUMNS if self.is_connected_table else Settings.GUI_TOGGLEABLE_DISCONNECTED_COLUMNS) if column in shown
         )
 
         if self.is_connected_table:
