@@ -19,6 +19,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
+    QFocusEvent,
     QFontMetrics,
     QIcon,
     QKeyEvent,
@@ -639,6 +640,14 @@ class _LeaderboardTableView(QTableView):
         self._is_resizing_columns = False
 
     @override
+    def focusInEvent(self, event: QFocusEvent) -> None:
+        """Handle focus without automatically selecting cell (0, 0)."""
+        had_valid_index = self.currentIndex().isValid()
+        super().focusInEvent(event)
+        if not had_valid_index:
+            self.setCurrentIndex(QModelIndex())
+
+    @override
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle Ctrl+C to copy selected rows and Ctrl+A to select all rows."""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -1000,6 +1009,8 @@ class PlayerLeaderboardWindow(QWidget):
             self._stacked_widget.setCurrentWidget(self._table)
             self._set_controls_enabled(enabled=True)
             self._table.setup_static_column_resizing()
+            self._table.clearSelection()
+            self._table.setCurrentIndex(QModelIndex())
             if on_ready is not None:
                 on_ready()
 
