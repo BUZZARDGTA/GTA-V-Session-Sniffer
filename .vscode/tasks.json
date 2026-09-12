@@ -4,7 +4,15 @@
         {
             "label": "🚀 Launch Session Sniffer",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
             "args": ["-m", "session_sniffer"],
             "options": {
                 "env": {
@@ -21,14 +29,21 @@
                 "focus": true,
                 "panel": "new",
                 "clear": true
-
             }
         },
         {
             "label": "🔎 Run All Quality Checks",
             "type": "shell",
-            "command": "powershell.exe",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/code-quality-checks.ps1"],
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "args": ["${workspaceFolder}/code_quality_checks.py"],
             "group": {
                 "kind": "test",
                 "isDefault": true
@@ -43,7 +58,15 @@
         {
             "label": "📦 Install Dependencies",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/pip",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/pip"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/pip"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/pip"
+            },
             "args": ["install", "-e", ".[dev]"],
             "group": "build",
             "presentation": {
@@ -55,8 +78,16 @@
         {
             "label": "🔄 Check Project Dependencies",
             "type": "shell",
-            "command": "powershell.exe",
-            "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/check_project_dependencies.ps1"],
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "args": ["${workspaceFolder}/check_project_dependencies.py"],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -69,7 +100,15 @@
         {
             "label": "⚡ Ruff - Fast Python Linter",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/ruff.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/ruff.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/ruff"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/ruff"
+            },
             "args": ["check", ".", "--config", "pyproject.toml"],
             "group": "test",
             "presentation": {
@@ -82,7 +121,15 @@
         {
             "label": "📝 Flake8 - Style Guide Enforcer",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/flake8.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/flake8.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/flake8"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/flake8"
+            },
             "args": [".", "--config", ".flake8"],
             "group": "test",
             "presentation": {
@@ -95,7 +142,15 @@
         {
             "label": "🧹 Pylint - Code Quality Analyzer",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/pylint.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/pylint.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/pylint"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/pylint"
+            },
             "args": [".", "--rcfile", "pyproject.toml"],
             "group": "test",
             "presentation": {
@@ -108,7 +163,15 @@
         {
             "label": "🎯 Pyright - Microsoft Type Checker",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/pyright.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/pyright.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/pyright"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/pyright"
+            },
             "args": [".", "--project", "pyproject.toml"],
             "group": "test",
             "presentation": {
@@ -121,7 +184,15 @@
         {
             "label": "🔬 MyPy - Static Type Checker",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/mypy.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/mypy.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/mypy"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/mypy"
+            },
             "args": [".", "--config-file", "pyproject.toml"],
             "group": "test",
             "presentation": {
@@ -134,7 +205,15 @@
         {
             "label": "🔥 Pyrefly - Static Type Checker",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/pyrefly.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/pyrefly.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/pyrefly"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/pyrefly"
+            },
             "args": ["check", "."],
             "group": "test",
             "presentation": {
@@ -147,7 +226,15 @@
         {
             "label": "🧪 Ty - Type Checker",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/ty.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/ty.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/ty"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/ty"
+            },
             "args": ["check", "."],
             "group": "test",
             "presentation": {
@@ -160,7 +247,15 @@
         {
             "label": "🦅 Vulture - Dead Code Detector",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/vulture.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/vulture.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/vulture"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/vulture"
+            },
             "args": [".", "--config", "pyproject.toml"],
             "group": "test",
             "presentation": {
@@ -173,7 +268,15 @@
         {
             "label": "🔐 Pip Audit - Vulnerability Scanner",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/pip-audit.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/pip-audit.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/pip-audit"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/pip-audit"
+            },
             "args": ["--local", "--skip-editable"],
             "group": "test",
             "presentation": {
@@ -186,7 +289,15 @@
         {
             "label": "🛡️ Safety - Security Vulnerability Check",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/safety.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/safety.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/safety"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/safety"
+            },
             "args": ["scan"],
             "group": "test",
             "presentation": {
@@ -199,8 +310,18 @@
         {
             "label": "🐍 Snyk - Developer Security Platform",
             "type": "shell",
-            "command": "powershell.exe",
-            "args": ["-Command", "& \"${workspaceFolder}/.venv/Scripts/Activate.ps1\"; snyk test"],
+            "windows": {
+                "command": "powershell.exe",
+                "args": ["-Command", "& \"${workspaceFolder}/.venv/Scripts/Activate.ps1\"; snyk test"]
+            },
+            "linux": {
+                "command": "bash",
+                "args": ["-c", "source \"${workspaceFolder}/.venv/bin/activate\" && snyk test"]
+            },
+            "osx": {
+                "command": "bash",
+                "args": ["-c", "source \"${workspaceFolder}/.venv/bin/activate\" && snyk test"]
+            },
             "group": "test",
             "presentation": {
                 "echo": true,
@@ -212,7 +333,15 @@
         {
             "label": "🌐 Verify IP Ranges",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "windows": {
+                "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
             "args": [
                 "${workspaceFolder}/.dev/verify_ranges.py",
                 "${workspaceFolder}/src/session_sniffer/networking/third_party_servers_ranges.py",

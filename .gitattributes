@@ -1,6 +1,6 @@
 bin/** linguist-vendored
-check_project_dependencies.ps1 linguist-vendored
-code-quality-checks.ps1 linguist-vendored
+check_project_dependencies.py linguist-vendored
+code_quality_checks.py linguist-vendored
 
 # Auto detect text files and normalize line endings to CRLF
 * text=auto eol=crlf
@@ -21,7 +21,6 @@ code-quality-checks.ps1 linguist-vendored
 *.md text eol=crlf
 
 # Scripts
-*.ps1 text eol=crlf
 *.spec text eol=crlf
 
 # Binary files - no conversion
