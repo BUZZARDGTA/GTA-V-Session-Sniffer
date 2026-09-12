@@ -784,7 +784,6 @@ class DetailedMessageDialog(QDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         set_dialog_window_flags(self)
         self.setMinimumWidth(scale_by_ui(520))
-        self.resize(scale_by_ui(520), scale_by_ui(160))
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(16, 16, 16, 16)
@@ -834,6 +833,9 @@ class DetailedMessageDialog(QDialog):
 
         main_layout.addLayout(button_layout)
 
+        initial_height = self.heightForWidth(scale_by_ui(520)) if self.hasHeightForWidth() else self.sizeHint().height()
+        self.resize(scale_by_ui(520), max(scale_by_ui(160), initial_height))
+
     @staticmethod
     def _get_standard_pixmap(icon: QMessageBox.Icon) -> QStyle.StandardPixmap | None:
         if icon == QMessageBox.Icon.Information:
@@ -855,7 +857,8 @@ class DetailedMessageDialog(QDialog):
         dialog_layout = self.layout()
         if dialog_layout is not None:
             dialog_layout.activate()
-        self.resize(self.width(), self.sizeHint().height())
+        target_height = self.heightForWidth(self.width()) if self.hasHeightForWidth() else self.sizeHint().height()
+        self.resize(self.width(), max(target_height, self.minimumSizeHint().height()))
 
 
 def show_detailed_message(
