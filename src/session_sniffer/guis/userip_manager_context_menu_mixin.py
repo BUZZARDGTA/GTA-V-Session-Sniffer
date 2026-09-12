@@ -331,7 +331,9 @@ class EntriesContextMenuMixin(QDialog):
         if ip_or_range and self._current_path is not None and Settings.is_gta5_feature_set() and is_single_ip:
             menu.addSeparator()
             refresh_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye.svg')), 'Add Username (Looky System)', self)
-            refresh_action.triggered.connect(lambda _checked=False, d=self._current_path, i=ip_or_range: looky_refresh_userip_entries(self, [(d, [i])]))
+            refresh_action.triggered.connect(
+                lambda _checked=False, database_path=self._current_path, target_ip=ip_or_range: looky_refresh_userip_entries(self, [(database_path, [target_ip])])
+            )
             configure_looky_action(refresh_action, 'Look up this IP via Looky System and add any new usernames to its UserIP database.')
             menu.addAction(refresh_action)
 
@@ -527,7 +529,9 @@ class EntriesContextMenuMixin(QDialog):
             _ip_refresh = ip_or_range
             menu.addSeparator()
             refresh_gs_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye.svg')), 'Add Username (Looky System)', self)
-            refresh_gs_action.triggered.connect(lambda _checked=False, d=_db_refresh, i=_ip_refresh: looky_refresh_userip_entries(self, [(d, [i])]))
+            refresh_gs_action.triggered.connect(
+                lambda _checked=False, database_path=_db_refresh, target_ip=_ip_refresh: looky_refresh_userip_entries(self, [(database_path, [target_ip])])
+            )
             configure_looky_action(refresh_gs_action, 'Look up this IP via Looky System and add any new usernames to its UserIP database.')
             menu.addAction(refresh_gs_action)
 

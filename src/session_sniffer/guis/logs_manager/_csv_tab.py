@@ -645,8 +645,8 @@ class CsvLogTab(QWidget):
             return
         lines: list[str] = []
         column_count = self._model.columnCount()
-        for i in sorted(indexes, key=lambda i: i.row()):
-            source_row = self._proxy.mapToSource(i).row()
+        for model_index in sorted(indexes, key=lambda index: index.row()):
+            source_row = self._proxy.mapToSource(model_index).row()
             cells: list[str] = []
             for column in range(column_count):
                 item = self._model.item(source_row, column)

@@ -50,7 +50,7 @@ class SessionDurationWindow(StatTableWindowMixin):
             for player in disconnected
             if player.datetime.session_time is not None
         ]
-        entries.sort(key=lambda e: e[0], reverse=True)
+        entries.sort(key=lambda entry: entry[0], reverse=True)
 
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)

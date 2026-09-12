@@ -552,7 +552,7 @@ def rendering_core(
                     current_session_host is not None
                     and not current_session_host.packets.pps.calculated_rate
                     and (datetime.now(tz=LOCAL_TZ) - current_session_host.datetime.last_seen).total_seconds() >= _HOST_INACTIVE_DISCONNECT_SECONDS
-                    and any(p.ip != current_session_host.ip and p.packets.pps.calculated_rate for p in p2p_host_candidates)
+                    and any(player.ip != current_session_host.ip and player.packets.pps.calculated_rate for player in p2p_host_candidates)
                 ):
                     time_since_host_seen = (datetime.now(tz=LOCAL_TZ) - current_session_host.datetime.last_seen).total_seconds()
                     logger.debug(
@@ -581,7 +581,7 @@ def rendering_core(
                     SessionHost.search_player = True
                     SessionHost.search_start_time = None
                     SessionHost.players_pending_for_disconnection.clear()
-                elif SessionHost.players_pending_for_disconnection and any(p.packets.pps.calculated_rate for p in p2p_host_candidates):
+                elif SessionHost.players_pending_for_disconnection and any(player.packets.pps.calculated_rate for player in p2p_host_candidates):
                     logger.debug(
                         '[SessionHost] New active player(s) detected while %d player(s) pending disconnection, resetting host and triggering search',
                         len(SessionHost.players_pending_for_disconnection),
