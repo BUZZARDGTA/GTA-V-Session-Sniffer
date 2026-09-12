@@ -153,6 +153,7 @@ def main() -> None:
                 sys.exit(0)
 
     splash.update_status('Applying custom settings from Settings.ini')
+    register_secret_provider(lambda: Settings.discord_webhook_url)
     register_secret_provider(lambda: Settings.looky_api_key)
     register_secret_provider(lambda: Settings.webserver_password)
     Settings.rebuild_blocked_ip_ranges()

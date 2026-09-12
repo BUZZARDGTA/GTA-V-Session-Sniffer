@@ -490,6 +490,7 @@ SETTING_METADATA: dict[str, SettingMeta] = {
         display_label='Webhook URL',
         setting_type=SettingType.STRING,
         tooltip='Discord channel webhook URL (e.g. https://discord.com/api/webhooks/<id>/<token>).',
+        secret=True,
     ),
     'discord_webhook_refresh_interval': SettingMeta(
         category='Discord',
