@@ -29,6 +29,7 @@ from session_sniffer.player.registry import (
     MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
     MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
     SESSION_HOST_CANDIDATE_PLAYERS_COUNT,
+    SESSION_HOST_MAX_PACKETS_FOR_DETECTION,
     SESSION_HOST_SEARCH_TIMEOUT_SECONDS,
     SESSION_HOST_STARTUP_WINDOW_SECONDS,
     PlayersRegistry,
@@ -70,6 +71,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _THREAD_COUNT_WARN_THRESHOLD = 150
+_HOST_INACTIVE_DISCONNECT_SECONDS = 2.0
 
 
 DISCORD_APPLICATION_ID = 1313304495958261781
@@ -77,6 +79,17 @@ COUNTRY_FLAGS_DIR_PATH = IMAGES_DIR_PATH / 'country_flags'
 SESSIONS_LOGGING_PATH = get_session_log_path(SESSIONS_LOGGING_DIR_PATH, LOCAL_TZ)
 DISCORD_PRESENCE_UPDATE_INTERVAL_SECONDS = 3.0
 DISCORD_WEBHOOK_UPDATE_INTERVAL_SECONDS = 1.0
+
+
+def _get_host_candidate_players(p2p_players: list[Player]) -> list[Player]:
+    """Return connected P2P players eligible for session host evaluation."""
+    return [
+        player
+        for player in p2p_players
+        if not player.left_event.is_set()
+        and player not in SessionHost.players_pending_for_disconnection
+        and player.packets.exchanged <= SESSION_HOST_MAX_PACKETS_FOR_DETECTION
+    ]
 
 
 def rendering_core(
@@ -515,6 +528,7 @@ def rendering_core(
                     _session_host_was_active = False
                     _relay_host_logged_ip = None
                 p2p_session_connected = [player for player in session_connected if not is_third_party_server_ip(player.ip)]
+                p2p_host_candidates = _get_host_candidate_players(p2p_session_connected)
                 current_session_host = SessionHost.get_player()
                 if current_session_host is not None and current_session_host.left_event.is_set():
                     if current_session_host.packets.exchanged <= MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST and _relay_host_logged_ip != current_session_host.ip:
@@ -526,10 +540,27 @@ def rendering_core(
                         )
                         _relay_host_logged_ip = current_session_host.ip
                     elif current_session_host.packets.exchanged > MAXIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
-                        logger.debug('[SessionHost] Current host %s left_event is set, clearing host', current_session_host.ip)
+                        logger.debug('[SessionHost] Current host %s left_event is set, clearing host and triggering search', current_session_host.ip)
                         _relay_host_logged_ip = None
                         SessionHost.set_player(None)
-                        SessionHost.search_player = False
+                        SessionHost.search_player = True
+                        SessionHost.search_start_time = None
+                elif (
+                    current_session_host is not None
+                    and not current_session_host.packets.pps.calculated_rate
+                    and (datetime.now(tz=LOCAL_TZ) - current_session_host.datetime.last_seen).total_seconds() >= _HOST_INACTIVE_DISCONNECT_SECONDS
+                    and any(p.ip != current_session_host.ip and p.packets.pps.calculated_rate for p in p2p_host_candidates)
+                ):
+                    time_since_host_seen = (datetime.now(tz=LOCAL_TZ) - current_session_host.datetime.last_seen).total_seconds()
+                    logger.debug(
+                        '[SessionHost] Current host %s has 0 PPS for %.1fs while new active players connected, clearing host and triggering search',
+                        current_session_host.ip,
+                        time_since_host_seen,
+                    )
+                    _relay_host_logged_ip = None
+                    SessionHost.set_player(None)
+                    SessionHost.search_player = True
+                    SessionHost.search_start_time = None
                 # Trigger search once every pending player has completed disconnection
                 if SessionHost.players_pending_for_disconnection and all(player.left_event.is_set() for player in SessionHost.players_pending_for_disconnection):
                     if SessionHost.has_player():
@@ -547,6 +578,15 @@ def rendering_core(
                     SessionHost.search_player = True
                     SessionHost.search_start_time = None
                     SessionHost.players_pending_for_disconnection.clear()
+                elif SessionHost.players_pending_for_disconnection and any(p.packets.pps.calculated_rate for p in p2p_host_candidates):
+                    logger.debug(
+                        '[SessionHost] New active player(s) detected while %d player(s) pending disconnection, resetting host and triggering search',
+                        len(SessionHost.players_pending_for_disconnection),
+                    )
+                    _relay_host_logged_ip = None
+                    SessionHost.set_player(None)
+                    SessionHost.search_player = True
+                    SessionHost.search_start_time = None
                 elif SessionHost.players_pending_for_disconnection and any(
                     not player.left_event.is_set() and player.packets.pps.calculated_rate for player in SessionHost.players_pending_for_disconnection
                 ):
@@ -578,23 +618,20 @@ def rendering_core(
                 if p2p_session_connected:
                     _session_host_was_active = True
 
-                if not session_connected:
+                if not p2p_session_connected:
                     if _session_host_was_active and (SessionHost.has_player() or not SessionHost.search_player):
-                        logger.debug('[SessionHost] No connected players, resetting host and triggering search')
+                        logger.debug('[SessionHost] No connected P2P players, resetting host and triggering search')
                     _session_host_was_active = False
                     _relay_host_logged_ip = None
-                    SessionHost.set_player(None)
+                    SessionHost.clear_session_host_data()
                     SessionHost.search_player = True
-                    SessionHost.players_pending_for_disconnection.clear()
-                elif not p2p_session_connected:
-                    pass
                 elif all(not player.packets.pps.is_first_calculation and not player.packets.pps.calculated_rate for player in p2p_session_connected):
                     if not SessionHost.players_pending_for_disconnection:
                         logger.debug(
                             '[SessionHost] All %d connected players have 0 PPS (past first calc), marking as pending for disconnection',
                             len(p2p_session_connected),
                         )
-                        SessionHost.players_pending_for_disconnection = p2p_session_connected
+                        SessionHost.players_pending_for_disconnection = list(p2p_session_connected)
                 elif SessionHost.search_player:
                     if SessionHost.search_start_time is None:
                         SessionHost.search_start_time = time.monotonic()
@@ -605,21 +642,27 @@ def rendering_core(
                             len(SessionHost.players_pending_for_disconnection),
                         )
                         SessionHost.clear_session_host_data()
-                    elif len(p2p_session_connected) == 1 and p2p_session_connected[0].packets.exchanged < MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
+                    elif len(p2p_host_candidates) == 1 and p2p_host_candidates[0].packets.exchanged < MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST:
                         logger.debug(
                             '[SessionHost] Sole candidate %s has %d packets, waiting for >= %d before searching',
-                            p2p_session_connected[0].ip,
-                            p2p_session_connected[0].packets.exchanged,
+                            p2p_host_candidates[0].ip,
+                            p2p_host_candidates[0].packets.exchanged,
                             MINIMUM_PACKETS_FOR_RELAY_SESSION_HOST,
                         )
                     else:
                         logger.debug(
-                            '[SessionHost] search_player=True, calling get_host_player with %d connected players',
+                            '[SessionHost] search_player=True, calling get_host_player with %d connected players (%d candidate%s)',
                             len(p2p_session_connected),
+                            len(p2p_host_candidates),
+                            pluralize(len(p2p_host_candidates)),
                         )
                         SessionHost.get_host_player(p2p_session_connected)
-                elif not SessionHost.has_player() and SessionHost.last_timing_gap_candidate is not None and len(p2p_session_connected) >= SESSION_HOST_CANDIDATE_PLAYERS_COUNT:
-                    top2 = sorted(p2p_session_connected, key=attrgetter('datetime.last_rejoin'))[:SESSION_HOST_CANDIDATE_PLAYERS_COUNT]
+                elif (
+                    not SessionHost.has_player()
+                    and SessionHost.last_timing_gap_candidate is not None
+                    and len(p2p_host_candidates) >= SESSION_HOST_CANDIDATE_PLAYERS_COUNT
+                ):
+                    top2 = sorted(p2p_host_candidates, key=attrgetter('datetime.last_rejoin'))[:SESSION_HOST_CANDIDATE_PLAYERS_COUNT]
                     current_pair = (top2[0].ip, top2[1].ip)
                     if current_pair != SessionHost.last_timing_gap_candidate:
                         logger.debug(

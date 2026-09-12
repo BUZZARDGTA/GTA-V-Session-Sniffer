@@ -8,6 +8,7 @@ from PySide6.QtCore import QByteArray, QEvent, QModelIndex, QPersistentModelInde
 from PySide6.QtGui import (
     QBrush,
     QColor,
+    QFont,
     QFontMetrics,
     QHelpEvent,
     QIcon,
@@ -35,6 +36,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QStyle,
     QStyledItemDelegate,
@@ -42,7 +44,6 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
     QTableWidgetItem,
-    QTextEdit,
     QToolTip,
     QTreeView,
     QVBoxLayout,
@@ -59,7 +60,7 @@ from .exceptions import PrimaryScreenNotFoundError, UnsupportedScreenResolutionE
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from PySide6.QtGui import QFont, QMouseEvent
+    from PySide6.QtGui import QMouseEvent
 
 SPINNER_FRAMES: tuple[str, ...] = ('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏')
 
@@ -765,6 +766,98 @@ def create_nonmodal_warning(parent: QWidget | None, text: str) -> QMessageBox:
     return dlg
 
 
+class DetailedMessageDialog(QDialog):
+    """A non-modal dialog displaying a message with an expandable details section."""
+
+    def __init__(
+        self,
+        parent: QWidget | None,
+        title: str,
+        text: str,
+        detailed_text: str | None = None,
+        *,
+        icon: QMessageBox.Icon = QMessageBox.Icon.Information,
+    ) -> None:
+        """Initialize the detailed message dialog and construct its layout."""
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        set_dialog_window_flags(self)
+        self.setMinimumWidth(scale_by_ui(520))
+        self.resize(scale_by_ui(520), scale_by_ui(160))
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(12)
+
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(12)
+
+        standard_pixmap = self._get_standard_pixmap(icon)
+        if standard_pixmap is not None:
+            icon_label = QLabel()
+            icon_size = scale_by_ui(32)
+            icon_label.setPixmap(self.style().standardIcon(standard_pixmap).pixmap(icon_size, icon_size))
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+            content_layout.addWidget(icon_label)
+
+        message_label = QLabel(text)
+        message_label.setWordWrap(True)
+        message_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        content_layout.addWidget(message_label, stretch=1)
+        main_layout.addLayout(content_layout)
+
+        self._details_edit: QPlainTextEdit | None = None
+        self._toggle_button: QPushButton | None = None
+
+        if detailed_text:
+            self._details_edit = QPlainTextEdit(detailed_text)
+            self._details_edit.setReadOnly(True)
+            self._details_edit.setFont(QFont('Consolas', 9))
+            self._details_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+            self._details_edit.setMinimumHeight(scale_by_ui(240))
+            self._details_edit.hide()
+            main_layout.addWidget(self._details_edit, stretch=1)
+
+            self._toggle_button = QPushButton('Show More')
+            self._toggle_button.clicked.connect(self._toggle_details)
+
+        button_layout = QHBoxLayout()
+        if self._toggle_button is not None:
+            button_layout.addWidget(self._toggle_button)
+        button_layout.addStretch(1)
+
+        ok_button = QPushButton('OK')
+        ok_button.setDefault(True)
+        ok_button.clicked.connect(self.accept)
+        button_layout.addWidget(ok_button)
+
+        main_layout.addLayout(button_layout)
+
+    @staticmethod
+    def _get_standard_pixmap(icon: QMessageBox.Icon) -> QStyle.StandardPixmap | None:
+        if icon == QMessageBox.Icon.Information:
+            return QStyle.StandardPixmap.SP_MessageBoxInformation
+        if icon == QMessageBox.Icon.Warning:
+            return QStyle.StandardPixmap.SP_MessageBoxWarning
+        if icon == QMessageBox.Icon.Critical:
+            return QStyle.StandardPixmap.SP_MessageBoxCritical
+        if icon == QMessageBox.Icon.Question:
+            return QStyle.StandardPixmap.SP_MessageBoxQuestion
+        return None
+
+    def _toggle_details(self) -> None:
+        if self._details_edit is None or self._toggle_button is None:
+            return
+        is_visible = self._details_edit.isVisible()
+        self._details_edit.setVisible(not is_visible)
+        self._toggle_button.setText('Show More' if is_visible else 'Hide More')
+        dialog_layout = self.layout()
+        if dialog_layout is not None:
+            dialog_layout.activate()
+        self.resize(self.width(), self.sizeHint().height())
+
+
 def show_detailed_message(
     parent: QWidget | None,
     title: str,
@@ -772,33 +865,13 @@ def show_detailed_message(
     detailed_text: str | None = None,
     *,
     icon: QMessageBox.Icon = QMessageBox.Icon.Information,
-) -> QMessageBox.StandardButton:
-    """Display a QMessageBox with an expandable Show More details section."""
-    dialog = QMessageBox(parent)
-    dialog.setWindowTitle(title)
-    dialog.setText(text)
-    dialog.setIcon(icon)
-    dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
-    if detailed_text:
-        dialog.setDetailedText(detailed_text)
-        text_edit = dialog.findChild(QTextEdit)
-        if text_edit is not None:
-            text_edit.setMinimumWidth(520)
-            text_edit.setMaximumHeight(16777215)
-            text_edit.setMinimumHeight(min(360, max(220, (detailed_text.count('\n') + 2) * 18)))
-        for button in dialog.findChildren(QPushButton):
-            if 'detail' in button.text().lower():
-                button.setText('Show More')
-
-                def _toggle_details(*_args: object, details_button: QPushButton = button) -> None:
-                    if 'hide' in details_button.text().lower():
-                        details_button.setText('Hide More')
-                    elif 'show' in details_button.text().lower():
-                        details_button.setText('Show More')
-
-                button.clicked.connect(_toggle_details)
-                break
-    return QMessageBox.StandardButton(dialog.exec())
+) -> DetailedMessageDialog:
+    """Display a non-modal dialog with an expandable Show More details section."""
+    dialog = DetailedMessageDialog(parent, title, text, detailed_text=detailed_text, icon=icon)
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+    return dialog
 
 
 def setup_stat_table(table: QTableWidget, layout: QVBoxLayout, *, sorting: bool = True) -> None:
