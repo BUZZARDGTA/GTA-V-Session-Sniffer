@@ -440,36 +440,20 @@ class SessionHost:
                 f'- Filtered Server IPs: {len(session_connected)}\n\n'
                 f'--- Filtered Server List ---\n{server_list}'
             )
-        candidate_players = [
-            player
-            for player in p2p_players
-            if not player.left_event.is_set()
-            and player not in cls.players_pending_for_disconnection
-            and (cls.manual_redetect or player.packets.exchanged <= SESSION_HOST_MAX_PACKETS_FOR_DETECTION)
-        ]
-        if not candidate_players:
-            logger.debug(
-                '[SessionHost] No qualifying P2P candidates remain (%d P2P players exceeded %d packets or pending disconnection)',
-                len(p2p_players),
-                SESSION_HOST_MAX_PACKETS_FOR_DETECTION,
-            )
-            cls.last_rejection_reason = (
-                f'All {len(p2p_players)} connected peer-to-peer player(s) have already exchanged too many packets '
-                'or are disconnecting, so the session host cannot be determined.'
-            )
+        active_p2p_players = [player for player in p2p_players if not player.left_event.is_set() and player not in cls.players_pending_for_disconnection]
+        if not active_p2p_players:
+            logger.debug('[SessionHost] No active P2P players remain (%d P2P players pending disconnection)', len(p2p_players))
+            cls.last_rejection_reason = 'All connected peer-to-peer player(s) are disconnecting, so the session host cannot be determined.'
             cls.last_debug_details = _format_host_debug_details(
                 session_connected,
                 p2p_players,
                 candidates=[],
-                outcome=(
-                    f'All {len(p2p_players)} connected P2P player(s) have packet counts exceeding {SESSION_HOST_MAX_PACKETS_FOR_DETECTION} '
-                    'or are pending disconnection.'
-                ),
+                outcome='All connected P2P player(s) are pending disconnection.',
             )
             cls.search_player = False
             cls.search_start_time = None
             return None
-        connected_players: list[Player] = nsmallest(SESSION_HOST_CANDIDATE_PLAYERS_COUNT, candidate_players, key=attrgetter('datetime.last_rejoin'))
+        connected_players: list[Player] = nsmallest(SESSION_HOST_CANDIDATE_PLAYERS_COUNT, active_p2p_players, key=attrgetter('datetime.last_rejoin'))
 
         for i, player in enumerate(connected_players):
             logger.debug(
@@ -497,6 +481,8 @@ class SessionHost:
                     gap_milliseconds,
                     SESSION_HOST_AMBIGUITY_MAX_THRESHOLD_MS,
                 )
+                cls.search_player = False
+                cls.search_start_time = None
                 cls.last_rejection_reason = (
                     f'The connection time gap between the first two players is too large ({gap_seconds:.1f}s gap).\n\n'
                     'Host detection requires players to connect together during session creation.'
@@ -597,6 +583,8 @@ class SessionHost:
                     potential_session_host_player.packets.exchanged,
                     SESSION_HOST_MAX_PACKETS_FOR_DETECTION,
                 )
+                cls.search_player = False
+                cls.search_start_time = None
                 cls.last_rejection_reason = (
                     f'Candidate player {potential_session_host_player.ip} has already exchanged too many packets to determine if they originally hosted the session.'
                 )
