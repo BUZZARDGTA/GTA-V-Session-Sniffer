@@ -267,7 +267,7 @@ class TableContextMenuMixin(QTableView):
             main_window = cast('MainWindow', self.window())
             for player in PlayersRegistry.get_default_sorted_players():
                 if check_ip_against_ranges(player.ip, Settings.blocked_ip_ranges):
-                    if player.left_event.is_set():
+                    if not PlayersRegistry.is_player_connected(player):
                         main_window.remove_player_from_disconnected(player.ip)
                     else:
                         main_window.remove_player_from_connected(player.ip)

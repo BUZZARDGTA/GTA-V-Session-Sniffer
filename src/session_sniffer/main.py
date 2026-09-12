@@ -321,7 +321,7 @@ def main() -> None:
 
             handle_detection_notification(matched_player, 'player_joined_session')
 
-        elif matched_player.left_event.is_set():
+        elif not PlayersRegistry.is_player_connected(matched_player):
             matched_player.mark_as_rejoined(
                 port=target_port,
                 packet_datetime=packet.datetime,

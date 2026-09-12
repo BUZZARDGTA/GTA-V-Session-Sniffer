@@ -549,7 +549,7 @@ def monitor_gta5_relay_task(player: Player) -> None:
     # above 0 for at least `_GTA5_RELAY_PPS_NONZERO_STREAK_SECONDS` (any 0-PPS sample resets the streak).
     # A 0-PPS relay is not actively sending packets and must be a false positive.
     _pps_nonzero_since: float | None = None
-    while not player.left_event.is_set() and not gui_closed__event.is_set():
+    while not player.left_event.is_set() and not gui_closed__event.is_set() and PlayersRegistry.is_player_connected(player):
         pps_active = _is_player_packet_flow_active(player)
         if pps_active:
             if _pps_nonzero_since is None:
@@ -566,7 +566,7 @@ def monitor_gta5_relay_task(player: Player) -> None:
 
         gui_closed__event.wait(0.25)
 
-    if player.left_event.is_set() or gui_closed__event.is_set():
+    if player.left_event.is_set() or gui_closed__event.is_set() or not PlayersRegistry.is_player_connected(player):
         return
 
     if GUIDetectionSettings.gta5_relay_enabled and CaptureState.is_local_capture():

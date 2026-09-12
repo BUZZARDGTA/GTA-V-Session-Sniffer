@@ -139,6 +139,12 @@ class PlayersRegistry:
             return player
 
     @classmethod
+    def is_player_connected(cls, player: Player) -> bool:
+        """Check whether the given player instance is currently in the connected registry."""
+        with cls._registry_lock:
+            return cls._connected_players_registry.get(player.ip) is player
+
+    @classmethod
     def get_connected_players(cls) -> list[Player]:
         """Return a snapshot of connected players (unsorted).
 
@@ -201,13 +207,19 @@ class PlayersRegistry:
     def clear_connected_players(cls) -> None:
         """Clear all connected players from the registry."""
         with cls._registry_lock:
+            players = list(cls._connected_players_registry.values())
             cls._connected_players_registry.clear()
+        for player in players:
+            player.left_event.set()
 
     @classmethod
     def clear_disconnected_players(cls) -> None:
         """Clear all disconnected players from the registry."""
         with cls._registry_lock:
+            players = list(cls._disconnected_players_registry.values())
             cls._disconnected_players_registry.clear()
+        for player in players:
+            player.left_event.set()
 
     @classmethod
     def remove_connected_player(cls, ip: str) -> Player | None:
@@ -220,7 +232,10 @@ class PlayersRegistry:
             The removed player object if found, otherwise `None`.
         """
         with cls._registry_lock:
-            return cls._connected_players_registry.pop(ip, None)
+            player = cls._connected_players_registry.pop(ip, None)
+        if player is not None:
+            player.left_event.set()
+        return player
 
     @classmethod
     def remove_disconnected_player(cls, ip: str) -> Player | None:
@@ -233,7 +248,10 @@ class PlayersRegistry:
             The removed player object if found, otherwise `None`.
         """
         with cls._registry_lock:
-            return cls._disconnected_players_registry.pop(ip, None)
+            player = cls._disconnected_players_registry.pop(ip, None)
+        if player is not None:
+            player.left_event.set()
+        return player
 
 
 def _format_host_debug_details(

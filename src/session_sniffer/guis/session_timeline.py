@@ -99,7 +99,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
             self._table.setRowCount(num_players)
 
             for row, player in enumerate(all_players):
-                is_connected = not player.left_event.is_set()
+                is_connected = PlayersRegistry.is_player_connected(player)
                 color = _COLOR_CONNECTED if is_connected else _COLOR_DISCONNECTED
 
                 try:
@@ -149,7 +149,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
             self._table.blockSignals(True)  # noqa: FBT003
 
             for row, player in enumerate(all_players):
-                is_connected = not player.left_event.is_set()
+                is_connected = PlayersRegistry.is_player_connected(player)
                 color = _COLOR_CONNECTED if is_connected else _COLOR_DISCONNECTED
 
                 try:
