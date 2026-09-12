@@ -19,6 +19,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
+    QColor,
     QFocusEvent,
     QFontMetrics,
     QIcon,
@@ -69,6 +70,7 @@ from session_sniffer.guis.utils import (
     HEADER_SORT_PADDING,
     ElidedTextTooltipDelegate,
     SearchHighlightDelegate,
+    ToggleAlwaysOnTopMixin,
     apply_search_icon,
     format_player_display,
     get_screen_size,
@@ -79,6 +81,7 @@ from session_sniffer.guis.utils import (
     setup_static_table_column_resizing,
     setup_table_view_headers,
 )
+from session_sniffer.player.registry import PlayersRegistry
 from session_sniffer.player.seen_stats import LeaderboardBaseline, LeaderboardEntry, overlay_live_session
 from session_sniffer.rendering_core.renderer import SESSIONS_LOGGING_PATH
 from session_sniffer.text_utils import pluralize
@@ -100,11 +103,25 @@ _MODE_DAYS = 'Unique Days'
 _MODE_SESSIONS = 'Sessions'
 _MODES = (_MODE_DAYS, _MODE_SESSIONS)
 
-_HEADERS = ('Rank', 'Usernames', 'IP Address', 'Sessions', 'First Seen', 'Last Seen', 'Country', 'ISP', 'Mobile', 'VPN', 'Hosting')
+_HEADERS = (
+    'Rank',
+    'Status',
+    'Usernames',
+    'IP Address',
+    'Sessions',
+    'First Seen',
+    'Last Seen',
+    'Country',
+    'ISP',
+    'Mobile',
+    'VPN',
+    'Hosting',
+)
 
-# Header tooltips, parallel to `_HEADERS`. The Days/Sessions column (index 3) is described dynamically in `headerData`.
+# Header tooltips, parallel to `_HEADERS`. The Days/Sessions column (index 4) is described dynamically in `headerData`.
 _HEADER_TOOLTIPS = (
     'Leaderboard position (row number) for the current sort order, time period and count mode.',
+    'Current session connection status (Connected, Disconnected, or not in the active session).',
     'In-game username(s) seen for this player across all recorded sessions.',
     "The player's IP address.",
     'How often this player was seen within the selected time period.',
@@ -131,13 +148,17 @@ _SEARCH_COLUMNS = (
     _SEARCH_COLUMN_ISP,
 )
 _COLUMN_RANK = 0
-_COLUMN_USERNAMES = 1
-_COLUMN_IP = 2
-_COLUMN_SESSIONS = 3
-_COLUMN_FIRST_SEEN = 4
-_COLUMN_LAST_SEEN = 5
-_COLUMN_COUNTRY = 6
-_COLUMN_ISP = 7
+_COLUMN_STATUS = 1
+_COLUMN_USERNAMES = 2
+_COLUMN_IP = 3
+_COLUMN_SESSIONS = 4
+_COLUMN_FIRST_SEEN = 5
+_COLUMN_LAST_SEEN = 6
+_COLUMN_COUNTRY = 7
+_COLUMN_ISP = 8
+_COLUMN_MOBILE = 9
+_COLUMN_VPN = 10
+_COLUMN_HOSTING = 11
 
 _SEARCH_COLUMN_TO_INDEX: dict[str, int] = {
     _SEARCH_COLUMN_ALL: -1,
@@ -155,6 +176,7 @@ _LIVE_REFRESH_INTERVAL_MS = 1000
 _SESSIONS_SCAN_COOLDOWN_MS = 3000
 
 _COLUMN_SAMPLE_TEXTS: dict[str, str] = {
+    'Status': 'Disconnected',
     'First Seen': '3 days ago',
     'Last Seen': '3 days ago',
     'IP Address': '255.255.255.255',
@@ -236,12 +258,21 @@ class _LeaderboardTableModel(QAbstractTableModel):
         _SCOPE_ALL_TIME: 'sessions_total',
     }
 
-    _CENTER_COLUMNS: ClassVar[frozenset[int]] = frozenset({0, 3, 8, 9, 10})
+    _CENTER_COLUMNS: ClassVar[frozenset[int]] = frozenset({
+        _COLUMN_RANK,
+        _COLUMN_STATUS,
+        _COLUMN_SESSIONS,
+        _COLUMN_MOBILE,
+        _COLUMN_VPN,
+        _COLUMN_HOSTING,
+    })
 
     def __init__(self) -> None:
         super().__init__()
         self._entries: list[LeaderboardEntry] = []
         self._index_by_ip: dict[str, int] = {}
+        self._connected_ips: frozenset[str] = frozenset()
+        self._disconnected_ips: frozenset[str] = frozenset()
         self._scope: str = _SCOPE_ALL_TIME
         self._mode: str = _MODE_DAYS
         self._scope_attr: str = 'days_total'
@@ -249,17 +280,18 @@ class _LeaderboardTableModel(QAbstractTableModel):
         self._username_cache: dict[str, str] = {}
         # Bound method dispatch — avoids per-cell getattr() overhead
         self._display_dispatch: dict[int, Callable[[int, LeaderboardEntry], object]] = {
-            0: self._display_rank,
-            1: self._display_usernames,
-            2: self._display_ip,
-            3: self._display_sessions,
-            4: self._display_first_seen,
-            5: self._display_last_seen,
-            6: self._display_country,
-            7: self._display_isp,
-            8: self._display_mobile,
-            9: self._display_vpn,
-            10: self._display_hosting,
+            _COLUMN_RANK: self._display_rank,
+            _COLUMN_STATUS: self._display_status,
+            _COLUMN_USERNAMES: self._display_usernames,
+            _COLUMN_IP: self._display_ip,
+            _COLUMN_SESSIONS: self._display_sessions,
+            _COLUMN_FIRST_SEEN: self._display_first_seen,
+            _COLUMN_LAST_SEEN: self._display_last_seen,
+            _COLUMN_COUNTRY: self._display_country,
+            _COLUMN_ISP: self._display_isp,
+            _COLUMN_MOBILE: self._display_mobile,
+            _COLUMN_VPN: self._display_vpn,
+            _COLUMN_HOSTING: self._display_hosting,
         }
 
     @override
@@ -285,16 +317,27 @@ class _LeaderboardTableModel(QAbstractTableModel):
             method = self._display_dispatch.get(column)
             return method(index.row(), entry) if method is not None else None
 
+        return self._non_display_data(entry, column, role)
+
+    def _non_display_data(self, entry: LeaderboardEntry, column: int, role: int) -> object:
         if role == Qt.ItemDataRole.TextAlignmentRole:
             return Qt.AlignmentFlag.AlignCenter if column in self._CENTER_COLUMNS else Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-
+        if role == Qt.ItemDataRole.ForegroundRole and column == _COLUMN_STATUS:
+            return self._status_foreground_color(entry.ip)
         if role == Qt.ItemDataRole.UserRole and column == _COLUMN_SESSIONS:
             return self.get_session_count(entry)
-
         if role == Qt.ItemDataRole.ToolTipRole:
             return self._tooltip_data(column, entry)
+        if role == Qt.ItemDataRole.DecorationRole and column == _COLUMN_COUNTRY:
+            return _get_flag_icon(entry.country_code)
+        return None
 
-        return _get_flag_icon(entry.country_code) if role == Qt.ItemDataRole.DecorationRole and column == _COLUMN_COUNTRY else None
+    def _status_foreground_color(self, ip_address: str) -> QColor:
+        if ip_address in self._connected_ips:
+            return QColor('#22c55e')
+        if ip_address in self._disconnected_ips:
+            return QColor('#ef4444')
+        return QColor('#6b7280')
 
     def _tooltip_data(self, column: int, entry: LeaderboardEntry) -> object:
         if column in (_COLUMN_FIRST_SEEN, _COLUMN_LAST_SEEN):
@@ -335,6 +378,13 @@ class _LeaderboardTableModel(QAbstractTableModel):
     @staticmethod
     def _display_rank(row: int, _entry: LeaderboardEntry) -> int:
         return row + 1
+
+    def _display_status(self, _row: int, entry: LeaderboardEntry) -> str:
+        if entry.ip in self._connected_ips:
+            return 'Connected'
+        if entry.ip in self._disconnected_ips:
+            return 'Disconnected'
+        return '—'
 
     @staticmethod
     def _display_ip(_row: int, entry: LeaderboardEntry) -> str:
@@ -442,6 +492,17 @@ class _LeaderboardTableModel(QAbstractTableModel):
         self.beginResetModel()
         self.endResetModel()
 
+    def set_current_session_ips(self, connected_ips: frozenset[str], disconnected_ips: frozenset[str]) -> None:
+        """Update active session connection status for players in the model."""
+        if connected_ips == self._connected_ips and disconnected_ips == self._disconnected_ips:
+            return
+        self._connected_ips = connected_ips
+        self._disconnected_ips = disconnected_ips
+        if self._entries:
+            top_left = self.index(0, _COLUMN_STATUS)
+            bottom_right = self.index(len(self._entries) - 1, _COLUMN_STATUS)
+            self.dataChanged.emit(top_left, bottom_right)
+
     def _refresh_scope_attr(self) -> None:
         scope_map = self._SCOPE_ATTR_DAYS if self._mode == _MODE_DAYS else self._SCOPE_ATTR_SESSIONS
         default = 'days_total' if self._mode == _MODE_DAYS else 'sessions_total'
@@ -459,6 +520,14 @@ class _LeaderboardSortProxy(QSortFilterProxyModel):
         self._server_ips: frozenset[str] = frozenset()
         self._hide_vpns: bool = False
         self._hide_hosting: bool = False
+        self._current_session_only: bool = False
+        self._connected_ips: frozenset[str] = frozenset()
+        self._disconnected_ips: frozenset[str] = frozenset()
+
+    @property
+    def current_session_ips(self) -> frozenset[str]:
+        """Return the combined set of connected and disconnected IPs in the active session."""
+        return self._connected_ips | self._disconnected_ips
 
     @override
     def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> object:
@@ -500,6 +569,20 @@ class _LeaderboardSortProxy(QSortFilterProxyModel):
         self._hide_hosting = hide
         self.invalidateFilter()
 
+    def set_current_session_only(self, enabled: bool) -> None:  # noqa: FBT001
+        """Toggle filtering to only players in the active session."""
+        self._current_session_only = enabled
+        self.invalidateFilter()
+
+    def set_current_session_ips(self, connected_ips: frozenset[str], disconnected_ips: frozenset[str]) -> None:
+        """Update active session IPs and invalidate filter if filtering is active."""
+        if connected_ips == self._connected_ips and disconnected_ips == self._disconnected_ips:
+            return
+        self._connected_ips = connected_ips
+        self._disconnected_ips = disconnected_ips
+        if self._current_session_only:
+            self.invalidateFilter()
+
     def _entry_matches_search(self, entry: LeaderboardEntry, text: str) -> bool:
         """Return True if *entry* contains *text* within the active search column."""
         if self._search_column == _SEARCH_COLUMN_ALL:
@@ -523,12 +606,14 @@ class _LeaderboardSortProxy(QSortFilterProxyModel):
 
     @override
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex | QPersistentModelIndex) -> bool:
-        """Reject rows with a zero session count, hidden servers/VPNs/hosting, or that don't match the search text."""
+        """Reject rows with hidden servers/VPNs/hosting, outside active session, zero count, or search mismatch."""
         _ = source_parent
         model = self.sourceModel()
         if not isinstance(model, _LeaderboardTableModel):
             return True
         entry = model.entries[source_row]
+        if self._current_session_only and entry.ip not in self.current_session_ips:
+            return False
         if not model.get_session_count(entry):
             return False
         if self._is_hidden(entry):
@@ -539,12 +624,18 @@ class _LeaderboardSortProxy(QSortFilterProxyModel):
 
     @override
     def lessThan(self, left: QModelIndex | QPersistentModelIndex, right: QModelIndex | QPersistentModelIndex) -> bool:
-        """Sort integers numerically instead of lexicographically."""
+        """Sort integers numerically and status by priority instead of lexicographically."""
         model = self.sourceModel()
         if not model:
             return super().lessThan(left, right)
         left_data = model.data(left, Qt.ItemDataRole.DisplayRole)
         right_data = model.data(right, Qt.ItemDataRole.DisplayRole)
+
+        if left.column() == _COLUMN_STATUS:
+            status_order: dict[str, int] = {'Connected': 0, 'Disconnected': 1, '—': 2}
+            left_rank = status_order.get(str(left_data), 3)
+            right_rank = status_order.get(str(right_data), 3)
+            return left_rank < right_rank
 
         if isinstance(left_data, int) and isinstance(right_data, int):
             return left_data < right_data
@@ -711,15 +802,18 @@ class _LeaderboardTableView(QTableView):
             self._is_resizing_columns = False
 
 
-class PlayerLeaderboardWindow(QWidget):
+class PlayerLeaderboardWindow(ToggleAlwaysOnTopMixin):
     """Standalone window showing the most-seen players leaderboard."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, always_on_top: bool = False) -> None:
         """Initialize the leaderboard window and load session data."""
         super().__init__(parent)
 
         self.setWindowTitle('Most Seen Players')
-        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowMaximizeButtonHint)
+        flags = Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowMaximizeButtonHint
+        if always_on_top:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setMinimumSize(scale_by_ui(980), scale_by_ui(480))
         screen_size = get_screen_size()
         resize_window_for_screen(self, screen_size)
@@ -810,11 +904,23 @@ class PlayerLeaderboardWindow(QWidget):
         self._hide_hosting_checkbox.toggled.connect(self._on_hide_hosting_toggled)
         filters_layout.addWidget(self._hide_hosting_checkbox)
 
+        self._current_session_checkbox = QCheckBox('Current session only')
+        self._current_session_checkbox.setToolTip('Show only players present in your active session (connected or disconnected)')
+        self._current_session_checkbox.toggled.connect(self._on_current_session_toggled)
+        filters_layout.addWidget(self._current_session_checkbox)
+
         self._relative_dates_checkbox = QCheckBox('Relative dates')
         self._relative_dates_checkbox.setChecked(True)
         self._relative_dates_checkbox.setToolTip('Display First Seen and Last Seen as natural relative times (e.g., 2 days ago)')
         self._relative_dates_checkbox.toggled.connect(self._on_relative_dates_toggled)
         filters_layout.addWidget(self._relative_dates_checkbox)
+
+        self._always_on_top_checkbox = QCheckBox('Always on Top')
+        self._always_on_top_checkbox.setToolTip('Keep this window above all other windows')
+        self._always_on_top_checkbox.setChecked(always_on_top)
+        self._always_on_top_checkbox.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._always_on_top_checkbox.toggled.connect(self.toggle_always_on_top)
+        filters_layout.addWidget(self._always_on_top_checkbox)
 
         filters_layout.addSpacing(12)
 
@@ -904,6 +1010,8 @@ class PlayerLeaderboardWindow(QWidget):
     def load_and_show(self) -> None:
         """Reveal the window immediately and load baseline data in the background."""
         self.show()
+        self.raise_()
+        self.activateWindow()
         self._start_load()
 
     def _on_sessions_changed(self, _path: str) -> None:
@@ -984,6 +1092,7 @@ class PlayerLeaderboardWindow(QWidget):
         self._hide_servers_checkbox.setEnabled(enabled)
         self._hide_vpns_checkbox.setEnabled(enabled)
         self._hide_hosting_checkbox.setEnabled(enabled)
+        self._current_session_checkbox.setEnabled(enabled)
         self._relative_dates_checkbox.setEnabled(enabled)
         self._cap_spinbox.setEnabled(enabled)
 
@@ -1024,9 +1133,15 @@ class PlayerLeaderboardWindow(QWidget):
     def _apply_baseline(self, baseline: LeaderboardBaseline) -> None:
         """Store a freshly-scanned baseline, render the initial overlaid leaderboard, and begin live refresh."""
         self._baseline = baseline
-        entries = overlay_live_session(baseline, self._live_session_file, limit=self._cap_spinbox.value())
+        connected_players, disconnected_players = PlayersRegistry.get_default_sorted_connected_and_disconnected_players()
+        connected_ips = frozenset(player.ip for player in connected_players)
+        disconnected_ips = frozenset(player.ip for player in disconnected_players)
+        preserve_ips = connected_ips | disconnected_ips
+        entries = overlay_live_session(baseline, self._live_session_file, limit=self._cap_spinbox.value(), preserve_ips=preserve_ips)
         self._all_entries = entries
         self._proxy.set_server_ips(server_ips_for(entries))
+        self._proxy.set_current_session_ips(connected_ips, disconnected_ips)
+        self._model.set_current_session_ips(connected_ips, disconnected_ips)
         self._model.load_data(entries)
         self._proxy.invalidateFilter()
         self._update_count_label()
@@ -1039,7 +1154,16 @@ class PlayerLeaderboardWindow(QWidget):
             return
         if self._overlay_worker is not None:
             return
-        worker = LeaderboardOverlayWorker(self._baseline, self._live_session_file, self._cap_spinbox.value())
+        connected_players, disconnected_players = PlayersRegistry.get_default_sorted_connected_and_disconnected_players()
+        connected_ips = frozenset(player.ip for player in connected_players)
+        disconnected_ips = frozenset(player.ip for player in disconnected_players)
+        worker = LeaderboardOverlayWorker(
+            self._baseline,
+            self._live_session_file,
+            self._cap_spinbox.value(),
+            connected_ips=connected_ips,
+            disconnected_ips=disconnected_ips,
+        )
         worker.finished_ok.connect(self._on_overlay_ready)
         worker.finished.connect(self._on_overlay_finished)
         self._overlay_worker = worker
@@ -1049,6 +1173,8 @@ class PlayerLeaderboardWindow(QWidget):
         """Apply a completed background overlay to the model on the GUI thread."""
         self._all_entries = result.entries
         self._proxy.set_server_ips(result.server_ips)
+        self._proxy.set_current_session_ips(result.connected_ips, result.disconnected_ips)
+        self._model.set_current_session_ips(result.connected_ips, result.disconnected_ips)
         self._model.apply_live_update(result.entries)
         self._update_count_label()
 
@@ -1117,6 +1243,15 @@ class PlayerLeaderboardWindow(QWidget):
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             self._proxy.set_hide_hosting(checked)
+            self._update_count_label()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _on_current_session_toggled(self, checked: bool) -> None:  # noqa: FBT001
+        """Toggle filtering to players present in the active session and refresh the count label."""
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            self._proxy.set_current_session_only(checked)
             self._update_count_label()
         finally:
             QApplication.restoreOverrideCursor()
@@ -1339,7 +1474,11 @@ class PlayerLeaderboardWindow(QWidget):
     def _update_count_label(self) -> None:
         visible = self._proxy.rowCount()
         total = len(self._all_entries)
-        self._count_label.setText(f'{visible} of {total} players')
+        if self._current_session_checkbox.isChecked():
+            session_total = len(self._proxy.current_session_ips)
+            self._count_label.setText(f'{visible} of {session_total} session players ({total} total)')
+        else:
+            self._count_label.setText(f'{visible} of {total} players')
 
     @override
     def showEvent(self, a0: QShowEvent) -> None:

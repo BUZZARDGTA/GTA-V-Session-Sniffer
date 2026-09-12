@@ -332,12 +332,19 @@ def build_leaderboard_baseline(
     return LeaderboardBaseline(entries=entries, seen_dates=seen_dates)
 
 
-def overlay_live_session(baseline: LeaderboardBaseline, live_file: Path, *, limit: int = 1000) -> list[LeaderboardEntry]:
+def overlay_live_session(
+    baseline: LeaderboardBaseline,
+    live_file: Path,
+    *,
+    limit: int = 1000,
+    preserve_ips: frozenset[str] | set[str] | None = None,
+) -> list[LeaderboardEntry]:
     """Overlay the live session file onto *baseline* and return the sorted, truncated leaderboard.
 
     The baseline is copied so it can be reused across repeated live refreshes. The live session file
     (a single continuously-rewritten snapshot) contributes at most one extra session per IP. If the
-    file is missing or read mid-write, the baseline is returned unchanged.
+    file is missing or read mid-write, the baseline is returned unchanged. Any IPs in the live session
+    file or in *preserve_ips* are preserved in the result even if they fall outside the top *limit*.
     """
     now = datetime.now(tz=LOCAL_TZ)
     entries: dict[str, LeaderboardEntry] = {ip: _copy_entry(entry) for ip, entry in baseline.entries.items()}
@@ -348,8 +355,34 @@ def overlay_live_session(baseline: LeaderboardBaseline, live_file: Path, *, limi
     except FileNotFoundError, json.JSONDecodeError, OSError:
         data = None
 
+    live_ips: set[str] = set()
     if isinstance(data, dict):
+        all_players = _extract_all_players_from_session(cast('dict[str, Any]', data))
+        live_ips = set(all_players.keys())
         _accumulate_session(entries, seen_dates, cast('dict[str, Any]', data), now)
 
+    if preserve_ips:
+        live_ips.update(preserve_ips)
+        for ip in preserve_ips:
+            if ip not in entries:
+                entries[ip] = LeaderboardEntry(
+                    ip=ip,
+                    sessions_today=1,
+                    sessions_week=1,
+                    sessions_month=1,
+                    sessions_year=1,
+                    sessions_total=1,
+                    first_seen=now,
+                    last_seen=now,
+                )
+                seen_dates[ip] = {now.date()}
+
     _finalize_days(entries, seen_dates, now)
-    return sorted(entries.values(), key=lambda entry: entry.sessions_total, reverse=True)[:limit]
+    sorted_entries = sorted(entries.values(), key=lambda entry: entry.sessions_total, reverse=True)
+    top_entries = sorted_entries[:limit]
+    if live_ips:
+        top_ips = {entry.ip for entry in top_entries}
+        extra_entries = [entries[ip] for ip in live_ips if ip in entries and ip not in top_ips]
+        if extra_entries:
+            return top_entries + extra_entries
+    return top_entries

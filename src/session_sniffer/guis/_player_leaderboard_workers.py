@@ -120,30 +120,50 @@ class OverlayResult:
 
     entries: list[LeaderboardEntry]
     server_ips: frozenset[str]
+    connected_ips: frozenset[str]
+    disconnected_ips: frozenset[str]
 
 
 class LeaderboardOverlayWorker(CrashingQThread):
     """Background thread that overlays the live session snapshot onto the cached baseline.
 
-    Emits `finished_ok` with an `_OverlayResult` (sorted entries plus their server IPs). Running this
-    off the GUI thread keeps the cursor and event loop responsive even for large baselines.
+    Emits `finished_ok` with an `OverlayResult` (sorted entries plus their server IPs and session IPs).
+    Running this off the GUI thread keeps the cursor and event loop responsive even for large baselines.
     """
 
     finished_ok: Signal = Signal(object)
 
-    def __init__(self, baseline: LeaderboardBaseline, live_file: Path, limit: int) -> None:
+    def __init__(
+        self,
+        baseline: LeaderboardBaseline,
+        live_file: Path,
+        limit: int,
+        *,
+        connected_ips: frozenset[str] = frozenset(),
+        disconnected_ips: frozenset[str] = frozenset(),
+    ) -> None:
         super().__init__()
         self._baseline = baseline
         self._live_file = live_file
         self._limit = limit
+        self._connected_ips = connected_ips
+        self._disconnected_ips = disconnected_ips
 
     @override
     def _run(self) -> None:
         """Overlay the live session onto the baseline and emit the resulting leaderboard."""
-        entries = overlay_live_session(self._baseline, self._live_file, limit=self._limit)
+        preserve_ips = self._connected_ips | self._disconnected_ips
+        entries = overlay_live_session(self._baseline, self._live_file, limit=self._limit, preserve_ips=preserve_ips)
         if self.isInterruptionRequested():
             return
         server_ips = server_ips_for(entries)
         if self.isInterruptionRequested():
             return
-        self.finished_ok.emit(OverlayResult(entries=entries, server_ips=server_ips))
+        self.finished_ok.emit(
+            OverlayResult(
+                entries=entries,
+                server_ips=server_ips,
+                connected_ips=self._connected_ips,
+                disconnected_ips=self._disconnected_ips,
+            ),
+        )
