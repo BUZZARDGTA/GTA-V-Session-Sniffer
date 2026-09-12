@@ -352,12 +352,12 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
         data_menu.addSeparator()
 
-        open_userip_databases_action = QAction('🗂️ Open UserIP Databases Folder', self)
+        open_userip_databases_action = QAction('📂 Open UserIP Databases Folder', self)
         open_userip_databases_action.setToolTip('Open Roaming AppData\\Session Sniffer\\UserIP Databases')
         open_userip_databases_action.triggered.connect(self._open_userip_databases_folder)
         data_menu.addAction(open_userip_databases_action)
 
-        open_user_scripts_action = QAction('🗂️ Open User Scripts Folder', self)
+        open_user_scripts_action = QAction('📂 Open User Scripts Folder', self)
         open_user_scripts_action.setToolTip('Open Roaming AppData\\Session Sniffer\\scripts')
         open_user_scripts_action.triggered.connect(self._open_user_scripts_folder)
         data_menu.addAction(open_user_scripts_action)
@@ -395,7 +395,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         open_logging_folder_action.triggered.connect(self._open_logging_folder)
         app_logs_submenu.addAction(open_logging_folder_action)
 
-        open_sessions_logs_action = QAction('🗂️ Open Sessions Folder', self)
+        open_sessions_logs_action = QAction('📂 Open Sessions Folder', self)
         open_sessions_logs_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging\\Sessions')
         open_sessions_logs_action.triggered.connect(self._open_sessions_logging_folder)
         app_logs_submenu.addAction(open_sessions_logs_action)
