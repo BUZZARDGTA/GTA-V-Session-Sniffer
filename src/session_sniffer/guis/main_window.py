@@ -147,14 +147,6 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         change_interface_action.triggered.connect(on_change_interface)
         capture_menu.addAction(change_interface_action)
 
-        capture_menu.addSeparator()
-
-        exit_action = QAction('❌ Exit', self)
-        exit_action.setToolTip('Close Session Sniffer and stop capture')
-        exit_action.setShortcut(QKeySequence('Ctrl+Q'))
-        exit_action.triggered.connect(self.close)
-        capture_menu.addAction(exit_action)
-
         gta5_menu = menu_bar.addMenu('GTA V')
         if not gta5_menu:
             message = 'Failed to create GTA5 menu'
