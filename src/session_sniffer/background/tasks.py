@@ -463,7 +463,7 @@ def process_userip_task(
         userip: The resolved UserIP snapshot captured at task-spawn time.
             Passed directly so this task never depends on `player.userip`,
             which may be temporarily `None` during a database re-parse.
-        connection_type: Either ``'connected'`` or ``'disconnected'``.
+        connection_type: Either `'connected'` or `'disconnected'`.
     """
     if player.userip_detection is None:
         raise TypeError(format_type_error(player.userip_detection, PlayerUserIPDetection))
