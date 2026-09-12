@@ -629,8 +629,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         """Handle the main window close event and terminate background work."""
         gui_closed__event.set()
-        if self._player_resolver_window is not None:
-            self._player_resolver_window.close()
+        self._player_resolver_window.close()
         if self._settings_dialog_window is not None:
             self._settings_dialog_window.close()
         if self._userip_manager_window is not None:
