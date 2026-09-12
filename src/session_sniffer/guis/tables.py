@@ -104,6 +104,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
         self._saved_h_scroll: int | None = None
         self._saved_v_scroll: int | None = None
         self._has_host_crown: bool = False
+        self._has_multiple_ports: bool = False
 
         self.setModel(model)
         self.setMouseTracking(True)  # Track mouse without clicks
@@ -283,13 +284,14 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
         base_width = font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
         if header_label == 'IP Address' and self.model().has_session_host():
             return base_width + font_metrics.horizontalAdvance(' 👑')
-        if header_label == 'Ports':
+        if header_label == 'Ports' and self.model().has_multiple_ports():
             return max(base_width, font_metrics.horizontalAdvance('65535, 65535') + HEADER_SORT_PADDING)
         return base_width
 
     def setup_static_column_resizing(self) -> None:
         """Set up initial column resizing for the table, fitting columns and distributing extra space to flexible columns."""
         self._has_host_crown = self.model().has_session_host()
+        self._has_multiple_ports = self.model().has_multiple_ports()
         setup_static_table_column_resizing(self, compute_base_width=self._compute_column_base_width)
 
     def adjust_username_column_width(self) -> None:
@@ -312,6 +314,22 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
             return
 
         self._has_host_crown = has_host
+        self.setup_static_column_resizing()
+
+    def adjust_ports_column_width(self) -> None:
+        """Adjust the 'Ports' column width when multiple ports presence changes."""
+        model = self.model()
+        ports_column_index = model.ports_column_index
+        if ports_column_index is None or ports_column_index < 0 or ports_column_index >= model.columnCount():
+            return
+        if self.horizontalHeader().isSectionHidden(ports_column_index):
+            return
+
+        has_multiple_ports = model.has_multiple_ports()
+        if has_multiple_ports == self._has_multiple_ports:
+            return
+
+        self._has_multiple_ports = has_multiple_ports
         self.setup_static_column_resizing()
 
     def sort_current_column(self) -> None:

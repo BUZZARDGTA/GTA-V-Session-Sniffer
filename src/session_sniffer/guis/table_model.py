@@ -110,6 +110,7 @@ class _ColumnIndices:
     ip: int
     username: int
     country: int | None
+    ports: int | None
 
 
 class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public-methods
@@ -133,6 +134,7 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
             ip=self._headers.index('IP Address'),
             username=self._headers.index('Usernames'),
             country=self.get_column_index('Country'),
+            ports=self.get_column_index('Ports'),
         )
         self._ip_to_row_index: dict[str, int] = {}  # O(1) row lookup by IP
 
@@ -193,6 +195,15 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
         It is read-only and specific to this instance.
         """
         return self._column_indices.username
+
+    @property
+    def ports_column_index(self) -> int | None:
+        """Returns the index of the 'Ports' column in this table model, or None if not present.
+
+        This value is computed during initialization based on the `headers` provided.<br>
+        It is read-only and specific to this instance.
+        """
+        return self._column_indices.ports
 
     # --------------------------------------------------------------------------
     # Qt model methods (overrides)
@@ -550,6 +561,13 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
             return False
         return any(len(row_data) > ip_column and '👑' in row_data[ip_column] for row_data in self._data)
 
+    def has_multiple_ports(self) -> bool:
+        """Return whether any row in the table contains multiple ports."""
+        ports_column = self.ports_column_index
+        if ports_column is None or ports_column < 0:
+            return False
+        return any(len(row_data) > ports_column and ',' in row_data[ports_column] for row_data in self._data)
+
     def add_row_without_refresh(self, row_data: list[str], row_colors: list[CellColor]) -> None:
         """Add a new row to the model without notifying the view in real time.
 
@@ -661,6 +679,7 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
                 ip=self._headers.index('IP Address'),
                 username=self._headers.index('Usernames'),
                 country=self.get_column_index('Country'),
+                ports=self.get_column_index('Ports'),
             )
         self._data = []
         self._compiled_colors = []

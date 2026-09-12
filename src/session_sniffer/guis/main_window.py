@@ -689,6 +689,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._connected.table_view.sort_current_column()
             self._connected.table_view.adjust_username_column_width()
             self._connected.table_view.adjust_ip_column_width()
+            self._connected.table_view.adjust_ports_column_width()
 
         if disconnected_count_changed:
             self._disconnected.update_current_count(payload.disconnected_count)
@@ -714,6 +715,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._disconnected.table_view.sort_current_column()
             self._disconnected.table_view.adjust_username_column_width()
             self._disconnected.table_view.adjust_ip_column_width()
+            self._disconnected.table_view.adjust_ports_column_width()
 
         self._connected.table_view.restore_selection()
         self._disconnected.table_view.restore_selection()
