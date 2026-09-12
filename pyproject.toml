@@ -195,6 +195,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel", "typing.NamedTuple"]
 [tool.pyrefly]
 python_version = "3.14"
 min-severity = "warn"
+site-package-path = [".venv/Lib/site-packages"]
 
 [tool.pyrefly.errors]
 bad-assignment = "ignore"
