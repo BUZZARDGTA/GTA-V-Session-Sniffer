@@ -63,6 +63,7 @@ _SEARCH_COLUMN_COUNTRY = 'Country'
 _SEARCH_COLUMN_CITY = 'City'
 _SEARCH_COLUMN_ISP = 'ISP'
 _SEARCH_COLUMN_ASN = 'ASN'
+_SEARCH_COLUMN_PORTS = 'Ports'
 _SEARCH_COLUMN_LAST_PORT = 'Last Port'
 _SEARCH_COLUMN_MIDDLE_PORTS = 'Middle Ports'
 _SEARCH_COLUMN_FIRST_PORT = 'First Port'
@@ -737,6 +738,7 @@ class SessionsLogTab(QWidget):
             _SEARCH_COLUMN_CITY: cls._normalize_search_value(info.get('City')),
             _SEARCH_COLUMN_ISP: cls._normalize_search_value(info.get('ISP')),
             _SEARCH_COLUMN_ASN: cls._normalize_search_value(info.get('ASN')),
+            _SEARCH_COLUMN_PORTS: cls._normalize_search_value(info.get('Ports')),
             _SEARCH_COLUMN_LAST_PORT: cls._normalize_search_value(info.get('Last Port')),
             _SEARCH_COLUMN_MIDDLE_PORTS: cls._normalize_search_value(info.get('Middle Ports')),
             _SEARCH_COLUMN_FIRST_PORT: cls._normalize_search_value(info.get('First Port')),

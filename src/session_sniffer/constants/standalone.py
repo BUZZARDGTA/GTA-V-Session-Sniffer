@@ -57,6 +57,7 @@ DATETIME_TRACKING_COLUMNS: tuple[str, ...] = ('First Seen', 'Last Rejoin', 'Last
 
 # Shared port column names.
 PORT_COLUMNS: tuple[str, ...] = (
+    'Ports',
     'Last Port',
     'Middle Ports',
     'First Port',

@@ -9,6 +9,7 @@ from session_sniffer.constants.external import LOCAL_TZ
 from session_sniffer.models.player import Player, PlayerBandwidth
 from session_sniffer.rendering_core.session_table_renderer import (
     format_player_middle_ports,
+    format_player_ports,
     format_player_usernames,
 )
 from session_sniffer.text_utils import format_elapsed_time
@@ -49,6 +50,7 @@ def format_player_column_value(player: Player, column_name: str, now: datetime) 
         'BPM': lambda: PlayerBandwidth.format_bytes(player.bandwidth.bpm.calculated_rate),
         'IP Address': lambda: player.ip,
         'Hostname': lambda: player.reverse_dns.hostname,
+        'Ports': lambda: format_player_ports(player),
         'Last Port': lambda: str(player.ports.last),
         'Middle Ports': lambda: format_player_middle_ports(player),
         'First Port': lambda: str(player.ports.first),

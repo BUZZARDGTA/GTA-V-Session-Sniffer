@@ -73,6 +73,7 @@ GUI_COLUMN_HEADERS_TOOLTIPS = {
     'BPM': 'The number of Bytes transferred (Downloaded + Uploaded) with the player Per Minute during the current session.',
     'IP Address': 'The IP address of the player.',
     'Hostname': "The domain name associated with the player's IP address, resolved through a reverse DNS lookup.",
+    'Ports': 'All ports used by the player, sorted by the order of discovery.',
     'Last Port': "The port used by the player's last captured packet.",
     'Middle Ports': 'The ports used by the player between the first and last captured packets.',
     'First Port': "The port used by the player's first captured packet.",
@@ -393,6 +394,12 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
 
             combined.sort(
                 key=lambda row: _ip_bandwidth_map[self.get_ip_from_data_safely(row[0])],
+                reverse=sort_order_bool,
+            )
+        elif sorted_column_name == 'Ports':
+            # Sort by tuple of integer port values in discovery order
+            combined.sort(
+                key=lambda row: tuple(int(port) for port in row[0][column].split(', ') if port.isdigit()),
                 reverse=sort_order_bool,
             )
         elif sorted_column_name == 'Middle Ports':

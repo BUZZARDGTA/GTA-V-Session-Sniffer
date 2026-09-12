@@ -35,6 +35,7 @@ def section_bar_qss(accent: str) -> str:
         border: 1px solid rgba(255, 255, 255, 0.55);
         border-radius: 6px;
     }}
+
     QComboBox {{
         min-height: 28px;
         padding: 0 24px 0 8px;

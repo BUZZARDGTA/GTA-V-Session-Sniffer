@@ -43,6 +43,7 @@ from session_sniffer.rendering_core.session_table_renderer import (
     build_session_table_snapshot,
     format_player_ip,
     format_player_middle_ports,
+    format_player_ports,
     format_player_usernames,
 )
 from session_sniffer.rendering_core.status_bar_renderer import build_gui_status_text
@@ -221,6 +222,7 @@ def rendering_core(
                 'BPM': PlayerBandwidth.format_bytes(player.bandwidth.bpm.calculated_rate),
                 'IP Address': format_player_ip(player.ip),
                 'Hostname': player.reverse_dns.hostname,
+                'Ports': format_player_ports(player),
                 'Last Port': player.ports.last,
                 'Middle Ports': format_player_middle_ports(player),
                 'First Port': player.ports.first,
@@ -281,6 +283,7 @@ def rendering_core(
                 'BPM': player.bandwidth.bpm.calculated_rate,
                 'IP Address': format_player_ip(player.ip),
                 'Hostname': player.reverse_dns.hostname,
+                'Ports': format_player_ports(player),
                 'Last Port': player.ports.last,
                 'Middle Ports': format_player_middle_ports(player),
                 'First Port': player.ports.first,

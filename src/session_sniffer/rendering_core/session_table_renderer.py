@@ -46,6 +46,13 @@ def format_player_middle_ports(player: Player) -> str:
     return ''
 
 
+def format_player_ports(player: Player) -> str:
+    """Format all player ports as comma-separated string in order of discovery."""
+    if player.ports.all:
+        return ', '.join(map(str, player.ports.all))
+    return ''
+
+
 def format_player_continent(player: Player) -> str:
     """Format player continent with optional alpha-2 code."""
     if Settings.gui_columns_geo_continent_append_alpha2:
@@ -247,6 +254,8 @@ def build_session_table_snapshot(
         connected_row_texts.append(format_player_ip(player.ip))
         if 'Hostname' in context.connected_shown_columns:
             connected_row_texts.append(player.reverse_dns.hostname)
+        if 'Ports' in context.connected_shown_columns:
+            connected_row_texts.append(format_player_ports(player))
         if 'Last Port' in context.connected_shown_columns:
             connected_row_texts.append(f'{player.ports.last}')
         if 'Middle Ports' in context.connected_shown_columns:
@@ -359,6 +368,8 @@ def build_session_table_snapshot(
         disconnected_row_texts.append(format_player_ip(player.ip))
         if 'Hostname' in context.disconnected_shown_columns:
             disconnected_row_texts.append(player.reverse_dns.hostname)
+        if 'Ports' in context.disconnected_shown_columns:
+            disconnected_row_texts.append(format_player_ports(player))
         if 'Last Port' in context.disconnected_shown_columns:
             disconnected_row_texts.append(f'{player.ports.last}')
         if 'Middle Ports' in context.disconnected_shown_columns:
