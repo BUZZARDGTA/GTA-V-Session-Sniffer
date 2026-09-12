@@ -180,6 +180,7 @@ class SessionTableSection(QWidget):
 
         # Search controls — text input and column selector
         self._search_combo = QComboBox()
+        self._search_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self._search_combo.addItem('All Columns')
         self._search_combo.setItemData(0, -1)
         for column_index, column_name in enumerate(column_names):
@@ -193,7 +194,7 @@ class SessionTableSection(QWidget):
 
         self._search_bar = QLineEdit()
         self._search_bar.setPlaceholderText('Search...')
-        self._search_bar.setMinimumWidth(220)
+        self._search_bar.setMinimumWidth(160)
         self._search_bar.textChanged.connect(self._on_search_changed)
         apply_search_icon(self._search_bar)
 

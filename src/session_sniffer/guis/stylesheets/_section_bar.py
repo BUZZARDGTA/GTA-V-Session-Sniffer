@@ -27,13 +27,22 @@ def section_bar_qss(accent: str) -> str:
         font-size: 11pt;
         font-weight: 600;
     }}
-    QComboBox, QPushButton, QToolButton {{
+    QPushButton, QToolButton {{
         min-height: 28px;
         padding: 0 8px;
         color: white;
         background: rgba(0, 0, 0, 0.18);
         border: 1px solid rgba(255, 255, 255, 0.55);
         border-radius: 6px;
+    }}
+    QComboBox {{
+        min-height: 28px;
+        padding: 0 24px 0 8px;
+        color: white;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 6px;
+        min-width: 105px;
     }}
     QSpinBox {{
         min-height: 28px;
