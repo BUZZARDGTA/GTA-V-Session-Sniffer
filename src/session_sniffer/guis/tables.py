@@ -283,6 +283,8 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
         base_width = font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
         if header_label == 'IP Address' and self.model().has_session_host():
             return base_width + font_metrics.horizontalAdvance(' 👑')
+        if header_label == 'Ports':
+            return max(base_width, font_metrics.horizontalAdvance('65535, 65535') + HEADER_SORT_PADDING)
         return base_width
 
     def setup_static_column_resizing(self) -> None:
