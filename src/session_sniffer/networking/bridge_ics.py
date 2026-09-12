@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 if sys.platform == 'win32':
-    import winreg  # pylint: disable=import-error
+    import winreg
 else:
     winreg = None  # type: ignore[assignment]  # pylint: disable=invalid-name
 

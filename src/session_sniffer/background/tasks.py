@@ -162,7 +162,7 @@ def _voice_notification_worker() -> None:
         if wav_path is None:
             continue
         if sys.platform == 'win32':
-            import winsound  # noqa: PLC0415  # pylint: disable=import-error,import-outside-toplevel
+            import winsound  # noqa: PLC0415  # pylint: disable=import-outside-toplevel
             with contextlib.suppress(RuntimeError):
                 winsound.PlaySound(wav_path, winsound.SND_FILENAME | winsound.SND_NODEFAULT)
         else:

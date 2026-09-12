@@ -18,13 +18,12 @@ from session_sniffer.utils import resource_path
 def _read_pyside6_version() -> str:
     pyproject_path = resource_path(Path('pyproject.toml'))
     pyproject_data = tomllib.loads(pyproject_path.read_text(encoding='utf-8'))
-    for dependency in pyproject_data['project']['dependencies']:
-        requirement = Requirement(dependency)
-
-        if requirement.name.lower() == 'pyside6':
-            for specifier in requirement.specifier:
-                if specifier.operator == '==':
-                    return specifier.version
+    for entry in pyproject_data['project']['dependencies']:
+        parsed_requirement = Requirement(entry)
+        if parsed_requirement.name.casefold() == 'pyside6':
+            exact_versions = [specifier.version for specifier in parsed_requirement.specifier if specifier.operator == '==']
+            if exact_versions:
+                return exact_versions[0]
 
     message = f'PySide6 dependency is missing from {pyproject_path}.'
     raise RuntimeError(message)
