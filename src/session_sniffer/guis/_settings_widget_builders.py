@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import DISCORD_INVITE_URL
+from session_sniffer.guis.color_picker_dialog import ColorPickerButton
 from session_sniffer.guis.secret_line_edit import SecretLineEdit
 from session_sniffer.guis.stylesheets import (
     COMPACT_BUTTON_STYLESHEET,
@@ -57,6 +58,15 @@ def create_boolean_widget(meta: SettingMeta) -> QCheckBox:
     if tooltip:
         checkbox.setToolTip(tooltip)
     return checkbox
+
+
+def create_color_widget(meta: SettingMeta) -> ColorPickerButton:
+    """Create a color picker button widget for a color setting."""
+    button = ColorPickerButton()
+    tooltip = format_setting_tooltip(meta)
+    if tooltip:
+        button.setToolTip(tooltip)
+    return button
 
 
 def create_text_widget(meta: SettingMeta) -> QLineEdit:

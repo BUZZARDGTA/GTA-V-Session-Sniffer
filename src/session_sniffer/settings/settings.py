@@ -60,6 +60,8 @@ class Settings:
     capture_filter_block_classicstun: bool = SETTING_DEFAULTS['capture_filter_block_classicstun']
     capture_filter_block_llmnr: bool = SETTING_DEFAULTS['capture_filter_block_llmnr']
     gui_always_on_top: bool = SETTING_DEFAULTS['gui_always_on_top']
+    gui_servers_color_enabled: bool = SETTING_DEFAULTS['gui_servers_color_enabled']
+    gui_servers_color: str = SETTING_DEFAULTS['gui_servers_color']
     gui_interface_selection_auto_connect: bool = SETTING_DEFAULTS['gui_interface_selection_auto_connect']
     gui_interface_selection_hide_inactive: bool = SETTING_DEFAULTS['gui_interface_selection_hide_inactive']
     gui_interface_selection_hide_neighbours: bool = SETTING_DEFAULTS['gui_interface_selection_hide_neighbours']
@@ -124,6 +126,9 @@ class Settings:
         'CAPTURE_PS3_NAME_RESOLVER',
         'CAPTURE_PREPEND_CUSTOM_CAPTURE_FILTER',
         *CAPTURE_FILTER_BLOCK_SETTINGS,
+        'GUI_ALWAYS_ON_TOP',
+        'GUI_SERVERS_COLOR_ENABLED',
+        'GUI_SERVERS_COLOR',
         'GUI_INTERFACE_SELECTION_AUTO_CONNECT',
         'GUI_INTERFACE_SELECTION_HIDE_INACTIVE',
         'GUI_INTERFACE_SELECTION_HIDE_NEIGHBOURS',

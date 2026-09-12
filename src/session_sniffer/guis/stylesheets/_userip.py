@@ -13,7 +13,7 @@ COLOR_SWATCH_SEPARATOR_STYLESHEET = 'color: #3a3a3a;'
 SETTINGS_SEPARATOR_STYLESHEET = 'background-color: rgba(74, 144, 226, 0.2); border: none;'
 
 COLOR_BUTTON_EMPTY_STYLESHEET = (
-    'QPushButton#DatabaseColorButton {'
+    'QPushButton#ColorPickerButton, QPushButton#DatabaseColorButton {'
     ' background-color: transparent;'
     ' border: 1px solid #555;'
     ' border-radius: 4px;'
@@ -24,7 +24,7 @@ COLOR_BUTTON_EMPTY_STYLESHEET = (
     ' padding: 0px;'
     ' margin: 0px;'
     '}'
-    ' QPushButton#DatabaseColorButton:hover { border-color: #4a90e2; }'
+    ' QPushButton#ColorPickerButton:hover, QPushButton#DatabaseColorButton:hover { border-color: #4a90e2; }'
 )
 
 
@@ -40,7 +40,7 @@ def color_swatch_button_stylesheet(bg_color: str, text_color: str, border_width:
 def color_button_filled_stylesheet(color_name: str) -> str:
     """Return the QSS for a color preview button showing the given `color_name`."""
     return (
-        'QPushButton#DatabaseColorButton {'
+        'QPushButton#ColorPickerButton, QPushButton#DatabaseColorButton {'
         f' background-color: {color_name};'
         ' border: 1px solid #555;'
         ' border-radius: 4px;'
@@ -51,7 +51,7 @@ def color_button_filled_stylesheet(color_name: str) -> str:
         ' padding: 0px;'
         ' margin: 0px;'
         '}'
-        ' QPushButton#DatabaseColorButton:hover { border-color: #ffffff; }'
+        ' QPushButton#ColorPickerButton:hover, QPushButton#DatabaseColorButton:hover { border-color: #ffffff; }'
     )
 
 

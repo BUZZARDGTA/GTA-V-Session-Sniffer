@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -48,6 +48,7 @@ from session_sniffer.guis._settings_widget_builders import (
     build_webserver_help_group,
     create_bool_or_enum_widget,
     create_boolean_widget,
+    create_color_widget,
     create_column_tuple_widget,
     create_enum_widget,
     create_float_widget,
@@ -59,6 +60,7 @@ from session_sniffer.guis._settings_widget_builders import (
     format_setting_tooltip,
     get_line_edit,
 )
+from session_sniffer.guis.color_picker_dialog import ColorPickerButton
 from session_sniffer.guis.process_selector_widget import ProcessSelectorWidget
 from session_sniffer.guis.relay_conflict import prompt_to_disable_gta5_relay_if_filtered
 from session_sniffer.guis.secret_line_edit import SecretLineEdit
@@ -604,6 +606,7 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
             SettingType.ENUM: partial(create_enum_widget, meta),
             SettingType.BOOL_OR_ENUM: partial(create_bool_or_enum_widget, meta),
             SettingType.COLUMN_TUPLE: partial(create_column_tuple_widget, key, meta),
+            SettingType.COLOR: partial(create_color_widget, meta),
             SettingType.THIRD_PARTY_SERVERS_TUPLE: partial(create_third_party_servers_split_widget, key, meta),
             SettingType.IP_RANGE_TUPLE: partial(create_ip_range_tuple_widget, meta, self),
         }
@@ -633,6 +636,9 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
 
         elif meta.setting_type in (SettingType.STRING, SettingType.IPV4, SettingType.MAC_ADDRESS):
             get_line_edit(widget).setText('' if value is None else str(value))
+
+        elif meta.setting_type == SettingType.COLOR:
+            cast('ColorPickerButton', widget).set_color(str(value) if value is not None else '')
 
         elif meta.setting_type == SettingType.FLOAT:
             cast('QDoubleSpinBox', widget).setValue(float(value) if isinstance(value, (int, float)) else 0.0)
@@ -691,6 +697,8 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
             case SettingType.STRING | SettingType.IPV4 | SettingType.MAC_ADDRESS:
                 text = get_line_edit(widget).text().strip()
                 value = text or None
+            case SettingType.COLOR:
+                value = cast('ColorPickerButton', widget).color()
             case SettingType.FLOAT:
                 value = cast('QDoubleSpinBox', widget).value()
             case SettingType.INTEGER | SettingType.INTEGER_OR_ALL:
@@ -728,6 +736,9 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
 
             if meta.setting_type == SettingType.IPV4 and isinstance(value, str) and not is_ipv4_address(value):
                 errors.append(f'{meta.display_label}: "{value}" is not a valid IPv4 address.')
+
+            elif meta.setting_type == SettingType.COLOR and (not isinstance(value, str) or not QColor(value).isValid()):
+                errors.append(f'{meta.display_label}: "{value}" is not a valid color.')
 
             elif meta.setting_type == SettingType.MAC_ADDRESS and isinstance(value, str):
                 formatted = format_mac_address(value)
@@ -893,6 +904,8 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
             meta = SETTING_METADATA[key]
             if isinstance(widget, QCheckBox):
                 widget.toggled.connect(self._update_restart_notice)
+            elif isinstance(widget, ColorPickerButton):
+                widget.color_changed.connect(self._update_restart_notice)
             elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 widget.valueChanged.connect(self._update_restart_notice)
             elif isinstance(widget, QComboBox):

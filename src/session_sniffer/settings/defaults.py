@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from session_sniffer.constants.standalone import (
     CLASSICSTUN_PORT,
+    DEFAULT_DETECTED_SERVER_COLOR,
     LLMNR_PORT,
     MAX_PORT,
     MIN_PORT,
@@ -33,6 +34,7 @@ class SettingType(Enum):
     COLUMN_TUPLE = auto()
     IP_RANGE_TUPLE = auto()
     THIRD_PARTY_SERVERS_TUPLE = auto()
+    COLOR = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -447,6 +449,20 @@ SETTING_METADATA: dict[str, SettingMeta] = {
         setting_type=SettingType.BOOLEAN,
         tooltip='Keep the main application window above all other windows.',
     ),
+    'gui_servers_color_enabled': SettingMeta(
+        category='Session',
+        group='Detected Servers',
+        display_label='Enabled',
+        setting_type=SettingType.BOOLEAN,
+        tooltip='Highlight detected game and hosting servers with a custom background color in the player tables.',
+    ),
+    'gui_servers_color': SettingMeta(
+        category='Session',
+        group='Detected Servers',
+        display_label='Color',
+        setting_type=SettingType.COLOR,
+        tooltip='Background color used to highlight detected game and hosting servers in the player tables.',
+    ),
     'gui_ignore_screen_resolution_warning': SettingMeta(
         category='Launcher',
         group='Application Popups',
@@ -698,6 +714,8 @@ class SettingDefaults(TypedDict):
     capture_filter_block_classicstun: bool
     capture_filter_block_llmnr: bool
     gui_always_on_top: bool
+    gui_servers_color_enabled: bool
+    gui_servers_color: str
     gui_interface_selection_auto_connect: bool
     gui_interface_selection_hide_inactive: bool
     gui_interface_selection_hide_neighbours: bool
@@ -766,6 +784,8 @@ SETTING_DEFAULTS: SettingDefaults = {
     'capture_filter_block_classicstun': True,
     'capture_filter_block_llmnr': True,
     'gui_always_on_top': False,
+    'gui_servers_color_enabled': True,
+    'gui_servers_color': DEFAULT_DETECTED_SERVER_COLOR,
     'gui_interface_selection_auto_connect': False,
     'gui_interface_selection_hide_inactive': True,
     'gui_interface_selection_hide_neighbours': False,

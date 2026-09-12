@@ -9,6 +9,8 @@ This module provides a modular color system organized into layers:
 
 import enum
 
+from session_sniffer.constants.standalone import DEFAULT_DETECTED_SERVER_COLOR
+
 
 class ColorPalette(enum.StrEnum):
     """Base Nordic-inspired color palette for the entire application.
@@ -75,3 +77,6 @@ class TableColors(enum.StrEnum):
     # Disconnected player row colors
     DISCONNECTED_TEXT = 'red'
     DISCONNECTED_USERIP_TEXT = 'white'
+
+    # Detected server row colors
+    SERVER_BACKGROUND = DEFAULT_DETECTED_SERVER_COLOR

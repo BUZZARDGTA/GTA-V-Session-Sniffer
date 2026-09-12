@@ -10,6 +10,7 @@ from session_sniffer.constants.external import LOCAL_TZ
 from session_sniffer.guis.colors import TableColors
 from session_sniffer.guis.exceptions import InvalidDateColumnConfigurationError
 from session_sniffer.models.player import Player, PlayerBandwidth
+from session_sniffer.networking.third_party_servers import is_third_party_server_ip
 from session_sniffer.player.registry import SessionHost
 from session_sniffer.rendering_core.types import CellColor, SessionTableSnapshot
 from session_sniffer.settings import Settings
@@ -25,6 +26,12 @@ _CONNECTED_TEXT_COLOR = QColor(TableColors.CONNECTED_TEXT)
 _CONNECTED_USERIP_TEXT_COLOR = QColor(TableColors.CONNECTED_USERIP_TEXT)
 _DISCONNECTED_TEXT_COLOR = QColor(TableColors.DISCONNECTED_TEXT)
 _DISCONNECTED_USERIP_TEXT_COLOR = QColor(TableColors.DISCONNECTED_USERIP_TEXT)
+_SERVER_BACKGROUND_COLOR = QColor(TableColors.SERVER_BACKGROUND)
+
+
+def is_detected_server(player: Player) -> bool:
+    """Return whether the player represents a detected third-party or hosting server."""
+    return is_third_party_server_ip(player.ip) or (player.iplookup.ipapi.is_initialized and player.iplookup.ipapi.hosting is True)
 
 
 def format_player_usernames(player: Player) -> str:
@@ -155,6 +162,12 @@ def build_session_table_snapshot(
     session_disconnected_table__processed_data: list[list[str]] = []
     session_disconnected_table__compiled_colors: list[list[CellColor]] = []
 
+    server_bg_color = (
+        QColor(Settings.gui_servers_color)
+        if Settings.gui_servers_color_enabled and QColor(Settings.gui_servers_color).isValid()
+        else _SERVER_BACKGROUND_COLOR
+    )
+
     _base_connected_cell = CellColor(foreground=_CONNECTED_TEXT_COLOR, background=HARDCODED_DEFAULT_TABLE_BACKGROUND_CELL_COLOR)
     _base_connected_row_colors = [_base_connected_cell] * context.connected_num_columns
 
@@ -162,6 +175,9 @@ def build_session_table_snapshot(
         if player.userip and player.userip.usernames:
             row_fg_color = _CONNECTED_USERIP_TEXT_COLOR
             row_colors = [CellColor(foreground=row_fg_color, background=player.userip.settings.color)] * context.connected_num_columns
+        elif Settings.gui_servers_color_enabled and is_detected_server(player):
+            row_fg_color = _CONNECTED_USERIP_TEXT_COLOR
+            row_colors = [CellColor(foreground=row_fg_color, background=server_bg_color)] * context.connected_num_columns
         else:
             row_fg_color = _CONNECTED_TEXT_COLOR
             row_colors = _base_connected_row_colors.copy()
@@ -315,6 +331,9 @@ def build_session_table_snapshot(
         if player.userip and player.userip.usernames:
             row_fg_color = _DISCONNECTED_USERIP_TEXT_COLOR
             row_colors = [CellColor(foreground=row_fg_color, background=player.userip.settings.color)] * context.disconnected_num_columns
+        elif Settings.gui_servers_color_enabled and is_detected_server(player):
+            row_fg_color = _DISCONNECTED_USERIP_TEXT_COLOR
+            row_colors = [CellColor(foreground=row_fg_color, background=server_bg_color)] * context.disconnected_num_columns
         else:
             row_fg_color = _DISCONNECTED_TEXT_COLOR
             row_colors = _base_disconnected_row_colors.copy()

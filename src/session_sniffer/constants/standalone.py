@@ -188,3 +188,6 @@ CAPTURE_FILTER_BLOCK_SETTINGS: tuple[str, ...] = (
 
 # Maximum duration in seconds for suspend rules and actions.
 MAX_SUSPEND_DURATION_SECONDS: int = 3600
+
+# Default display color for detected server table rows.
+DEFAULT_DETECTED_SERVER_COLOR: str = 'purple'

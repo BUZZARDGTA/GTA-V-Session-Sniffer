@@ -13,8 +13,15 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Self, cast
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator, model_validator
+from PySide6.QtGui import QColor
 
-from session_sniffer.constants.standalone import CAPTURE_FILTER_BLOCK_SETTINGS, MAX_PORT, MIN_PORT, WEBSERVER_DEFAULT_HOST
+from session_sniffer.constants.standalone import (
+    CAPTURE_FILTER_BLOCK_SETTINGS,
+    DEFAULT_DETECTED_SERVER_COLOR,
+    MAX_PORT,
+    MIN_PORT,
+    WEBSERVER_DEFAULT_HOST,
+)
 from session_sniffer.networking.ip_range import parse_ip_range
 from session_sniffer.networking.utils import format_mac_address, is_ipv4_address, is_mac_address
 from session_sniffer.utils import (
@@ -82,6 +89,8 @@ class SettingsIniModel(BaseModel):
 
     # GUI settings
     GUI_ALWAYS_ON_TOP: bool
+    GUI_SERVERS_COLOR_ENABLED: bool
+    GUI_SERVERS_COLOR: str
     GUI_INTERFACE_SELECTION_AUTO_CONNECT: bool
     GUI_INTERFACE_SELECTION_HIDE_INACTIVE: bool
     GUI_INTERFACE_SELECTION_HIDE_NEIGHBOURS: bool
@@ -145,6 +154,8 @@ class SettingsIniModel(BaseModel):
             'DISCORD_WEBHOOK_INCLUDE_CONNECTED',
             'DISCORD_WEBHOOK_INCLUDE_DISCONNECTED',
             'WEBSERVER_ENABLED',
+            'GUI_ALWAYS_ON_TOP',
+            'GUI_SERVERS_COLOR_ENABLED',
             'GUI_COLUMNS_DATETIME_SHOW_DATE',
             'GUI_COLUMNS_DATETIME_SHOW_ELAPSED_TIME',
             'GUI_COLUMNS_DATETIME_SHOW_TIME',
@@ -558,6 +569,16 @@ class SettingsIniModel(BaseModel):
         cls._set_flag(info, 'should_rewrite', value=True)
         default_value = cls._get_default_for_field(info)
         return default_value if isinstance(default_value, str) else ''
+
+    @field_validator('GUI_SERVERS_COLOR', mode='before')
+    @classmethod
+    def _parse_gui_servers_color(cls, value: object, info: ValidationInfo) -> str:
+        if isinstance(value, str) and QColor(value).isValid():
+            return value
+        cls._set_flag(info, 'should_rewrite', value=True)
+        default_val = cls._get_default_for_field(info)
+        return str(default_val) if default_val is not None else DEFAULT_DETECTED_SERVER_COLOR
+
 
     @field_validator('DISCORD_WEBHOOK_URL', 'DISCORD_WEBHOOK_MESSAGE_IDS', 'WEBSERVER_USERNAME', 'WEBSERVER_PASSWORD', 'LOOKY_API_KEY', mode='before')
     @classmethod
