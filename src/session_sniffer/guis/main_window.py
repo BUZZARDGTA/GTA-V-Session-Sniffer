@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QKeySequence, QShowEvent
+from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -96,7 +96,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
         self.capture = capture_holder
         self._on_change_interface = on_change_interface
-        self._player_resolver_window = PlayerResolverWindow(self._highlight_connected_ips, self)
+        self._player_resolver_window = PlayerResolverWindow(self._highlight_connected_ips)
         self._detections_manager_window: DetectionsManagerDialog | None = None
         self._logs_manager_window: LogsManager | None = None
         self._settings_dialog_window: SettingsDialog | None = None
@@ -629,6 +629,16 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         """Handle the main window close event and terminate background work."""
         gui_closed__event.set()
+        if self._player_resolver_window is not None:
+            self._player_resolver_window.close()
+        if self._settings_dialog_window is not None:
+            self._settings_dialog_window.close()
+        if self._userip_manager_window is not None:
+            self._userip_manager_window.close()
+        if self._logs_manager_window is not None:
+            self._logs_manager_window.close()
+        if self._detections_manager_window is not None:
+            self._detections_manager_window.close()
         if self._leaderboard_window is not None:
             self._leaderboard_window.close()
         close_all_crawler_dialogs()
@@ -859,7 +869,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._settings_dialog_window.raise_()
             self._settings_dialog_window.activateWindow()
             return
-        self._settings_dialog_window = SettingsDialog(self, self.capture.get(), self._on_change_interface)
+        self._settings_dialog_window = SettingsDialog(None, self.capture.get(), self._on_change_interface)
         self._settings_dialog_window.accepted.connect(self._update_gta5_toolbar_visibility)
         self._settings_dialog_window.accepted.connect(self._apply_always_on_top)
         self._settings_dialog_window.destroyed.connect(lambda: setattr(self, '_settings_dialog_window', None))
@@ -871,7 +881,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._userip_manager_window.raise_()
             self._userip_manager_window.activateWindow()
             return
-        self._userip_manager_window = UserIPDatabasesManager(self)
+        self._userip_manager_window = UserIPDatabasesManager(None)
         self._userip_manager_window.destroyed.connect(lambda: setattr(self, '_userip_manager_window', None))
         self._userip_manager_window.show()
 
@@ -881,7 +891,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._logs_manager_window.raise_()
             self._logs_manager_window.activateWindow()
             return
-        self._logs_manager_window = LogsManager(self)
+        self._logs_manager_window = LogsManager(None)
         self._logs_manager_window.destroyed.connect(lambda: setattr(self, '_logs_manager_window', None))
         self._logs_manager_window.show()
 
@@ -891,7 +901,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             self._detections_manager_window.raise_()
             self._detections_manager_window.activateWindow()
             return
-        self._detections_manager_window = DetectionsManagerDialog(self)
+        self._detections_manager_window = DetectionsManagerDialog(None)
         self._detections_manager_window.destroyed.connect(lambda: setattr(self, '_detections_manager_window', None))
         self._detections_manager_window.show()
 

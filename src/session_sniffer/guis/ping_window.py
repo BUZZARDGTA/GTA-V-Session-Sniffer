@@ -408,10 +408,9 @@ class PingWindow(QWidget):
         *,
         mode: PingMode = PingMode.ICMP,
         port: int | None = None,
-        parent: QWidget | None = None,
     ) -> None:
         """Initialize the Ping Diagnostics window."""
-        super().__init__(parent, Qt.WindowType.Window)
+        super().__init__(None, Qt.WindowType.Window)
         self.setWindowTitle(f'{TITLE} - Ping Diagnostics')
         self.setWindowIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')))
         self.resize(scale_by_ui(860), scale_by_ui(560))
@@ -465,11 +464,10 @@ class PingWindow(QWidget):
         *,
         mode: PingMode = PingMode.ICMP,
         port: int | None = None,
-        parent: QWidget | None = None,
     ) -> PingWindow:
         """Open or reuse the active PingWindow and activate it."""
         if cls._instance is None or not cls._instance.isVisible():
-            cls._instance = cls(targets, mode=mode, port=port, parent=parent)
+            cls._instance = cls(targets, mode=mode, port=port)
         else:
             target_list = [targets] if isinstance(targets, str) else targets
             for target in target_list:

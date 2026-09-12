@@ -133,7 +133,7 @@ class UserIPDatabasesManager(EntriesContextMenuMixin, FileSyncMixin, SettingsPan
     _cached_maximized: ClassVar[bool] = False
     _cached_splitter: ClassVar[QByteArray | None] = None
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         """Build the UserIP Databases Manager dialog."""
         super().__init__(parent)
         self.setWindowTitle(f'UserIP Databases Manager - {TITLE}')

@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 class DetectionsManagerDialog(UnsavedChangesMixin, DetectionsManagerTabsMixin, QDialog):
     """Comprehensive detections manager with VPN, IP range, and advanced threat detection capabilities."""
 
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the Detections Manager dialog."""
         super().__init__(parent)
         self.setWindowTitle(f'{TITLE} - Detections Manager')

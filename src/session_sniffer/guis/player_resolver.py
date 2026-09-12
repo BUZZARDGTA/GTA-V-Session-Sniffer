@@ -28,8 +28,14 @@ class PlayerResolverWindow(ToggleAlwaysOnTopMixin):
 
         self.setWindowTitle('Player Resolver')
         self.setMinimumSize(700, 400)
-        _base_flags = Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowStaysOnTopHint
-        self.setWindowFlags(_base_flags)
+        flags = (
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowCloseButtonHint
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setWindowFlags(flags)
 
         layout = QVBoxLayout(self)
 

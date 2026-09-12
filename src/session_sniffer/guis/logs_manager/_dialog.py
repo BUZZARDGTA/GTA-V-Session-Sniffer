@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 class LogsManager(QDialog):
     """Non-modal dialog for viewing, searching, filtering, and managing application log files."""
 
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         """Build the Logs Manager dialog with tabs for each log file type."""
         super().__init__(parent)
         self.setWindowTitle(f'Logs Manager - {TITLE}')

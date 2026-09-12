@@ -140,7 +140,7 @@ def tcp_port_ping(parent: QWidget, ip: str) -> None:
         QMessageBox.warning(parent, 'Error', 'Please enter a valid port number between 1 and 65535.')
         return
 
-    PingWindow.open_window(ip, mode=PingMode.TCP, port=port, parent=parent)
+    PingWindow.open_window(ip, mode=PingMode.TCP, port=port)
 
 
 def tcp_port_ping_multi(parent: QWidget, ip_addresses: list[str]) -> None:
@@ -162,7 +162,7 @@ def tcp_port_ping_multi(parent: QWidget, ip_addresses: list[str]) -> None:
         QMessageBox.warning(parent, 'Error', 'Please enter a valid port number between 1 and 65535.')
         return
 
-    PingWindow.open_window(ip_addresses, mode=PingMode.TCP, port=port, parent=parent)
+    PingWindow.open_window(ip_addresses, mode=PingMode.TCP, port=port)
 
 
 def block_ip_as_range(parent: QWidget, ip_address: str) -> str | None:
