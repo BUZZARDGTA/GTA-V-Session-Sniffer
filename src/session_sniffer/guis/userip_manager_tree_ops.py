@@ -7,7 +7,7 @@ import subprocess
 import zipfile
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, QUrl
+from PySide6.QtCore import QFileSystemWatcher, QPoint, Qt, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon, QStandardItemModel
 from PySide6.QtWidgets import QCheckBox, QDialog, QFileDialog, QFileSystemModel, QFrame, QInputDialog, QLineEdit, QMenu, QMessageBox, QPushButton, QTreeView
 
@@ -57,6 +57,7 @@ class TreeOperationsMixin(QDialog):
     _delete_button: QPushButton
     _delete_tree_button: QPushButton
     _entries_dirty: bool
+    _fs_watcher: QFileSystemWatcher
     _global_search_active: bool
     _global_search_checkbox: QCheckBox
     _settings_snapshot: dict[str, str]
@@ -82,6 +83,17 @@ class TreeOperationsMixin(QDialog):
     def read_settings_from_widgets(self) -> dict[str, str]:
         """Read current widget values and return them as a settings dict."""
         raise NotImplementedError
+
+    def _unwatch_path(self, path: Path) -> None:
+        """Remove *path* and any of its descendants from the filesystem watcher."""
+        target_path_str = str(path)
+        watched_paths_to_remove = [
+            watched_path
+            for watched_path in (*self._fs_watcher.files(), *self._fs_watcher.directories())
+            if watched_path == target_path_str or watched_path.startswith((f'{target_path_str}\\', f'{target_path_str}/'))
+        ]
+        if watched_paths_to_remove:
+            self._fs_watcher.removePaths(watched_paths_to_remove)
 
     # ------------------------------------------------------------------
     # Tree: selection
@@ -398,6 +410,8 @@ class TreeOperationsMixin(QDialog):
         if result != QMessageBox.StandardButton.Yes:
             return
 
+        self._unwatch_path(path)
+
         if path.is_dir():
             shutil.rmtree(path)
         else:
@@ -502,6 +516,8 @@ class TreeOperationsMixin(QDialog):
         if new_path.exists():
             QMessageBox.warning(self, TITLE, f'"{path.name}" already exists in the destination folder.')
             return
+
+        self._unwatch_path(path)
 
         shutil.move(str(path), str(new_path))
 
@@ -625,6 +641,7 @@ class TreeOperationsMixin(QDialog):
         # Remove user-created subdirectories
         for entry in USERIP_DATABASES_DIR_PATH.iterdir():
             if entry.is_dir():
+                self._unwatch_path(entry)
                 with contextlib.suppress(OSError):
                     shutil.rmtree(entry)
 

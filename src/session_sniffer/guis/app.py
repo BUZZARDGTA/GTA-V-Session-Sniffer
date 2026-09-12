@@ -13,7 +13,7 @@ from session_sniffer.guis.theme import get_dark_palette
 
 
 def _qt_message_handler(message_type: QtMsgType, _context: QMessageLogContext, message: str) -> None:
-    if 'Portal operation not allowed' in message:
+    if 'Portal operation not allowed' in message or 'QFileSystemWatcher: FindNextChangeNotification failed' in message:
         return
     if message_type in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg):
         sys.stderr.write(f'{message}\n')
@@ -29,7 +29,8 @@ def _configure_platform_qt_environment() -> None:
         # On Wayland, use bradient decorations so window controls (minimize, maximize, close)
         # and dark title bars render reliably without relying on desktop portal D-Bus queries.
         os.environ.setdefault('QT_WAYLAND_DECORATION', 'bradient')
-        qInstallMessageHandler(_qt_message_handler)
+
+    qInstallMessageHandler(_qt_message_handler)
 
 
 _configure_platform_qt_environment()
