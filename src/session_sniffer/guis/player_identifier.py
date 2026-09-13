@@ -167,9 +167,9 @@ class PlayerIdentifierWidget(QWidget):
         _streak_header.setToolTip(
             'Consecutive seconds above the relevant threshold.\n\n'
             'Baseline/Ready phase: contamination streak — aborts when it reaches\n'
-            'the contamination duration (see ⚙ Parameters).\n\n'
+            'the contamination duration (see Parameters).\n\n'
             'Resolving phase: spike streak — confirms the IP as a match when\n'
-            'it reaches the spike duration (see ⚙ Parameters).',
+            'it reaches the spike duration (see Parameters).',
         )
         self._zscore_table.setHorizontalHeaderItem(5, _streak_header)
         _zscore_header_view = self._zscore_table.horizontalHeader()
@@ -241,7 +241,7 @@ class PlayerIdentifierWidget(QWidget):
         layout.addStretch()
 
         # Parameters control panel
-        self._params_box = QGroupBox('⚙ Parameters')
+        self._params_box = QGroupBox('Parameters')
         params_layout = QHBoxLayout(self._params_box)
 
         left_form = QFormLayout()
@@ -469,7 +469,7 @@ class PlayerIdentifierWidget(QWidget):
         self._stability_bar.setFormat('Locked')
         self._stability_bar.setValue(100)
         self._stability_bar.setStyleSheet(PROGRESS_BAR_CHUNK_GREEN_STYLESHEET)
-        self._stability_label.setText('Stability: <span style="color:green;">Locked ✔</span>')
+        self._stability_label.setText('Stability: <span style="color:green;">Locked</span>')
         self._contamination_streak.clear()
 
     def _on_resolve(self) -> None:
@@ -695,7 +695,7 @@ class PlayerIdentifierWidget(QWidget):
         elif converged:
             pct = 100
             style = 'QProgressBar::chunk { background-color: #27ae60; }'
-            label = 'Stability: <span style="color:green;">Stable ✔ Ready to stop</span>'
+            label = 'Stability: <span style="color:green;">Stable — Ready to stop</span>'
         elif avg_shift <= effective_yellow:
             ratio = (effective_yellow - avg_shift) / (effective_yellow - effective_green)
             pct = int(60 + ratio * 39)
@@ -871,7 +871,7 @@ class PlayerIdentifierWidget(QWidget):
 
         # Build ranked result text
         num_resolved = len(resolved)
-        lines: list[str] = [f'🎯 {num_resolved} match{pluralize(num_resolved, plural="es")} found (ranked by confidence):']
+        lines: list[str] = [f'{num_resolved} match{pluralize(num_resolved, plural="es")} found (ranked by confidence):']
         for rank, entry in enumerate(resolved, 1):
             name_part = f' — <b>{entry.username}</b>' if entry.username else ''
             lines.append(f'#{rank} — <b>{entry.ip}</b>{name_part} — {entry.confidence:.0f}% — {entry.reason}')
@@ -883,7 +883,7 @@ class PlayerIdentifierWidget(QWidget):
             f'{num_resolved} player{pluralize(num_resolved)} identified!<br>Click <b>Reset</b> to start over, or check the highlighted rows in the connected players table.',
         )
         self._stability_bar.setValue(100)
-        self._stability_bar.setFormat('Resolved ✔')
+        self._stability_bar.setFormat('Resolved')
         self._stability_bar.setStyleSheet(PROGRESS_BAR_CHUNK_GREEN_STYLESHEET)
         self._start_button.setEnabled(False)
         self._resolve_button.setEnabled(False)

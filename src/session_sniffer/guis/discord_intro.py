@@ -5,8 +5,10 @@ import webbrowser
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import DISCORD_INVITE_URL, TITLE
 from session_sniffer.guis.app import app
 from session_sniffer.guis.exceptions import PrimaryScreenNotFoundError
@@ -41,7 +43,7 @@ class DiscordIntro(QDialog):
         """Initialize the Discord community intro dialog."""
         super().__init__(parent)
 
-        window_title = '🏆 Join our Discord Community! 🤝'
+        window_title = 'Join our Discord Community!'
 
         # Modeless: must not block the main window, otherwise Windows greys out
         # the main window's native close (X) button while this dialog is open.
@@ -81,7 +83,8 @@ class DiscordIntro(QDialog):
         layout.addWidget(self.title_label)
         layout.addItem(QSpacerItem(0, 4, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        self.join_button = QPushButton(f'🔥 Join Now - {TITLE} Discord! 🔥', self)
+        self.join_button = QPushButton(f'Join Now - {TITLE} Discord!', self)
+        self.join_button.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'discord.svg')))
         self.join_button.setToolTip('Open Discord and join the Session Sniffer community server')
         self.join_button.setStyleSheet(DISCORD_POPUP_JOIN_BUTTON_STYLESHEET)
         self.join_button.setCursor(Qt.CursorShape.PointingHandCursor)

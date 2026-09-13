@@ -4,9 +4,10 @@ import functools
 from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence, QResizeEvent, QShortcut, QShowEvent
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QResizeEvent, QShortcut, QShowEvent
 from PySide6.QtWidgets import QBoxLayout, QMenu, QTableWidget, QWidget
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis.stylesheets import SVG_ICON_CONTEXT_MENU_STYLESHEET
 from session_sniffer.guis.table_column_resizing import add_column_sizing_actions, setup_table_header_context_menu
 from session_sniffer.guis.tables_player_actions import (
@@ -31,7 +32,7 @@ def extract_ip_addresses_from_table_selection(table: QTableWidget) -> list[str]:
         header_item = table.horizontalHeaderItem(item.column())
         if header_item is None or header_item.text() not in ('IP Address', 'IP', 'Gateway IP'):
             continue
-        ip_address = item.text().removesuffix(' 👑').strip()
+        ip_address = item.text().strip()
         if ip_address and ip_address not in ip_addresses:
             ip_addresses.append(ip_address)
     return ip_addresses
@@ -91,15 +92,15 @@ class TableContextMenuManager:
         menu.setStyleSheet(SVG_ICON_CONTEXT_MENU_STYLESHEET)
         menu.setToolTipsVisible(True)
 
-        copy_label = f'📋 Copy Rows ({selected_row_count})' if selected_row_count > 1 else '📋 Copy Row'
-        copy_row_action = QAction(copy_label, menu)
+        copy_label = f'Copy Rows ({selected_row_count})' if selected_row_count > 1 else 'Copy Row'
+        copy_row_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), copy_label, menu)
         copy_row_action.setShortcut('Ctrl+C')
         copy_row_action.setToolTip('Copy the selected row(s) to the clipboard as tab-separated text.')
         copy_row_action.setEnabled(selected_row_count > 0)
         copy_row_action.triggered.connect(lambda: copy_table_widget_selection(self._table))
         menu.addAction(copy_row_action)
 
-        copy_all_action = QAction('📋 Copy All', menu)
+        copy_all_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), 'Copy All', menu)
         copy_all_action.setToolTip('Select all rows, then copy them to the clipboard.')
         copy_all_action.setEnabled(self._table.rowCount() > 0)
 
@@ -112,14 +113,14 @@ class TableContextMenuManager:
 
         menu.addSeparator()
 
-        select_all_action = QAction('☑️ Select All', menu)
+        select_all_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'select_all.svg')), 'Select All', menu)
         select_all_action.setShortcut('Ctrl+A')
         select_all_action.setToolTip('Select all rows in the table.')
         select_all_action.setEnabled(self._table.rowCount() > 0)
         select_all_action.triggered.connect(self._table.selectAll)
         menu.addAction(select_all_action)
 
-        clear_selection_action = QAction('⬜ Clear Selection', menu)
+        clear_selection_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg')), 'Clear Selection', menu)
         clear_selection_action.setToolTip('Deselect all currently selected rows.')
         clear_selection_action.triggered.connect(self._table.clearSelection)
         menu.addAction(clear_selection_action)
@@ -130,28 +131,29 @@ class TableContextMenuManager:
 
             if len(selected_ip_addresses) == 1:
                 target_ip = selected_ip_addresses[0]
-                lookup_action = QAction('🔎 IP Lookup Details…', menu)
+                lookup_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')), 'IP Lookup Details…', menu)
                 lookup_action.setToolTip('Show detailed IP lookup information for this IP address.')
                 lookup_action.triggered.connect(lambda _checked=False, ip_address=target_ip: show_detailed_ip_lookup(self._parent, ip_address))
                 menu.addAction(lookup_action)
 
             # pylint: disable=duplicate-code
-            ping_menu = QMenu('📡 Ping', menu)
+            ping_menu = QMenu('Ping', menu)
+            ping_menu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')))
             ping_menu.setToolTipsVisible(True)
             if len(selected_ip_addresses) == 1:
                 target_ip = selected_ip_addresses[0]
-                normal_action = QAction('🏓 Normal (ICMP)', ping_menu)
+                normal_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')), 'Normal (ICMP)', ping_menu)
                 normal_action.setToolTip('Checks if selected IP address responds to pings.')
                 normal_action.triggered.connect(lambda _checked=False, ip_address=target_ip: ping_ip(ip_address))
                 ping_menu.addAction(normal_action)
 
-                tcp_action = QAction('🔌 TCP Port Ping', ping_menu)
+                tcp_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')), 'TCP Port Ping', ping_menu)
                 tcp_action.setToolTip('Checks if selected IP address responds to TCP pings on a given port.')
                 tcp_action.triggered.connect(lambda _checked=False, ip_address=target_ip: tcp_port_ping(self._parent, ip_address))
                 ping_menu.addAction(tcp_action)
             else:
                 ip_list = list(selected_ip_addresses)
-                normal_action = QAction('🏓 Normal (ICMP)', ping_menu)
+                normal_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')), 'Normal (ICMP)', ping_menu)
                 normal_action.setToolTip('Checks if selected IP addresses respond to pings.')
 
                 def _ping_all() -> None:
@@ -160,10 +162,11 @@ class TableContextMenuManager:
                 normal_action.triggered.connect(_ping_all)
                 ping_menu.addAction(normal_action)
 
-                tcp_menu = QMenu('🔌 TCP Port Ping', ping_menu)
+                tcp_menu = QMenu('TCP Port Ping', ping_menu)
+                tcp_menu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')))
                 tcp_menu.setToolTipsVisible(True)
 
-                tcp_one_action = QAction('🔌 One Port for All', tcp_menu)
+                tcp_one_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')), 'One Port for All', tcp_menu)
                 tcp_one_action.setToolTip('Ask for a port once, then TCP ping all selected IPs on that port.')
 
                 def _tcp_ping_multi() -> None:
@@ -172,7 +175,7 @@ class TableContextMenuManager:
                 tcp_one_action.triggered.connect(_tcp_ping_multi)
                 tcp_menu.addAction(tcp_one_action)
 
-                tcp_indiv_action = QAction('🔌 Individual Port per IP', tcp_menu)
+                tcp_indiv_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')), 'Individual Port per IP', tcp_menu)
                 tcp_indiv_action.setToolTip('Ask for a separate port for each selected IP.')
 
                 def _tcp_ping_indiv() -> None:

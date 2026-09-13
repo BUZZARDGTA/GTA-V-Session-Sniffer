@@ -208,7 +208,7 @@ def _build_capture_section(snapshot: StatusBarSnapshot) -> str:
         interface_name = interface_name[:_INTERFACE_NAME_MAX_LEN] + '…'
     return (
         f'<span style="font-size: 9pt;">'
-        f'<span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">📡 Capture:</span> '
+        f'<span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">Capture:</span> '
         f'<span style="color: {StatusBarColors.DIVIDER};"> • </span>'
         f'<span style="color: {StatusBarColors.LABEL_ACCENT};">Interface:</span> '
         f'<span style="color: {StatusBarColors.ENABLED};">{interface_name}</span> '
@@ -260,7 +260,7 @@ def _build_config_section(snapshot: StatusBarSnapshot, *, vpn_mode_enabled: bool
 
     divider = f'<span style="color: {StatusBarColors.DIVIDER};"> • </span>'
     body = divider.join(parts) if parts else f'<span style="color: {StatusBarColors.DISABLED};">Default</span>'
-    return f'<span style="font-size: 9pt;"><span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">⚙️ Config:</span> {body}</span>'
+    return f'<span style="font-size: 9pt;"><span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">Config:</span> {body}</span>'
 
 
 def _build_userip_issues_section(snapshot: StatusBarSnapshot) -> str:
@@ -269,10 +269,10 @@ def _build_userip_issues_section(snapshot: StatusBarSnapshot) -> str:
 
     issues: list[str] = []
     if snapshot.userip.conflict_ip_count:
-        issues.append(f'<span style="color: {StatusBarColors.DISABLED};">⚠️ Conflicts: {snapshot.userip.conflict_ip_count}</span>')
+        issues.append(f'<span style="color: {StatusBarColors.DISABLED};">Conflicts: {snapshot.userip.conflict_ip_count}</span>')
 
     divider = f' <span style="color: {StatusBarColors.DIVIDER};"> • </span> '
-    return f'<span style="color: {StatusBarColors.DISABLED}; font-weight: bold;">🧯 UserIP Issues:</span> {divider.join(issues)}'
+    return f'<span style="color: {StatusBarColors.DISABLED}; font-weight: bold;">UserIP Issues:</span> {divider.join(issues)}'
 
 
 def _build_performance_section(snapshot: StatusBarSnapshot) -> str:
@@ -303,7 +303,7 @@ def _build_performance_section(snapshot: StatusBarSnapshot) -> str:
 
     return (
         f'<span style="font-size: 9pt;">'
-        f'<span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">⚡ Performance:</span> '
+        f'<span style="color: {StatusBarColors.TITLE_ACCENT}; font-weight: bold;">Performance:</span> '
         f'<span style="color: {StatusBarColors.LABEL_ACCENT};">Latency:</span> '
         f'<span style="color: {latency_color};">{latency_text}</span>'
         f'{restarts_display}'

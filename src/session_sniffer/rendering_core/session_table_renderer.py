@@ -11,7 +11,6 @@ from session_sniffer.guis.colors import TableColors
 from session_sniffer.guis.exceptions import InvalidDateColumnConfigurationError
 from session_sniffer.models.player import Player, PlayerBandwidth
 from session_sniffer.networking.third_party_servers import is_third_party_server_ip
-from session_sniffer.player.registry import SessionHost
 from session_sniffer.rendering_core.types import CellColor, SessionTableSnapshot
 from session_sniffer.settings import Settings
 from session_sniffer.text_utils import format_elapsed_time
@@ -40,9 +39,7 @@ def format_player_usernames(player: Player) -> str:
 
 
 def format_player_ip(player_ip: str) -> str:
-    """Format player IP with crown emoji if session host."""
-    if SessionHost.is_host(player_ip):
-        return f'{player_ip} 👑'
+    """Format player IP string."""
     return player_ip
 
 

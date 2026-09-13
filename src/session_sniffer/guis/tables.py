@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, cast, override
 
 from PySide6.QtCore import QAbstractItemModel, QEvent, QItemSelection, QItemSelectionModel, QModelIndex, QObject, QPoint, QRect, QSize, Qt
-from PySide6.QtGui import QAction, QClipboard, QFontMetrics, QHoverEvent, QKeyEvent, QMouseEvent, QResizeEvent
+from PySide6.QtGui import QAction, QClipboard, QFontMetrics, QHoverEvent, QIcon, QKeyEvent, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QHeaderView,
     QMenu,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import (
     BANDWIDTH_RATE_STAT_COLUMNS,
     LOCATION_COLUMNS,
@@ -41,9 +42,9 @@ if TYPE_CHECKING:
 # Category groupings for the Choose Columns submenu.
 # First match wins; columns not matched fall under 'Other'.
 _COLUMN_CATEGORY_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
-    ('⏱ Session', frozenset({'T. Session Time', 'Session Time'})),
+    ('Session', frozenset({'T. Session Time', 'Session Time'})),
     (
-        '📦 Packets',
+        'Packets',
         frozenset(
             {
                 *PACKET_STAT_COLUMNS,
@@ -53,11 +54,11 @@ _COLUMN_CATEGORY_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
         ),
     ),
     (
-        '📶 Bandwidth',
+        'Bandwidth',
         frozenset(BANDWIDTH_RATE_STAT_COLUMNS),
     ),
     (
-        '🌐 Network',
+        'Network',
         frozenset(
             {
                 'Hostname',
@@ -67,10 +68,10 @@ _COLUMN_CATEGORY_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
         ),
     ),
     (
-        '📍 Location',
+        'Location',
         frozenset(LOCATION_COLUMNS),
     ),
-    ('🏢 Organization', frozenset({'Organization', 'ISP', 'ASN / ISP', 'AS', 'ASN'})),
+    ('Organization', frozenset({'Organization', 'ISP', 'ASN / ISP', 'AS', 'ASN'})),
 )
 
 
@@ -283,7 +284,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
     def _compute_column_base_width(self, font_metrics: QFontMetrics, header_label: str) -> int:
         base_width = font_metrics.horizontalAdvance(header_label) + HEADER_SORT_PADDING
         if header_label == 'IP Address' and self.model().has_session_host():
-            return base_width + font_metrics.horizontalAdvance(' 👑')
+            return base_width + 24
         if header_label == 'Ports' and self.model().has_multiple_ports():
             return max(base_width, font_metrics.horizontalAdvance('65535, 65535') + HEADER_SORT_PADDING)
         return base_width
@@ -444,8 +445,8 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
 
         menu.addSeparator()
 
-        hide_label = f"👁️ Hide Column '{clicked_column_name}'" if clicked_column_name else '👁️ Hide Column'
-        hide_column_action = QAction(hide_label, menu)
+        hide_label = f"Hide Column '{clicked_column_name}'" if clicked_column_name else 'Hide Column'
+        hide_column_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye_hide.svg')), hide_label, menu)
         hide_column_action.setEnabled(clicked_column_name is not None and clicked_column_name in toggleable_columns)
         hide_column_action.setToolTip(
             f"Hide the '{clicked_column_name}' column from the table." if clicked_column_name else 'Hide the selected column from the table.',
@@ -456,23 +457,24 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
             )
         menu.addAction(hide_column_action)
 
-        choose_columns_menu = PersistentMenu('🧩 Choose Columns', menu)
+        choose_columns_menu = PersistentMenu('Choose Columns', menu)
+        choose_columns_menu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'settings.svg')))
         choose_columns_menu.setStyleSheet(SVG_ICON_CONTEXT_MENU_STYLESHEET)
         choose_columns_menu.setToolTipsVisible(True)
         choose_columns_menu.setToolTip('Choose which columns to show or hide in this table.')
 
-        reset_columns_action = QAction('↩️ Reset to Default', choose_columns_menu)
+        reset_columns_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'reset.svg')), 'Reset to Default', choose_columns_menu)
         reset_columns_action.setToolTip('Reset column visibility back to default visible columns.')
         reset_columns_action.triggered.connect(self._reset_to_default_columns)
         choose_columns_menu.addAction(reset_columns_action)
         choose_columns_menu.addSeparator()
 
-        select_all_columns_action = QAction('☑️ Select All', choose_columns_menu)
+        select_all_columns_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'select_all.svg')), 'Select All', choose_columns_menu)
         select_all_columns_action.setToolTip('Show all available columns in the table.')
         select_all_columns_action.triggered.connect(self._select_all_columns)
         choose_columns_menu.addAction(select_all_columns_action)
 
-        deselect_all_columns_action = QAction('⬜ Unselect All', choose_columns_menu)
+        deselect_all_columns_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg')), 'Unselect All', choose_columns_menu)
         deselect_all_columns_action.setToolTip('Hide all optional columns from the table.')
         deselect_all_columns_action.triggered.connect(self._deselect_all_columns)
         choose_columns_menu.addAction(deselect_all_columns_action)
@@ -503,7 +505,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
             category_menu.setToolTipsVisible(True)
             category_menu.setToolTip(f'Toggle columns in the {label} category.')
 
-            select_all_action = QAction('☑️ Select All', category_menu)
+            select_all_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'select_all.svg')), 'Select All', category_menu)
             select_all_action.setToolTip(f'Show all columns in the {label} category.')
 
             def _on_select_all(_checked: bool, cols: list[str] = columns) -> None:  # noqa: FBT001
@@ -512,7 +514,7 @@ class SessionTableView(TableContextMenuMixin, QTableView):  # pylint: disable=to
             select_all_action.triggered.connect(_on_select_all)
             category_menu.addAction(select_all_action)
 
-            deselect_all_action = QAction('⬜ Unselect All', category_menu)
+            deselect_all_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg')), 'Unselect All', category_menu)
             deselect_all_action.setToolTip(f'Hide all columns in the {label} category.')
 
             def _on_deselect_all(_checked: bool, cols: list[str] = columns) -> None:  # noqa: FBT001

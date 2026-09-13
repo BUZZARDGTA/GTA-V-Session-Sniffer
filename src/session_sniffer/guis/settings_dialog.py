@@ -532,7 +532,7 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
 
         # Footer note about automod / Wick.
         note = QLabel(
-            '⚠ If your server runs Wick or another automod with a "wall of text" filter, '
+            'If your server runs Wick or another automod with a "wall of text" filter, '
             'whitelist this webhook (or its channel) to prevent the messages — and the webhook itself — from being deleted.',
         )
         note.setWordWrap(True)
@@ -558,7 +558,8 @@ class SettingsDialog(SettingsDialogLookyMixin, UnsavedChangesMixin, QDialog):
             url_line.set_revealed(revealed=checked)
         else:
             url_line.setEchoMode(QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password)
-        show_button.setText('🙈 Hide' if checked else '👁 Show')
+        show_button.setText(' Hide' if checked else ' Show')
+        show_button.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / ('eye_hide.svg' if checked else 'eye.svg'))))
 
     def _reset_stored_messages(self) -> None:
         """Clear persisted Discord webhook message IDs so the next post creates new messages."""

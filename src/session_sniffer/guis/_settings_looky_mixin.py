@@ -38,8 +38,8 @@ if TYPE_CHECKING:
 def _bool_badge(value: bool, true_text: str, false_text: str) -> str:  # noqa: FBT001
     """Return an HTML-coloured badge string: green for `True`, red for `False`."""
     if value:
-        return f'<span style="color:#4ade80; font-size:10.5pt; font-weight:600;">✓ {true_text}</span>'
-    return f'<span style="color:#f87171; font-size:10.5pt; font-weight:600;">✗ {false_text}</span>'
+        return f'<span style="color:#4ade80; font-size:10.5pt; font-weight:600;">{true_text}</span>'
+    return f'<span style="color:#f87171; font-size:10.5pt; font-weight:600;">{false_text}</span>'
 
 
 class _LookyVerifyWorker(CrashingQThread):
@@ -246,7 +246,7 @@ class SettingsDialogLookyMixin(QDialog):
     def _on_verify_failed(self, error: str) -> None:
         """Handle a failed whoami response — show the error in the status label."""
         self._last_verified_key = ''
-        self._looky_verify_status_label.setText(f'✗ {error}')
+        self._looky_verify_status_label.setText(error)
         self._looky_verify_status_label.setVisible(True)
         self._looky_card_forms_container.setVisible(False)
 

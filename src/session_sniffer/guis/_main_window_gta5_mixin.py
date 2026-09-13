@@ -3,9 +3,11 @@
 from threading import Event
 from typing import TYPE_CHECKING
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QMainWindow, QMenu
 
 from session_sniffer import msgbox
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.error_messages import (
     format_gta5_solo_session_process_not_running_message,
@@ -184,8 +186,10 @@ class GTA5Mixin(QMainWindow):
                 self._gta5_solo_active = False
             self._gta5_process_suspended = False
             self._gta5_externally_suspended = False
-            self._gta5_process_submenu.setTitle('🎮 GTA5 Process')
-            self._gta5_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')))
+            self._gta5_suspend_resume_action.setText('Suspend Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             self._gta5_suspend_resume_action.setEnabled(False)
             self._gta5_solo_menu_action.setEnabled(False)
             self._gta5_suspend_resume_action.setToolTip(
@@ -194,19 +198,25 @@ class GTA5Mixin(QMainWindow):
                 else 'GTA5 is not currently running — launch GTA5 to enable process control.',
             )
         elif self._manual_gta5_suspend_active:
-            self._gta5_process_submenu.setTitle('⏸️ GTA5 Process (Suspended)')
-            self._gta5_suspend_resume_action.setText('▶️ Resume Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process (Suspended)')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._gta5_suspend_resume_action.setText('Resume Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._gta5_suspend_resume_action.setToolTip('Remove the manual suspend hold from the GTA5 process')
             self._gta5_suspend_resume_action.setEnabled(True)
             self._gta5_solo_menu_action.setEnabled(False)
         elif self._gta5_solo_active:
-            self._gta5_process_submenu.setTitle('🎯 GTA5 Process (Going Solo...)')
-            self._gta5_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process (Going Solo...)')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg')))
+            self._gta5_suspend_resume_action.setText('Suspend Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             self._gta5_suspend_resume_action.setEnabled(False)
             self._gta5_solo_menu_action.setEnabled(False)
         elif self._gta5_process_suspended:
-            self._gta5_process_submenu.setTitle('⏸️ GTA5 Process (Suspended)')
-            self._gta5_suspend_resume_action.setText('▶️ Resume Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process (Suspended)')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._gta5_suspend_resume_action.setText('Resume Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._gta5_suspend_resume_action.setEnabled(False)
             self._gta5_solo_menu_action.setEnabled(False)
             self._gta5_suspend_resume_action.setToolTip(
@@ -214,15 +224,19 @@ class GTA5Mixin(QMainWindow):
             )
             self._gta5_solo_menu_action.setToolTip('Process is already suspended')
         elif self._gta5_externally_suspended:
-            self._gta5_process_submenu.setTitle('⏸️ GTA5 Process (Suspended)')
-            self._gta5_suspend_resume_action.setText('▶️ Resume Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process (Suspended)')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._gta5_suspend_resume_action.setText('Resume Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._gta5_suspend_resume_action.setEnabled(True)
             self._gta5_solo_menu_action.setEnabled(False)
             self._gta5_suspend_resume_action.setToolTip('GTA5 was left suspended outside this app — click to resume it')
             self._gta5_solo_menu_action.setToolTip('Process is currently suspended — resume it first')
         else:
-            self._gta5_process_submenu.setTitle('🎮 GTA5 Process')
-            self._gta5_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._gta5_process_submenu.setTitle('GTA5 Process')
+            self._gta5_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')))
+            self._gta5_suspend_resume_action.setText('Suspend Process')
+            self._gta5_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             if self._gta5_process_detected:
                 self._gta5_suspend_resume_action.setEnabled(True)
                 self._gta5_solo_menu_action.setEnabled(True)

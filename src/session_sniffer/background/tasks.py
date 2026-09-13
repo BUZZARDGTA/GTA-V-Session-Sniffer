@@ -23,6 +23,7 @@ from session_sniffer.error_messages import format_type_error
 from session_sniffer.gta5.suspend_manager import GTASuspendManager
 from session_sniffer.guis.tables_player_actions import (
     DetectionNotificationInfo,
+    NotificationType,
     PlayerDetectionInfo,
     show_detection_notification_dialog,
     show_player_detection_dialog,
@@ -261,18 +262,11 @@ def wait_for_player_data_ready(
 class NotificationConfig(TypedDict):
     """Type definition for notification configuration."""
 
-    emoji: str
     title: str
     description: str
     icon: msgbox.Style
     thread_name: str
 
-
-NotificationType = Literal[
-    'player_joined_session',
-    'player_rejoined_session',
-    'player_left_session',
-]
 
 _NOTIFICATION_TYPE_SETTING_PREFIX: dict[NotificationType, str] = {
     'player_joined_session': 'player_join',
@@ -282,21 +276,18 @@ _NOTIFICATION_TYPE_SETTING_PREFIX: dict[NotificationType, str] = {
 
 _NOTIFICATION_CONFIGS: dict[NotificationType, NotificationConfig] = {
     'player_joined_session': {
-        'emoji': '🟢',
         'title': 'PLAYER JOINED SESSION!',
         'description': 'A new player has joined your session!',
         'icon': msgbox.Style.MB_ICONINFORMATION,
         'thread_name': 'PlayerJoined',
     },
     'player_rejoined_session': {
-        'emoji': '🔄',
         'title': 'PLAYER REJOINED SESSION!',
         'description': 'A player has rejoined your session after disconnecting!',
         'icon': msgbox.Style.MB_ICONINFORMATION,
         'thread_name': 'PlayerRejoined',
     },
     'player_left_session': {
-        'emoji': '🔴',
         'title': 'PLAYER LEFT SESSION!',
         'description': 'A player has left your session!',
         'icon': msgbox.Style.MB_ICONINFORMATION,
@@ -388,7 +379,7 @@ def handle_detection_notification(
             # Message box popup
             if msgbox_setting:
                 _info = PlayerDetectionInfo(
-                    emoji=config['emoji'],
+                    event_type=notification_type,
                     title=config['title'],
                     description=config['description'],
                     event_time=datetime.now(tz=LOCAL_TZ).strftime('%H:%M:%S'),
@@ -455,7 +446,7 @@ def handle_detection_notification(
                             show_detection_notification_dialog(
                                 find_main_window(),
                                 player,
-                                DetectionNotificationInfo(emoji='🔗', display_title=title, extra_detection_fields=extra_fields, event_time=event_time_str),
+                                DetectionNotificationInfo(display_title=title, extra_detection_fields=extra_fields, event_time=event_time_str),
                             )
 
                         gui_dispatcher.invoke(_callback)
@@ -624,7 +615,6 @@ def monitor_gta5_relay_task(player: Player) -> None:
                 find_main_window(),
                 player,
                 DetectionNotificationInfo(
-                    emoji='🛡',
                     display_title='GTA5 Relay Detected',
                     extra_detection_fields=[('Packets', str(player.packets.exchanged))],
                     event_time=_et,
@@ -659,7 +649,6 @@ def check_global_detections(player: Player) -> None:
 
     def handle_detection_notifications(
         detection_title: str,
-        emoji: str,
         display_title: str,
         extra_detection_fields: list[tuple[str, str]],
         settings: _DetectionSettings,
@@ -696,7 +685,7 @@ def check_global_detections(player: Player) -> None:
                 show_detection_notification_dialog(
                     find_main_window(),
                     player,
-                    DetectionNotificationInfo(emoji=emoji, display_title=display_title, extra_detection_fields=extra_detection_fields, event_time=_event_time),
+                    DetectionNotificationInfo(display_title=display_title, extra_detection_fields=extra_detection_fields, event_time=_event_time),
                 )
 
             gui_dispatcher.invoke(_show_detection_notif)
@@ -713,7 +702,6 @@ def check_global_detections(player: Player) -> None:
             )
         handle_detection_notifications(
             detection_title='MOBILE CONNECTION DETECTED!',
-            emoji='📱',
             display_title='Mobile Connection Detected',
             extra_detection_fields=[],
             settings=_DetectionSettings(
@@ -732,7 +720,6 @@ def check_global_detections(player: Player) -> None:
             )
         handle_detection_notifications(
             detection_title='VPN/PROXY/TOR CONNECTION DETECTED!',
-            emoji='🔒',
             display_title='VPN/Proxy/Tor Connection Detected',
             extra_detection_fields=[],
             settings=_DetectionSettings(
@@ -752,7 +739,6 @@ def check_global_detections(player: Player) -> None:
             )
         handle_detection_notifications(
             detection_title='HOSTING/DATA CENTER CONNECTION DETECTED!',
-            emoji='🏢',
             display_title='Hosting/Data Center Connection Detected',
             extra_detection_fields=[],
             settings=_DetectionSettings(
@@ -772,7 +758,6 @@ def check_global_detections(player: Player) -> None:
             )
         handle_detection_notifications(
             detection_title='BLOCKED COUNTRY DETECTED!',
-            emoji='🌍',
             display_title='Blocked Country Detected',
             extra_detection_fields=[],
             settings=_DetectionSettings(
@@ -810,7 +795,6 @@ def check_global_detections(player: Player) -> None:
                 )
             handle_detection_notifications(
                 detection_title='BLOCKED ISP DETECTED!',
-                emoji='🌐',
                 display_title='Blocked ISP Detected',
                 extra_detection_fields=[('Matched Entry', matched_isp)],
                 settings=_DetectionSettings(
@@ -854,7 +838,6 @@ def check_global_detections(player: Player) -> None:
                 )
                 handle_detection_notifications(
                     detection_title='BLOCKED ASN DETECTED!',
-                    emoji='🔢',
                     display_title='Blocked ASN Detected',
                     extra_detection_fields=[('ASN', asn_display)],
                     settings=_DetectionSettings(
@@ -876,7 +859,6 @@ def check_global_detections(player: Player) -> None:
         conditions_summary = ', '.join(f'{key}={value}' for key, value in rule.conditions.items() if key != 'event')
         handle_detection_notifications(
             detection_title=f'COMBO RULE MATCHED: {rule.name}',
-            emoji='🔗',
             display_title=f'Combo Rule Matched: {rule.name}',
             extra_detection_fields=[('Conditions', conditions_summary)],
             settings=_DetectionSettings(

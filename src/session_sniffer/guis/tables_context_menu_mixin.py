@@ -6,7 +6,7 @@ from PySide6.QtCore import QItemSelectionModel, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon
 from PySide6.QtWidgets import QMenu, QTableView
 
-from session_sniffer.constants.local import BUILTIN_SCRIPTS_DIR_PATH, USER_SCRIPTS_DIR_PATH, USERIP_DATABASES_DIR_PATH
+from session_sniffer.constants.local import BUILTIN_SCRIPTS_DIR_PATH, RESOURCES_DIR_PATH, USER_SCRIPTS_DIR_PATH, USERIP_DATABASES_DIR_PATH
 from session_sniffer.constants.standalone import LOOKY_BASE_HOST
 from session_sniffer.error_messages import ensure_instance
 from session_sniffer.guis.looky_text import (
@@ -279,17 +279,19 @@ class TableContextMenuMixin(QTableView):
             if len(selected_indexes) == 1 and len(players) == 1:
                 add_action(
                     context_menu,
-                    '📋 Copy for Discord',
+                    'Copy for Discord',
                     tooltip='Copy a detailed player info report formatted for Discord to the clipboard.',
                     handler=lambda: copy_player_info_for_discord(players[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')),
                 )
                 return
 
             add_action(
                 context_menu,
-                '📋 Copy for Discord',
+                'Copy for Discord',
                 tooltip='Copy Discord-formatted reports for all selected players to the clipboard.',
                 handler=lambda: copy_players_info_for_discord(players),
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')),
             )
 
         def add_remove_players_action(ip_addresses: list[str]) -> None:
@@ -298,10 +300,10 @@ class TableContextMenuMixin(QTableView):
 
             ips_to_remove = set(ip_addresses)
             if len(ips_to_remove) == 1:
-                label = '🗑️ Remove Player'
+                label = 'Remove Player'
                 tooltip = 'Remove this player from the table and registry.'
             else:
-                label = f'🗑️ Remove {len(ips_to_remove)} Players'
+                label = f'Remove {len(ips_to_remove)} Players'
                 tooltip = f'Remove {len(ips_to_remove)} selected players from the table and registry.'
 
             add_action(
@@ -309,6 +311,7 @@ class TableContextMenuMixin(QTableView):
                 label,
                 tooltip=tooltip,
                 handler=lambda: self.remove_players_by_ip_from_table(ips_to_remove),
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'remove.svg')),
             )
 
         def add_exclude_ips_action(ip_addresses: list[str]) -> None:
@@ -324,9 +327,10 @@ class TableContextMenuMixin(QTableView):
 
                 add_action(
                     context_menu,
-                    '🚫 Exclude IP / Range',
+                    'Exclude IP / Range',
                     tooltip='Exclude this IP or a range/subnet from appearing in the session. Persisted to settings.',
                     handler=_do_block_single_ip,
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'close.svg')),
                 )
                 return
 
@@ -339,9 +343,10 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 context_menu,
-                '🚫 Exclude IPs / Ranges',
+                'Exclude IPs / Ranges',
                 tooltip='For each selected IP, prompt whether to exclude as single IP, range, or subnet. Persisted to settings.',
                 handler=_do_block_multi_ips,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'close.svg')),
             )
 
         def add_ip_lookup_action(players: list[Player]) -> None:
@@ -351,9 +356,10 @@ class TableContextMenuMixin(QTableView):
             if len(players) == 1:
                 add_action(
                     context_menu,
-                    '🔎 IP Lookup Details',
+                    'IP Lookup Details',
                     tooltip='Displays a notification with a detailed IP lookup report for selected player.',
                     handler=lambda: show_detailed_ip_lookup(self, players[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')),
                 )
                 return
 
@@ -363,9 +369,10 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 context_menu,
-                '🔎 IP Lookup Details',
+                'IP Lookup Details',
                 tooltip='Displays a detailed IP lookup report for each selected player.',
                 handler=_show_all_lookups,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')),
             )
 
         def add_rate_graph_action(ip_addresses: list[str]) -> None:
@@ -377,9 +384,10 @@ class TableContextMenuMixin(QTableView):
             if len(ip_addresses) == 1:
                 add_action(
                     context_menu,
-                    '📈 Rate Graph',
+                    'Rate Graph',
                     tooltip='Open a live PPS/BPS graph for this player.',
                     handler=lambda: open_rate_graph_callback(ip_addresses[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'chart.svg')),
                 )
                 return
 
@@ -389,9 +397,10 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 context_menu,
-                '📈 Rate Graph',
+                'Rate Graph',
                 tooltip='Open a live PPS/BPS graph for each selected player.',
                 handler=_open_multi_graphs,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'chart.svg')),
             )
 
         def add_seen_stats_action(players: list[Player]) -> None:
@@ -401,9 +410,10 @@ class TableContextMenuMixin(QTableView):
             if len(players) == 1:
                 add_action(
                     context_menu,
-                    '📅 Seen Stats',
+                    'Seen Stats',
                     tooltip='Shows how many sessions this IP appeared in (today, week, month, year, total).',
                     handler=lambda: show_seen_stats(self, players[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'calendar.svg')),
                 )
                 return
 
@@ -413,9 +423,10 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 context_menu,
-                '📅 Seen Stats',
+                'Seen Stats',
                 tooltip='Shows session appearance stats for each selected player.',
                 handler=_show_all_seen_stats,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'calendar.svg')),
             )
 
         def add_looky_system_menu(parent_menu: QMenu, players: list[Player]) -> None:
@@ -429,16 +440,17 @@ class TableContextMenuMixin(QTableView):
             ) -> None:
                 configure_looky_action(action, default_tooltip=action.toolTip(), players=players)
 
-            looky_menu = add_menu(parent_menu, '👁️ Looky System', 'Looky System tools and shortcuts.')
+            looky_menu = add_menu(parent_menu, 'Looky System', 'Looky System tools and shortcuts.', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye.svg')))
 
             def _open_looky_website() -> None:
                 QDesktopServices.openUrl(QUrl(LOOKY_BASE_HOST))
 
             add_action(
                 looky_menu,
-                '🌐 Open Website',
+                'Open Website',
                 tooltip='Open the Looky System website in your default browser.',
                 handler=_open_looky_website,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'website.svg')),
             )
 
             looky_menu.addSeparator()
@@ -446,17 +458,19 @@ class TableContextMenuMixin(QTableView):
             if len(players) == 1:
                 lookup_action = add_action(
                     looky_menu,
-                    '🔎 Lookup',
+                    'Lookup',
                     tooltip='Query the Looky System API to find players associated with this IP.',
                     handler=lambda: show_looky_lookup(self, players[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')),
                 )
                 _apply_looky_gating(lookup_action, players=players[0])
                 if players[0].looky_system.rockstarids:
                     crawler_action = add_action(
                         looky_menu,
-                        '🤖 Request Crawler',
+                        'Request Crawler',
                         tooltip='Call the crawler bot to resolve usernames for players in the session associated with this IP.',
                         handler=lambda: show_crawler_request(self, players[0]),
+                        icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'bot.svg')),
                     )
                     _apply_looky_gating(crawler_action, players=players[0])
                 return
@@ -469,9 +483,10 @@ class TableContextMenuMixin(QTableView):
 
             lookup_all_action = add_action(
                 looky_menu,
-                '🔎 Lookup (All Selected)',
+                'Lookup (All Selected)',
                 tooltip='Query the Looky System API for each selected player IP.',
                 handler=_show_looky_lookup_for_all,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')),
             )
             _apply_looky_gating(lookup_all_action, players=players)
 
@@ -479,20 +494,22 @@ class TableContextMenuMixin(QTableView):
             if not ip_addresses:
                 return
 
-            ping_menu = add_menu(context_menu, '📡 Ping')
+            ping_menu = add_menu(context_menu, 'Ping', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')))
 
             if len(ip_addresses) == 1:
                 add_action(
                     ping_menu,
-                    '🏓 Normal (ICMP)',
+                    'Normal (ICMP)',
                     tooltip='Checks if selected IP address responds to pings.',
                     handler=lambda: ping_ip(ip_addresses[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')),
                 )
                 add_action(
                     ping_menu,
-                    '🔌 TCP Port Ping',
+                    'TCP Port Ping',
                     tooltip='Checks if selected IP address responds to TCP pings on a given port.',
                     handler=lambda: tcp_port_ping(self, ip_addresses[0]),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')),
                 )
                 return
 
@@ -508,22 +525,25 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 ping_menu,
-                '🏓 Normal (ICMP)',
+                'Normal (ICMP)',
                 tooltip='Checks if selected IP addresses respond to pings.',
                 handler=_ping_all,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ping.svg')),
             )
-            tcp_menu = add_menu(ping_menu, '🔌 TCP Port Ping')
+            tcp_menu = add_menu(ping_menu, 'TCP Port Ping', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')))
             add_action(
                 tcp_menu,
-                '🔌 One Port for All',
+                'One Port for All',
                 tooltip='Ask for a port once, then TCP ping all selected IPs on that port.',
                 handler=_tcp_ping_all_one_port,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')),
             )
             add_action(
                 tcp_menu,
-                '🔌 Individual Port per IP',
+                'Individual Port per IP',
                 tooltip='Ask for a separate port for each selected IP.',
                 handler=_tcp_ping_all_diff_ports,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')),
             )
 
         def get_script_candidates(directory: Path) -> list[Path]:
@@ -552,7 +572,7 @@ class TableContextMenuMixin(QTableView):
             add_scripts_to_menu(menu, user_scripts, ip_addresses, per_ip=per_ip)
 
         def add_user_scripts_menu(ip_addresses: list[str]) -> None:
-            scripts_menu = add_menu(context_menu, '📜 User Scripts')
+            scripts_menu = add_menu(context_menu, 'User Scripts', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')))
             builtin_scripts = get_script_candidates(BUILTIN_SCRIPTS_DIR_PATH)
             user_scripts = get_script_candidates(USER_SCRIPTS_DIR_PATH)
 
@@ -561,10 +581,20 @@ class TableContextMenuMixin(QTableView):
                 return
 
             if builtin_scripts or user_scripts:
-                all_at_once_menu = add_menu(scripts_menu, '📚 All IPs as Args', 'Pass all selected IPs as arguments to the script in one call.')
+                all_at_once_menu = add_menu(
+                    scripts_menu,
+                    'All IPs as Args',
+                    'Pass all selected IPs as arguments to the script in one call.',
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')),
+                )
                 _populate_scripts_menu(all_at_once_menu, builtin_scripts, user_scripts, ip_addresses)
 
-                per_ip_menu = add_menu(scripts_menu, '📄 One Process per IP', 'Spawn a separate script process for each selected IP.')
+                per_ip_menu = add_menu(
+                    scripts_menu,
+                    'One Process per IP',
+                    'Spawn a separate script process for each selected IP.',
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'new_file.svg')),
+                )
                 _populate_scripts_menu(per_ip_menu, builtin_scripts, user_scripts, ip_addresses, per_ip=True)
 
         def add_detections_menu(players: list[Player]) -> None:
@@ -573,25 +603,30 @@ class TableContextMenuMixin(QTableView):
             if not players:
                 return
 
-            detections_menu = add_menu(context_menu, '🚨 Detections')
+            detections_menu = add_menu(context_menu, 'Detections', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'shield.svg')))
             if len(players) == 1:
                 build_detections_menu(detections_menu, add_action, players[0], self)
                 return
             build_detections_menu_multi(detections_menu, add_action, players, self)
 
         def add_userip_single_menu(ip_address: str, player: Player) -> None:
-            userip_menu = add_menu(context_menu, '🗃️ UserIP')
+            userip_menu = add_menu(context_menu, 'UserIP', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'database.svg')))
 
             if player.userip is None:
                 database_paths = UserIPDatabases.get_userip_database_filepaths()
-                add_userip_menu = add_menu(userip_menu, '➕ Add', 'Add selected IP address to UserIP database.')  # noqa: RUF001
+                add_userip_menu = add_menu(userip_menu, 'Add', 'Add selected IP address to UserIP database.', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'add.svg')))
                 populate_db_menu(
                     add_userip_menu,
                     database_paths,
                     tooltip='Add selected IP address to this UserIP database.',
                     handler_factory=lambda db_path: lambda: userip_add(self, [ip_address], db_path),
                 )
-                add_range_userip_menu = add_menu(userip_menu, '➕ Add as Range', 'Add selected IP as a range entry to a UserIP database.')  # noqa: RUF001
+                add_range_userip_menu = add_menu(
+                    userip_menu,
+                    'Add as Range',
+                    'Add selected IP as a range entry to a UserIP database.',
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'add.svg')),
+                )
                 populate_db_menu(
                     add_range_userip_menu,
                     database_paths,
@@ -607,56 +642,68 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 userip_menu,
-                '📂 Open Database',
+                'Open Database',
                 tooltip="Open this player's UserIP database file in the default text editor.",
                 handler=_open_userip_database,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')),
             )
             userip_menu.addSeparator()
             add_action(
                 userip_menu,
-                '➕ Add Username',  # noqa: RUF001
+                'Add Username',
                 tooltip='Add an additional username for this IP address in its UserIP database.',
                 handler=lambda: userip_add_username(self, ip_address, player),
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'add.svg')),
             )
             if Settings.is_gta5_feature_set():
                 userip_menu.addSeparator()
                 refresh_action = add_action(
                     userip_menu,
-                    '👁️ Add Username (Looky System)',
+                    'Add Username (Looky System)',
                     tooltip='Look up this IP via Looky System and add any new usernames to its UserIP database.',
                     handler=lambda: looky_refresh_userip_entries(self, [(player.userip.db_path, [ip_address])]) if player.userip else None,
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye.svg')),
                 )
                 configure_looky_action(refresh_action, default_tooltip=refresh_action.toolTip(), players=player)
                 userip_menu.addSeparator()
             add_action(
                 userip_menu,
-                '✏️ Rename',
+                'Rename',
                 tooltip='Rename all entries for this IP address by picking from existing usernames in its database.',
                 handler=lambda: userip_rename(self, ip_address, player),
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'edit.svg')),
             )
             entry_desc = _classify_userip_entry(ip_address)
             if entry_desc == 'single IP':
                 add_action(
                     userip_menu,
-                    '🔄 Convert to Range',
+                    'Convert to Range',
                     tooltip=f'Replace this single IP entry with a range, e.g. a VPN or subnet, keeping its username{pluralize(len(player.userip.usernames))}.',
                     handler=lambda: userip_convert_to_range(self, ip_address, player),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'refresh.svg')),
                 )
             else:
                 add_action(
                     userip_menu,
-                    '📏 Edit Range',
+                    'Edit Range',
                     tooltip=f'Edit this {entry_desc} entry, or narrow it back to a single IP, keeping its username{pluralize(len(player.userip.usernames))}.',
                     handler=lambda: userip_edit_range(self, ip_address, player),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'edit.svg')),
                 )
             if player.userip.usernames and len(player.userip.usernames) >= MIN_USERNAMES_FOR_REMOVAL:
                 add_action(
                     userip_menu,
-                    '➖ Remove Username',  # noqa: RUF001
+                    'Remove Username',
                     tooltip='Remove selected usernames for this IP address while keeping others.',
                     handler=lambda: userip_remove_username(self, ip_address, player),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'remove.svg')),
                 )
-            move_userip_menu = add_menu(userip_menu, '📦 Move', f'Move this {entry_desc} entry to another UserIP database.')
+            move_userip_menu = add_menu(
+                userip_menu,
+                'Move',
+                f'Move this {entry_desc} entry to another UserIP database.',
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'move_box.svg')),
+            )
             populate_db_menu(
                 move_userip_menu,
                 UserIPDatabases.get_userip_database_filepaths(),
@@ -666,16 +713,17 @@ class TableContextMenuMixin(QTableView):
             )
             add_action(
                 userip_menu,
-                '🗑️ Delete',
+                'Delete',
                 tooltip=f'Delete this {entry_desc} entry from its UserIP database.',
                 handler=lambda: userip_delete(self, [ip_address]),
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'remove.svg')),
             )
 
         def add_userip_multi_menu(ip_addresses: list[str], players: list[Player]) -> None:
             if all(not UserIPDatabases.is_known_ip(ip) for ip in ip_addresses):
-                userip_menu = add_menu(context_menu, '🗃️ UserIP')
+                userip_menu = add_menu(context_menu, 'UserIP', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'database.svg')))
                 add_count = '' if len(ip_addresses) == 1 else f'{len(ip_addresses)} '
-                add_userip_menu = add_menu(userip_menu, '➕ Add Selected')  # noqa: RUF001
+                add_userip_menu = add_menu(userip_menu, 'Add Selected', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'add.svg')))
                 populate_db_menu(
                     add_userip_menu,
                     UserIPDatabases.get_userip_database_filepaths(),
@@ -685,7 +733,7 @@ class TableContextMenuMixin(QTableView):
                 return
 
             if all(UserIPDatabases.is_known_ip(ip) for ip in ip_addresses):
-                userip_menu = add_menu(context_menu, '🗃️ UserIP')
+                userip_menu = add_menu(context_menu, 'UserIP', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'database.svg')))
                 entries_phrase = _describe_selected_userip_entries(ip_addresses)
 
                 rename_players = [player for player in players if player.userip is not None]
@@ -693,9 +741,10 @@ class TableContextMenuMixin(QTableView):
                     rename_phrase = _describe_selected_userip_entries([player.ip for player in rename_players])
                     add_action(
                         userip_menu,
-                        '✏️ Rename Selected',
+                        'Rename Selected',
                         tooltip=f'Rename the username for {rename_phrase} in its UserIP database.',
                         handler=lambda: userip_rename_multi(self, rename_players),
+                        icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'edit.svg')),
                     )
 
                 if Settings.is_gta5_feature_set():
@@ -711,14 +760,20 @@ class TableContextMenuMixin(QTableView):
                             userip_menu.addSeparator()
                         refresh_multi_action = add_action(
                             userip_menu,
-                            '👁️ Add Usernames (Looky System)',
+                            'Add Usernames (Looky System)',
                             tooltip=f'Look up {entries_phrase} via Looky System and add any new usernames to their UserIP databases.',
                             handler=lambda: looky_refresh_userip_entries(self, list(_refresh_by_db.items())),
+                            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'eye.svg')),
                         )
                         configure_looky_action(refresh_multi_action, default_tooltip=refresh_multi_action.toolTip(), players=players)
                         userip_menu.addSeparator()
 
-                move_userip_menu = add_menu(userip_menu, '📦 Move Selected', f'Move {entries_phrase} to another UserIP database.')
+                move_userip_menu = add_menu(
+                    userip_menu,
+                    'Move Selected',
+                    f'Move {entries_phrase} to another UserIP database.',
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'move_box.svg')),
+                )
                 populate_db_menu(
                     move_userip_menu,
                     UserIPDatabases.get_userip_database_filepaths(),
@@ -728,9 +783,10 @@ class TableContextMenuMixin(QTableView):
 
                 add_action(
                     userip_menu,
-                    '🗑️ Delete Selected',
+                    'Delete Selected',
                     tooltip=f'Delete {entries_phrase} from the UserIP databases.',
                     handler=lambda: userip_delete(self, ip_addresses),
+                    icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'remove.svg')),
                 )
 
         selected_ips = get_selected_ips(selected_indexes)
@@ -754,31 +810,69 @@ class TableContextMenuMixin(QTableView):
 
             add_action(
                 context_menu,
-                '❌ Clear Session Host',
+                'Clear Session Host',
                 tooltip='Manually clear this player as the detected session host.',
                 handler=SessionHost.clear_session_host_data,
+                icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'close.svg')),
             )
 
         copy_selection_action = add_action(
             context_menu,
-            '📋 Copy Selection',
+            'Copy Selection',
             tooltip='Copy selected cells to your clipboard.',
             handler=lambda: self.copy_selected_cells(selected_model, selected_indexes),
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')),
         )
         copy_selection_action.setShortcut('Ctrl+C')
         add_copy_for_discord_action(selected_players)
         context_menu.addSeparator()
 
-        select_menu = add_menu(context_menu, '☑️ Select')
-        select_all_action = add_action(select_menu, '☑️ Select All', tooltip='Select all cells in the table.', handler=self.select_all_cells)
+        select_menu = add_menu(context_menu, 'Select', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'select_all.svg')))
+        select_all_action = add_action(
+            select_menu,
+            'Select All',
+            tooltip='Select all cells in the table.',
+            handler=self.select_all_cells,
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'select_all.svg')),
+        )
         select_all_action.setShortcut('Ctrl+A')
-        add_action(select_menu, '➡️ Select Row', tooltip='Select all cells in this row.', handler=lambda: self.select_row_cells(index.row()))
-        add_action(select_menu, '⬇️ Select Column', tooltip='Select all cells in this column.', handler=lambda: self.select_column_cells(index.column()))
+        add_action(
+            select_menu,
+            'Select Row',
+            tooltip='Select all cells in this row.',
+            handler=lambda: self.select_row_cells(index.row()),
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_right.svg')),
+        )
+        add_action(
+            select_menu,
+            'Select Column',
+            tooltip='Select all cells in this column.',
+            handler=lambda: self.select_column_cells(index.column()),
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_down.svg')),
+        )
 
-        unselect_menu = add_menu(context_menu, '⬜ Unselect')
-        add_action(unselect_menu, '⬜ Unselect All', tooltip='Unselect all cells in the table.', handler=self.unselect_all_cells)
-        add_action(unselect_menu, '➡️ Unselect Row', tooltip='Unselect all cells in this row.', handler=lambda: self.unselect_row_cells(index.row()))
-        add_action(unselect_menu, '⬇️ Unselect Column', tooltip='Unselect all cells in this column.', handler=lambda: self.unselect_column_cells(index.column()))
+        unselect_menu = add_menu(context_menu, 'Unselect', icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg')))
+        add_action(
+            unselect_menu,
+            'Unselect All',
+            tooltip='Unselect all cells in the table.',
+            handler=self.unselect_all_cells,
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'unselect_all.svg')),
+        )
+        add_action(
+            unselect_menu,
+            'Unselect Row',
+            tooltip='Unselect all cells in this row.',
+            handler=lambda: self.unselect_row_cells(index.row()),
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_right.svg')),
+        )
+        add_action(
+            unselect_menu,
+            'Unselect Column',
+            tooltip='Unselect all cells in this column.',
+            handler=lambda: self.unselect_column_cells(index.column()),
+            icon=QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_down.svg')),
+        )
         context_menu.addSeparator()
 
         add_column_sizing_actions(

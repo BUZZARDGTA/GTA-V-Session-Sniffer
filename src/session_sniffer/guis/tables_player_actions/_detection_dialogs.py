@@ -1,7 +1,7 @@
 """DetectionNotificationDialog, PlayerDetectionDialog, and related helpers."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -20,12 +20,17 @@ from session_sniffer.text_utils import pluralize
 if TYPE_CHECKING:
     from session_sniffer.models.player import Player
 
+NotificationType = Literal[
+    'player_joined_session',
+    'player_rejoined_session',
+    'player_left_session',
+]
+
 
 @dataclass(slots=True, kw_only=True)
 class DetectionNotificationInfo:
     """Bundled metadata for a detection manager notification dialog."""
 
-    emoji: str
     display_title: str
     extra_detection_fields: list[tuple[str, str]]
     event_time: str
@@ -51,7 +56,7 @@ class DetectionNotificationDialog(PlayerInfoDialogMixin):
         outer_layout.setContentsMargins(10, 10, 10, 10)
         outer_layout.setSpacing(8)
 
-        self._add_header_label(outer_layout, f'{info.emoji}  {info.display_title} — {format_player_display(player.ip, player.usernames)}', '#744210', '#975a16')
+        self._add_header_label(outer_layout, f'{info.display_title} — {format_player_display(player.ip, player.usernames)}', '#744210', '#975a16')
 
         scroll_layout = self._init_scroll_area(outer_layout)
 
@@ -66,7 +71,7 @@ class DetectionNotificationDialog(PlayerInfoDialogMixin):
 
     def _build_detection_group(self, parent_layout: QVBoxLayout, player: Player, extra_detection_fields: list[tuple[str, str]], event_time: str) -> None:
         """Add the 'Detection Details' section."""
-        group, form = self._make_group('🚨  Detection Details', accent='#c53030')
+        group, form = self._make_group('Detection Details', accent='#c53030')
         self._add_row(form, 'Time', event_time)
         for label, value in extra_detection_fields:
             self._add_row(form, label, value)
@@ -75,21 +80,21 @@ class DetectionNotificationDialog(PlayerInfoDialogMixin):
 
     def _build_connection_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Connection Details' section."""
-        group, form = self._make_group('🔗  Connection Details', accent='#2b6cb0')
+        group, form = self._make_group('Connection Details', accent='#2b6cb0')
         self._add_row(form, 'IP Address', player.ip)
         self._add_row(form, 'Hostname', format_text(player.reverse_dns.hostname))
         parent_layout.addWidget(group)
 
     def _build_location_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Location Details' section."""
-        group, form = self._make_group('🌍  Location Details', accent='#38a169')
+        group, form = self._make_group('Location Details', accent='#38a169')
         self._add_row(form, 'Country', format_text(player.iplookup.geolite2.country))
         self._add_row(form, 'City', format_text(player.iplookup.geolite2.city))
         parent_layout.addWidget(group)
 
     def _build_network_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Network Details' section."""
-        group, form = self._make_group('🌐  Network Details', accent='#d69e2e')
+        group, form = self._make_group('Network Details', accent='#d69e2e')
         self._add_row(form, 'ISP', format_text(player.iplookup.ipapi.isp))
         self._add_row(form, 'Organization', format_text(player.iplookup.ipapi.org))
         asn = format_text(player.iplookup.ipapi.asn)
@@ -100,7 +105,7 @@ class DetectionNotificationDialog(PlayerInfoDialogMixin):
 
     def _build_flags_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Detection Flags' section."""
-        group, form = self._make_group('🚩  Detection Flags', accent='#805ad5')
+        group, form = self._make_group('Detection Flags', accent='#805ad5')
         self._add_row(form, 'Mobile (cellular)', format_bool(player.iplookup.ipapi.mobile))
         self._add_row(form, 'Proxy / VPN / Tor', format_bool(player.iplookup.ipapi.proxy))
         self._add_row(form, 'Hosting / Datacenter', format_bool(player.iplookup.ipapi.hosting))
@@ -124,17 +129,17 @@ def show_detection_notification_dialog(
 class PlayerDetectionInfo:
     """Bundled metadata for a player detection event notification."""
 
-    emoji: str
+    event_type: NotificationType
     title: str
     description: str
     event_time: str
     data_ready: bool
 
 
-_DETECTION_EMOJI_HEADER_COLORS: dict[str, tuple[str, str]] = {
-    '🟢': ('#276749', '#38a169'),  # 🟢 joined  → green
-    '🔄': ('#2b6cb0', '#4c51bf'),  # 🔄 rejoined → blue
-    '🔴': ('#9b2c2c', '#c53030'),  # 🔴 left     → red
+_DETECTION_TYPE_HEADER_COLORS: dict[NotificationType, tuple[str, str]] = {
+    'player_joined_session': ('#276749', '#38a169'),
+    'player_rejoined_session': ('#2b6cb0', '#4c51bf'),
+    'player_left_session': ('#9b2c2c', '#c53030'),
 }
 _DETECTION_DEFAULT_HEADER_COLORS = ('#2d3748', '#4a5568')
 
@@ -155,16 +160,16 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
         self.setWindowTitle(f'{TITLE} - {info.title} ({format_player_display(player.ip, player.usernames)})')
         self._apply_standard_dialog_size()
 
-        color_start, color_stop = _DETECTION_EMOJI_HEADER_COLORS.get(info.emoji, _DETECTION_DEFAULT_HEADER_COLORS)
+        color_start, color_stop = _DETECTION_TYPE_HEADER_COLORS.get(info.event_type, _DETECTION_DEFAULT_HEADER_COLORS)
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(10, 10, 10, 10)
         outer_layout.setSpacing(8)
 
-        self._add_header_label(outer_layout, f'{info.emoji}  {info.title} — {format_player_display(player.ip, player.usernames)}', color_start, color_stop)
+        self._add_header_label(outer_layout, f'{info.title} — {format_player_display(player.ip, player.usernames)}', color_start, color_stop)
 
         if not info.data_ready:
-            warn_label = QLabel('⚠️  Some data may still be loading and missing from this notification')
+            warn_label = QLabel('Some data may still be loading and missing from this notification')
             warn_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             warn_label.setWordWrap(True)
             warn_label.setStyleSheet(DETECTION_WARN_LABEL_STYLESHEET)
@@ -183,7 +188,7 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
 
     def _build_player_group(self, parent_layout: QVBoxLayout, player: Player, info: PlayerDetectionInfo, accent: str) -> None:
         """Add the 'Player Details' section."""
-        group, form = self._make_group('👤  Player Details', accent=accent)
+        group, form = self._make_group('Player Details', accent=accent)
         self._add_row(form, 'Event', info.description)
         self._add_row(form, 'Event Time', info.event_time)
         self._add_row(form, f'Username{pluralize(len(player.usernames))}', ', '.join(player.usernames) or 'N/A')
@@ -191,7 +196,7 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
 
     def _build_connection_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Connection Details' section."""
-        group, form = self._make_group('🔗  Connection Details', accent='#2b6cb0')
+        group, form = self._make_group('Connection Details', accent='#2b6cb0')
         self._add_row(form, 'IP Address', player.ip)
         self._add_row(form, 'Hostname', format_text(player.reverse_dns.hostname))
         self._add_row(form, 'First Port', str(player.ports.first))
@@ -204,7 +209,7 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
 
     def _build_location_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Location Details' section."""
-        group, form = self._make_group('🌍  Location Details', accent='#38a169')
+        group, form = self._make_group('Location Details', accent='#38a169')
         continent = format_text(player.iplookup.ipapi.continent)
         continent_code = format_text(player.iplookup.ipapi.continent_code)
         continent_display = f'{continent} ({continent_code})' if continent != 'N/A' and continent_code != 'N/A' else continent
@@ -221,7 +226,7 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
 
     def _build_network_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Network Details' section."""
-        group, form = self._make_group('🌐  Network Details', accent='#d69e2e')
+        group, form = self._make_group('Network Details', accent='#d69e2e')
         self._add_row(form, 'ISP', format_text(player.iplookup.ipapi.isp))
         self._add_row(form, 'Organization', format_text(player.iplookup.ipapi.org))
         asn = format_text(player.iplookup.ipapi.asn)
@@ -232,7 +237,7 @@ class PlayerDetectionDialog(PlayerInfoDialogMixin):
 
     def _build_flags_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Detection Flags' section."""
-        group, form = self._make_group('🚩  Detection Flags', accent='#805ad5')
+        group, form = self._make_group('Detection Flags', accent='#805ad5')
         self._add_row(form, 'Mobile (cellular)', format_bool(player.iplookup.ipapi.mobile))
         self._add_row(form, 'Proxy / VPN / Tor', format_bool(player.iplookup.ipapi.proxy))
         self._add_row(form, 'Hosting / Datacenter', format_bool(player.iplookup.ipapi.hosting))

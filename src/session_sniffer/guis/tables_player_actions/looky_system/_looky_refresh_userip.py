@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.guis._crashing_qthread import CrashingQThread
 from session_sniffer.guis.looky_text import LOOKY_TITLE
@@ -306,11 +307,13 @@ class LookyRefreshReviewDialog(PlayerInfoDialogMixin):
 
         controls_bar.addSpacing(10)
 
-        select_all_btn = QPushButton('☑ Select All')
+        select_all_btn = QPushButton('Select All')
+        select_all_btn.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'check.svg')))
         select_all_btn.setStyleSheet(LOOKY_REVIEW_SELECT_BUTTON_STYLESHEET)
         select_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         select_all_btn.clicked.connect(self._select_all)
-        deselect_all_btn = QPushButton('☐ Unselect All')
+        deselect_all_btn = QPushButton('Unselect All')
+        deselect_all_btn.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'close.svg')))
         deselect_all_btn.setStyleSheet(LOOKY_REVIEW_SELECT_BUTTON_STYLESHEET)
         deselect_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         deselect_all_btn.clicked.connect(self._deselect_all)

@@ -62,7 +62,7 @@ class LogsManager(QDialog):
                 column_min_widths={5: 160},
             ),
         )
-        tabs.addTab(self._userip_tab, '📄 UserIP Logging')
+        tabs.addTab(self._userip_tab, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'database.svg')), 'UserIP Logging')
 
         self._detection_tab = CsvLogTab(
             CsvLogTabConfig(
@@ -73,7 +73,7 @@ class LogsManager(QDialog):
                 column_min_widths={0: 220, 5: 160},
             ),
         )
-        tabs.addTab(self._detection_tab, '🔎 Detection Logging')
+        tabs.addTab(self._detection_tab, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')), 'Detection Logging')
         self._protection_tab = CsvLogTab(
             CsvLogTabConfig(
                 file_path=PROTECTION_LOGGING_PATH,
@@ -83,11 +83,11 @@ class LogsManager(QDialog):
                 column_min_widths={0: 220, 5: 160},
             ),
         )
-        tabs.addTab(self._protection_tab, '🛡️ Protection Logging')
+        tabs.addTab(self._protection_tab, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'shield.svg')), 'Protection Logging')
         self._debug_tab = TextLogTab(file_path=DEBUG_LOG_PATH)
-        tabs.addTab(self._debug_tab, '📄 Debug Log')
+        tabs.addTab(self._debug_tab, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'bug.svg')), 'Debug Log')
         self._sessions_tab = SessionsLogTab(sessions_dir=SESSIONS_LOGGING_DIR_PATH)
-        tabs.addTab(self._sessions_tab, '📂 Sessions Logging')
+        tabs.addTab(self._sessions_tab, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Sessions Logging')
 
         root_layout.addWidget(tabs, stretch=1)
 

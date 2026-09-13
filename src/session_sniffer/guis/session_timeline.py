@@ -112,7 +112,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
                     total_seconds = session_seconds
 
                 player_item = QTableWidgetItem(format_player_display(player.ip, player.usernames))
-                status_item = QTableWidgetItem('🟢 Connected' if is_connected else '🔴 Disconnected')
+                status_item = QTableWidgetItem('Connected' if is_connected else 'Disconnected')
 
                 first_item = NumericTableWidgetItem(player.datetime.first_seen.strftime('%H:%M:%S'))
                 first_item.setData(Qt.ItemDataRole.UserRole, player.datetime.first_seen.timestamp())
@@ -170,7 +170,7 @@ class SessionTimelineWindow(StatTableWindowMixin):
 
                 cell = self._table.item(row, _COLUMN_STATUS)
                 if cell is not None:
-                    new_val = '🟢 Connected' if is_connected else '🔴 Disconnected'
+                    new_val = 'Connected' if is_connected else 'Disconnected'
                     if cell.text() != new_val:
                         cell.setText(new_val)
                         cell.setForeground(color)

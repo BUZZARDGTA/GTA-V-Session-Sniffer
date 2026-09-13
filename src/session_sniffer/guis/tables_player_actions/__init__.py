@@ -12,6 +12,7 @@ from session_sniffer.guis.tables_player_actions._actions import (
 from session_sniffer.guis.tables_player_actions._detection_dialogs import (
     DetectionNotificationDialog,
     DetectionNotificationInfo,
+    NotificationType,
     PlayerDetectionDialog,
     PlayerDetectionInfo,
     show_detection_notification_dialog,
@@ -49,6 +50,7 @@ __all__ = [
     'IPLookupDetailsDialog',
     'LookyLookupDialog',
     'LookyRefreshReviewDialog',
+    'NotificationType',
     'PlayerDetectionDialog',
     'PlayerDetectionInfo',
     'SeenStatsDialog',

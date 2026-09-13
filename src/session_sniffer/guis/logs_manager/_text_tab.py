@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QIcon, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.guis.file_watch import DebouncedFileWatcher
 from session_sniffer.guis.logs_manager._helpers import (
@@ -58,13 +59,13 @@ class TextLogTab(QWidget):
         self._search_input.textChanged.connect(self._on_search_changed)
         top_bar.addWidget(self._search_input, stretch=1)
 
-        prev_button = QPushButton('◀')
+        prev_button = QPushButton(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_left.svg')), '')
         prev_button.setToolTip('Previous match')
         prev_button.setFixedWidth(30)
         prev_button.clicked.connect(self._find_prev)
         top_bar.addWidget(prev_button)
 
-        next_button = QPushButton('▶')
+        next_button = QPushButton(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'arrow_right.svg')), '')
         next_button.setToolTip('Next match')
         next_button.setFixedWidth(30)
         next_button.clicked.connect(self._find_next)

@@ -54,7 +54,7 @@ class LeaderboardLoadingWidget(QWidget):
         frame_layout.setContentsMargins(24, 20, 24, 20)
         frame_layout.setSpacing(10)
 
-        self._header_label = QLabel('🏆 Building Leaderboard')
+        self._header_label = QLabel('Building Leaderboard')
         self._header_label.setFont(QFont('Segoe UI', 15, QFont.Weight.Bold))
         self._header_label.setStyleSheet('color: #88c0d0;')
         self._header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

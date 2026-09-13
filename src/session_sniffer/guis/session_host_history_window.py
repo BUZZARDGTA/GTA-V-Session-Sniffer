@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QAction, QIcon, QPixmap
 
 from session_sniffer.constants.external import LOCAL_TZ
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis._combo_rule_editor import AVAILABLE_FLAG_CODES, COUNTRY_FLAGS_DIR
 from session_sniffer.player.registry import PlayersRegistry, SessionHost
 from session_sniffer.text_utils import format_elapsed_time
@@ -51,18 +52,18 @@ def setup_session_host_actions(
     """Populate common session host control actions and the Host History submenu."""
     session_host_submenu.addSeparator()
 
-    clear_host_action = QAction('❌ Clear Session Host', session_host_submenu)
+    clear_host_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'close.svg')), 'Clear Session Host', session_host_submenu)
     clear_host_action.setToolTip('Manually clear the currently detected session host')
     clear_host_action.triggered.connect(clear_host_callback)
     session_host_submenu.addAction(clear_host_action)
 
-    redetect_host_action = QAction('🔄 Re-detect Host', session_host_submenu)
+    redetect_host_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'refresh.svg')), 'Re-detect Host', session_host_submenu)
     redetect_host_action.setToolTip('Clear the current host and immediately re-trigger host detection')
     redetect_host_action.triggered.connect(redetect_host_callback)
     session_host_submenu.addAction(redetect_host_action)
 
     session_host_submenu.addSeparator()
-    host_history_submenu = session_host_submenu.addMenu('📜 Host History')
+    host_history_submenu = session_host_submenu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'history.svg')), 'Host History')
     if not host_history_submenu:
         message = f'Failed to create {error_label} submenu'
         raise RuntimeError(message)

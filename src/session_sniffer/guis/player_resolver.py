@@ -3,12 +3,14 @@
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QTabWidget,
     QVBoxLayout,
 )
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.guis.high_pps_monitor import HighRateMonitorWidget
 from session_sniffer.guis.player_identifier import PlayerIdentifierWidget
 from session_sniffer.guis.utils import ToggleAlwaysOnTopMixin
@@ -45,11 +47,11 @@ class PlayerResolverWindow(ToggleAlwaysOnTopMixin):
 
         # Tab 1: High Rate Monitor
         self.high_rate_monitor = HighRateMonitorWidget(self)
-        self._tabs.addTab(self.high_rate_monitor, '📈 High Rate Monitor')
+        self._tabs.addTab(self.high_rate_monitor, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'speedometer.svg')), 'High Rate Monitor')
 
         # Tab 2: Player Identifier
         self.player_identifier = PlayerIdentifierWidget(highlight_ips_callback, self)
-        self._tabs.addTab(self.player_identifier, '🎯 Player Identifier')
+        self._tabs.addTab(self.player_identifier, QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg')), 'Player Identifier')
 
         # Always on top checkbox (shared across tabs)
         always_on_top_checkbox = QCheckBox('Always on Top')

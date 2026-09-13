@@ -253,10 +253,10 @@ class UserIPDatabasesManager(EntriesContextMenuMixin, FileSyncMixin, SettingsPan
         transfer_buttons = QHBoxLayout()
 
         import_menu = QMenu(self)
-        import_files_action = import_menu.addAction('📂 Import .ini file(s)…')
+        import_files_action = import_menu.addAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Import .ini file(s)…')
         if import_files_action:
             import_files_action.triggered.connect(self._import_database_files)
-        import_zip_action = import_menu.addAction('📦 Import from ZIP…')
+        import_zip_action = import_menu.addAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'import.svg')), 'Import from ZIP…')
         if import_zip_action:
             import_zip_action.triggered.connect(self._import_from_zip)
 
@@ -269,11 +269,11 @@ class UserIPDatabasesManager(EntriesContextMenuMixin, FileSyncMixin, SettingsPan
         transfer_buttons.addWidget(import_button)
 
         export_menu = QMenu(self)
-        self._export_selected_action = export_menu.addAction('📤 Export selected database…')
+        self._export_selected_action = export_menu.addAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'export.svg')), 'Export selected database…')
         if self._export_selected_action:
             self._export_selected_action.triggered.connect(self._export_selected_database)
             self._export_selected_action.setEnabled(False)
-        export_zip_action = export_menu.addAction('📦 Export all as ZIP…')
+        export_zip_action = export_menu.addAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'export.svg')), 'Export all as ZIP…')
         if export_zip_action:
             export_zip_action.triggered.connect(self._export_all_as_zip)
 

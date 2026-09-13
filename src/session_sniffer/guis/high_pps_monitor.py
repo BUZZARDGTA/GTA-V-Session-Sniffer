@@ -305,7 +305,7 @@ class HighRateMonitorWidget(QWidget):
         layout.addWidget(self._table)
 
         # Parameters control panel
-        params_box = QGroupBox('⚙ Thresholds')
+        params_box = QGroupBox('Thresholds')
         params_layout = QHBoxLayout(params_box)
         params_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 

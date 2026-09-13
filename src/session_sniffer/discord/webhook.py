@@ -318,7 +318,7 @@ def send_test_message(url: str) -> tuple[bool, str]:
 
     payload = json.dumps(
         {
-            'content': f'🔧 Test from {TITLE} — webhook is working.',
+            'content': f'Test from {TITLE} — webhook is working.',
         },
     ).encode('utf-8')
     try:

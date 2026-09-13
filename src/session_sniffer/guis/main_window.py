@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QShowEvent
+from PySide6.QtGui import QAction, QCloseEvent, QFont, QFontMetrics, QIcon, QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from session_sniffer.background.events import gui_closed__event
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.core import terminate_script
 from session_sniffer.gta5.suspend_manager import GTASuspendManager
@@ -135,14 +136,14 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         capture_menu.setToolTipsVisible(True)
 
-        toggle_capture_action = QAction('⏹️ Stop Capture', self)
+        toggle_capture_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'stop.svg')), 'Stop Capture', self)
         toggle_capture_action.setToolTip('Stop packet capture')
         toggle_capture_action.triggered.connect(self._toggle_capture)
         capture_menu.addAction(toggle_capture_action)
 
         capture_menu.addSeparator()
 
-        change_interface_action = QAction('🔄 Change Interface', self)
+        change_interface_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'refresh.svg')), 'Change Interface', self)
         change_interface_action.setToolTip('Stop capture, select a different network interface, and restart capture')
         change_interface_action.triggered.connect(on_change_interface)
         capture_menu.addAction(change_interface_action)
@@ -174,7 +175,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         gta5_menu.aboutToShow.connect(self._update_gta5_status_label)
         self._gta5_menu_status_separator = gta5_menu.addSeparator()
 
-        player_resolver_action = QAction('🔎 Player Resolver', self)
+        player_resolver_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')), 'Player Resolver', self)
         player_resolver_action.setToolTip('Find the exact IP of a player in your current GTA5 session.')
         player_resolver_action.triggered.connect(self._open_player_resolver)
         gta5_menu.addAction(player_resolver_action)
@@ -184,7 +185,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
         gta5_menu.addSeparator()
 
-        session_host_submenu = gta5_menu.addMenu('👑 Session Host')
+        session_host_submenu = gta5_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'crown.svg')), 'Session Host')
         if not session_host_submenu:
             message = 'Failed to create Session Host submenu'
             raise RuntimeError(message)
@@ -192,7 +193,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         session_host_submenu.menuAction().setToolTip('Session host detection controls for the current GTA5 lobby')
         self._session_host_submenu = session_host_submenu
 
-        host_status_action = QAction('ℹ️ No host', self)  # noqa: RUF001
+        host_status_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'info.svg')), 'No host', self)
         host_status_action.setEnabled(False)
         host_status_action.setToolTip('Current session host detection state')
         session_host_submenu.addAction(host_status_action)
@@ -201,11 +202,11 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         def _update_host_status_label() -> None:
             current_session_host = SessionHost.get_player()
             if current_session_host is not None:
-                self._host_status_action.setText(f'ℹ️ Detected: {current_session_host.ip}')  # noqa: RUF001
+                self._host_status_action.setText(f'Detected: {current_session_host.ip}')
             elif SessionHost.search_player:
-                self._host_status_action.setText('ℹ️ Searching…')  # noqa: RUF001
+                self._host_status_action.setText('Searching…')
             else:
-                self._host_status_action.setText('ℹ️ No host')  # noqa: RUF001
+                self._host_status_action.setText('No host')
 
         session_host_submenu.aboutToShow.connect(_update_host_status_label)
 
@@ -213,7 +214,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
 
         self._gta5_menu_process_separator = gta5_menu.addSeparator()
 
-        gta5_process_submenu = gta5_menu.addMenu('🎮 GTA5 Process')
+        gta5_process_submenu = gta5_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')), 'GTA5 Process')
         if not gta5_process_submenu:
             message = 'Failed to create GTA5 Process submenu'
             raise RuntimeError(message)
@@ -221,14 +222,14 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         gta5_process_submenu.menuAction().setToolTip('GTA5 process controls — suspend/resume for solo and public session manipulation')
         self._gta5_process_submenu = gta5_process_submenu
 
-        gta5_menu_solo_action = QAction('🎯 Solo Public Session (~8s)', self)
+        gta5_menu_solo_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg')), 'Solo Public Session (~8s)', self)
         gta5_menu_solo_action.setToolTip(GTA5_SOLO_TOOLTIP)
         gta5_menu_solo_action.triggered.connect(self.gta5_solo_session)
         gta5_process_submenu.addAction(gta5_menu_solo_action)
 
         gta5_process_submenu.addSeparator()
 
-        gta5_suspend_resume_action = QAction('⏸️ Suspend Process', self)
+        gta5_suspend_resume_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')), 'Suspend Process', self)
         gta5_suspend_resume_action.setToolTip('Manually suspend the GTA5 process — stays suspended until you click it again to resume')
         gta5_suspend_resume_action.triggered.connect(self.toggle_manual_gta5_suspend)
         gta5_process_submenu.addAction(gta5_suspend_resume_action)
@@ -267,24 +268,24 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         tools_menu.setToolTipsVisible(True)
 
-        detections_manager_action = QAction('🛡️ Detections Manager', self)
+        detections_manager_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'shield.svg')), 'Detections Manager', self)
         detections_manager_action.setToolTip('Configure detection, notifications, and protection rules')
         detections_manager_action.triggered.connect(self._open_detections_manager)
         tools_menu.addAction(detections_manager_action)
 
-        userip_manager_action = QAction('🗃️ UserIP Manager', self)
+        userip_manager_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'database.svg')), 'UserIP Manager', self)
         userip_manager_action.setToolTip('Browse, edit, add, and delete entries in UserIP database files')
         userip_manager_action.triggered.connect(self._open_userip_manager)
         tools_menu.addAction(userip_manager_action)
 
-        logs_manager_action = QAction('📋 Logs Manager', self)
+        logs_manager_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'Logs Manager', self)
         logs_manager_action.setToolTip('View, search, filter, and manage application log files')
         logs_manager_action.triggered.connect(self._open_logs_manager)
         tools_menu.addAction(logs_manager_action)
 
         tools_menu.addSeparator()
 
-        leaderboard_action = QAction('🏆 Most Seen Players', self)
+        leaderboard_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'crown.svg')), 'Most Seen Players', self)
         leaderboard_action.setToolTip('View a leaderboard of the most frequently seen players across sessions')
         leaderboard_action.triggered.connect(self._open_player_leaderboard)
         tools_menu.addAction(leaderboard_action)
@@ -295,41 +296,41 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         statistics_menu.setToolTipsVisible(True)
 
-        capture_health_action = QAction('📊 Capture Statistics', self)
+        capture_health_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'chart.svg')), 'Capture Statistics', self)
         capture_health_action.setToolTip('Capture restart count and packet latency statistics')
         capture_health_action.triggered.connect(self._open_capture_health)
         statistics_menu.addAction(capture_health_action)
 
-        session_rate_graph_action = QAction('⚡ Session Rate Graph', self)
+        session_rate_graph_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'speedometer.svg')), 'Session Rate Graph', self)
         session_rate_graph_action.setToolTip('Live PPS and BPS graphs for the whole session')
         session_rate_graph_action.triggered.connect(self._open_session_rate_graph)
         statistics_menu.addAction(session_rate_graph_action)
 
         statistics_menu.addSeparator()
 
-        session_timeline_action = QAction('🕐 Session Timeline', self)
+        session_timeline_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'calendar.svg')), 'Session Timeline', self)
         session_timeline_action.setToolTip('Gantt chart showing when each player was present')
         session_timeline_action.triggered.connect(self._open_session_timeline)
         statistics_menu.addAction(session_timeline_action)
 
         statistics_menu.addSeparator()
 
-        country_breakdown_action = QAction('🌍 Country Breakdown', self)
+        country_breakdown_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'globe.svg')), 'Country Breakdown', self)
         country_breakdown_action.setToolTip('Rank players by country of origin')
         country_breakdown_action.triggered.connect(self._open_country_breakdown)
         statistics_menu.addAction(country_breakdown_action)
 
-        reconnect_frequency_action = QAction('🔁 Reconnect Frequency', self)
+        reconnect_frequency_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'refresh.svg')), 'Reconnect Frequency', self)
         reconnect_frequency_action.setToolTip('List players sorted by reconnect count')
         reconnect_frequency_action.triggered.connect(self._open_reconnect_frequency)
         statistics_menu.addAction(reconnect_frequency_action)
 
-        avg_session_duration_action = QAction('⏱️ Session Duration', self)
+        avg_session_duration_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'history.svg')), 'Session Duration', self)
         avg_session_duration_action.setToolTip('Disconnected players ranked by their session duration')
         avg_session_duration_action.triggered.connect(self._open_session_duration)
         statistics_menu.addAction(avg_session_duration_action)
 
-        port_heatmap_action = QAction('📡 Port Heatmap', self)
+        port_heatmap_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')), 'Port Heatmap', self)
         port_heatmap_action.setToolTip('Rank observed ports by frequency across all players')
         port_heatmap_action.triggered.connect(self._open_port_heatmap)
         statistics_menu.addAction(port_heatmap_action)
@@ -340,86 +341,86 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         data_menu.setToolTipsVisible(True)
 
-        open_local_appdata_action = QAction('📂 Open Local AppData Folder', self)
+        open_local_appdata_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open Local AppData Folder', self)
         open_local_appdata_action.setToolTip('Open Local AppData\\Session Sniffer in Windows Explorer')
         open_local_appdata_action.triggered.connect(self._open_local_appdata_folder)
         data_menu.addAction(open_local_appdata_action)
 
-        open_roaming_appdata_action = QAction('📂 Open Roaming AppData Folder', self)
+        open_roaming_appdata_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open Roaming AppData Folder', self)
         open_roaming_appdata_action.setToolTip('Open Roaming AppData\\Session Sniffer in Windows Explorer')
         open_roaming_appdata_action.triggered.connect(self._open_roaming_appdata_folder)
         data_menu.addAction(open_roaming_appdata_action)
 
         data_menu.addSeparator()
 
-        open_userip_databases_action = QAction('📂 Open UserIP Databases Folder', self)
+        open_userip_databases_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open UserIP Databases Folder', self)
         open_userip_databases_action.setToolTip('Open Roaming AppData\\Session Sniffer\\UserIP Databases')
         open_userip_databases_action.triggered.connect(self._open_userip_databases_folder)
         data_menu.addAction(open_userip_databases_action)
 
-        open_user_scripts_action = QAction('📂 Open User Scripts Folder', self)
+        open_user_scripts_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open User Scripts Folder', self)
         open_user_scripts_action.setToolTip('Open Roaming AppData\\Session Sniffer\\scripts')
         open_user_scripts_action.triggered.connect(self._open_user_scripts_folder)
         data_menu.addAction(open_user_scripts_action)
 
         data_menu.addSeparator()
 
-        debug_logs_submenu = data_menu.addMenu('🐛 Debug Logs')
+        debug_logs_submenu = data_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'bug.svg')), 'Debug Logs')
         if not debug_logs_submenu:
             message = 'Failed to create Debug Logs submenu'
             raise RuntimeError(message)
         debug_logs_submenu.setToolTipsVisible(True)
         debug_logs_submenu.menuAction().setToolTip('Open or browse the application debug log files')
 
-        open_debug_logs_folder_action = QAction('📂 Open Debug Logs Folder', self)
+        open_debug_logs_folder_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open Debug Logs Folder', self)
         open_debug_logs_folder_action.setToolTip('Open Local AppData\\Session Sniffer\\Debug')
         open_debug_logs_folder_action.triggered.connect(self._open_debug_logs_folder)
         debug_logs_submenu.addAction(open_debug_logs_folder_action)
 
         debug_logs_submenu.addSeparator()
 
-        open_debug_log_action = QAction('📄 debug.log', self)
+        open_debug_log_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'debug.log', self)
         open_debug_log_action.setToolTip('Open Local AppData\\Session Sniffer\\Debug\\debug.log')
         open_debug_log_action.triggered.connect(self._open_debug_log_file)
         debug_logs_submenu.addAction(open_debug_log_action)
 
-        app_logs_submenu = data_menu.addMenu('📋 Application Logs')
+        app_logs_submenu = data_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'Application Logs')
         if not app_logs_submenu:
             message = 'Failed to create Application Logs submenu'
             raise RuntimeError(message)
         app_logs_submenu.setToolTipsVisible(True)
         app_logs_submenu.menuAction().setToolTip('Open or browse CSV application log files (detections, protection, UserIP)')
 
-        open_logging_folder_action = QAction('📂 Open Logging Folder', self)
+        open_logging_folder_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open Logging Folder', self)
         open_logging_folder_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging')
         open_logging_folder_action.triggered.connect(self._open_logging_folder)
         app_logs_submenu.addAction(open_logging_folder_action)
 
-        open_sessions_logs_action = QAction('📂 Open Sessions Folder', self)
+        open_sessions_logs_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'folder.svg')), 'Open Sessions Folder', self)
         open_sessions_logs_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging\\Sessions')
         open_sessions_logs_action.triggered.connect(self._open_sessions_logging_folder)
         app_logs_submenu.addAction(open_sessions_logs_action)
 
         app_logs_submenu.addSeparator()
 
-        open_detection_log_action = QAction('📄 Detection_Logging.csv', self)
+        open_detection_log_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'Detection_Logging.csv', self)
         open_detection_log_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging\\Detection_Logging.csv')
         open_detection_log_action.triggered.connect(self._open_detection_log_file)
         app_logs_submenu.addAction(open_detection_log_action)
 
-        open_protection_log_action = QAction('📄 Protection_Logging.csv', self)
+        open_protection_log_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'Protection_Logging.csv', self)
         open_protection_log_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging\\Protection_Logging.csv')
         open_protection_log_action.triggered.connect(self._open_protection_log_file)
         app_logs_submenu.addAction(open_protection_log_action)
 
-        open_userip_log_action = QAction('📄 UserIP_Logging.csv', self)
+        open_userip_log_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'text_editor.svg')), 'UserIP_Logging.csv', self)
         open_userip_log_action.setToolTip('Open Local AppData\\Session Sniffer\\Logging\\UserIP_Logging.csv')
         open_userip_log_action.triggered.connect(self._open_userip_log_file)
         app_logs_submenu.addAction(open_userip_log_action)
 
         data_menu.addSeparator()
 
-        open_settings_ini_action = QAction('📄 Open Settings.ini', self)
+        open_settings_ini_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'settings.svg')), 'Open Settings.ini', self)
         open_settings_ini_action.setToolTip('Open Roaming AppData\\Session Sniffer\\Settings.ini')
         open_settings_ini_action.triggered.connect(self._open_settings_file)
         data_menu.addAction(open_settings_ini_action)
@@ -430,7 +431,7 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         settings_menu.setToolTipsVisible(True)
 
-        open_settings_action = QAction('⚙️ Open Settings', self)
+        open_settings_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'settings.svg')), 'Open Settings', self)
         open_settings_action.setToolTip('View and edit all application settings')
         open_settings_action.triggered.connect(self._open_settings_dialog)
         settings_menu.addAction(open_settings_action)
@@ -441,53 +442,53 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
             raise RuntimeError(message)
         help_menu.setToolTipsVisible(True)
 
-        repo_action = QAction('📦 Project Repository', self)
+        repo_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'link.svg')), 'Project Repository', self)
         repo_action.setToolTip('Open the Session Sniffer GitHub repository in your default web browser')
         repo_action.triggered.connect(self._open_project_repo)
         help_menu.addAction(repo_action)
 
-        docs_action = QAction('📚 Documentation', self)
+        docs_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'book.svg')), 'Documentation', self)
         docs_action.setToolTip('View the complete documentation and user guide for Session Sniffer')
         docs_action.triggered.connect(self._open_documentation)
         help_menu.addAction(docs_action)
 
-        tips_action = QAction('💡 Tips and Tricks', self)
+        tips_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'lightbulb.svg')), 'Tips and Tricks', self)
         tips_action.setToolTip('Learn optimization strategies, hidden features, and best practices')
         tips_action.triggered.connect(self._open_tips_and_tricks)
         help_menu.addAction(tips_action)
 
-        release_notes_action = QAction('📋 Release Notes', self)
+        release_notes_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'history.svg')), 'Release Notes', self)
         release_notes_action.setToolTip('View the release history and notes on GitHub')
         release_notes_action.triggered.connect(self._open_release_notes)
         help_menu.addAction(release_notes_action)
 
-        license_action = QAction('⚖️ View License', self)
+        license_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'balance.svg')), 'View License', self)
         license_action.setToolTip('View the GNU General Public License (GPLv3) for Session Sniffer')
         license_action.triggered.connect(self._view_license)
         help_menu.addAction(license_action)
 
         help_menu.addSeparator()
 
-        report_issue_action = QAction('🐛 Report Issue', self)
+        report_issue_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'bug.svg')), 'Report Issue', self)
         report_issue_action.setToolTip('Open a new issue on GitHub to report a bug or request a feature')
         report_issue_action.triggered.connect(self._report_issue)
         help_menu.addAction(report_issue_action)
 
-        discord_action = QAction('💬 Discord Server', self)
+        discord_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'discord.svg')), 'Discord Server', self)
         discord_action.setToolTip('Join the official Session Sniffer Discord community for support and updates')
         discord_action.triggered.connect(self._join_discord)
         help_menu.addAction(discord_action)
 
         help_menu.addSeparator()
 
-        check_updates_action = QAction('🔄 Check for Updates', self)
+        check_updates_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'cloud_download.svg')), 'Check for Updates', self)
         check_updates_action.setToolTip('Check GitHub for a newer version of Session Sniffer')
         check_updates_action.triggered.connect(self._check_for_updates)
         help_menu.addAction(check_updates_action)
 
         help_menu.addSeparator()
 
-        about_action = QAction('💡 About', self)
+        about_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'info.svg')), 'About', self)
         about_action.setToolTip(f'About {TITLE}')
         about_action.triggered.connect(self._show_about_dialog)
         help_menu.addAction(about_action)
@@ -931,11 +932,13 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         """Toggle the packet capture on/off."""
         if self.capture.is_running():
             self.capture.stop()
-            self._actions.toggle_capture.setText('▶️ Start Capture')
+            self._actions.toggle_capture.setText('Start Capture')
+            self._actions.toggle_capture.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._actions.toggle_capture.setToolTip('Start packet capture')
         else:
             self.capture.start()
-            self._actions.toggle_capture.setText('⏹️ Stop Capture')
+            self._actions.toggle_capture.setText('Stop Capture')
+            self._actions.toggle_capture.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'stop.svg')))
             self._actions.toggle_capture.setToolTip('Stop packet capture')
 
         self._update_header_capture_status()
@@ -973,10 +976,12 @@ class MainWindow(LookyMixin, GTA5Mixin, RDR2Mixin, StatsMixin, FilesMixin, QMain
         """Synchronize GUI state after the capture interface has been replaced."""
         self._update_gta5_toolbar_visibility()
         if self.capture.is_running():
-            self._actions.toggle_capture.setText('⏹️ Stop Capture')
+            self._actions.toggle_capture.setText('Stop Capture')
+            self._actions.toggle_capture.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'stop.svg')))
             self._actions.toggle_capture.setToolTip('Stop packet capture')
         else:
-            self._actions.toggle_capture.setText('▶️ Start Capture')
+            self._actions.toggle_capture.setText('Start Capture')
+            self._actions.toggle_capture.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._actions.toggle_capture.setToolTip('Start packet capture')
         self._actions.toggle_capture.setEnabled(True)
         self._update_header_capture_status()

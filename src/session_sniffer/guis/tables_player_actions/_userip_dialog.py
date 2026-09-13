@@ -34,7 +34,7 @@ class UserIPDetectedDialog(PlayerInfoDialogMixin):
         outer_layout.setContentsMargins(10, 10, 10, 10)
         outer_layout.setSpacing(8)
 
-        self._add_header_label(outer_layout, f'🔔  UserIP Detected — {format_player_display(player.ip, player.usernames)}', '#c53030', '#dd6b20')
+        self._add_header_label(outer_layout, f'UserIP Detected — {format_player_display(player.ip, player.usernames)}', '#c53030', '#dd6b20')
 
         scroll_layout = self._init_scroll_area(outer_layout)
 
@@ -46,7 +46,7 @@ class UserIPDetectedDialog(PlayerInfoDialogMixin):
 
     def _build_detection_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'Detection Details' section to the scroll layout."""
-        group, form = self._make_group('🔴  Detection Details', accent='#c53030')
+        group, form = self._make_group('Detection Details', accent='#c53030')
         detection_time = player.userip_detection.time if player.userip_detection is not None else 'N/A'
         usernames = ', '.join(player.userip.usernames) if player.userip is not None and player.userip.usernames else 'N/A'
         ports_str = ', '.join(map(str, reversed(player.ports.all))) if player.ports.all else 'N/A'
@@ -70,7 +70,7 @@ class UserIPDetectedDialog(PlayerInfoDialogMixin):
 
     def _build_iplookup_group(self, parent_layout: QVBoxLayout, player: Player) -> None:
         """Add the 'IP Lookup' section to the scroll layout."""
-        group, form = self._make_group('🌍  IP Lookup', accent='#38a169')
+        group, form = self._make_group('IP Lookup', accent='#38a169')
         self._add_row(form, 'Continent', format_text(player.iplookup.ipapi.continent))
         self._add_row(form, 'Country', format_text(player.iplookup.geolite2.country))
         self._add_row(form, 'Region', format_text(player.iplookup.ipapi.region))

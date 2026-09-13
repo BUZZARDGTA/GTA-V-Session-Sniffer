@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QTableView,
 )
 
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import (
     BANDWIDTH_BASE_COLUMN_ATTRS,
     BANDWIDTH_RATE_STAT_COLUMNS,
@@ -30,7 +31,7 @@ from session_sniffer.constants.standalone import (
 )
 from session_sniffer.error_messages import format_type_error
 from session_sniffer.guis.exceptions import TableDataConsistencyError, UnsupportedSortColumnError
-from session_sniffer.player.registry import PlayersRegistry
+from session_sniffer.player.registry import PlayersRegistry, SessionHost
 
 if TYPE_CHECKING:
     from session_sniffer.guis.tables import SessionTableView
@@ -137,25 +138,12 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
             ports=self.get_column_index('Ports'),
         )
         self._ip_to_row_index: dict[str, int] = {}  # O(1) row lookup by IP
+        self._crown_icon: QIcon | None = None
 
     # --------------------------------------------------------------------------
     # Public properties
     # --------------------------------------------------------------------------
 
-    @staticmethod
-    def _remove_session_host_crown_from_ip(ip_address: str) -> str:
-        """Remove the crown suffix from an IP address string if present.
-
-        The crown emoji (👑) is used to indicate that this IP address belongs to the session host.
-        This method removes that visual indicator to get the clean IP address string.
-
-        Args:
-            ip_address: The IP address string that may contain a session host crown suffix.
-
-        Returns:
-            The IP address string with session host crown suffix removed.
-        """
-        return ip_address.removesuffix(' 👑')
 
     @property
     def view(self) -> SessionTableView:
@@ -238,12 +226,19 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
 
         output: str | QBrush | QIcon | None = None
 
-        if role == Qt.ItemDataRole.DecorationRole and self._column_indices.country is not None and self._column_indices.country == column_index:
-            ip = self.get_ip_from_data_safely(self._data[row_index])
+        if role == Qt.ItemDataRole.DecorationRole:
+            if self._column_indices.country is not None and self._column_indices.country == column_index:
+                ip = self.get_ip_from_data_safely(self._data[row_index])
 
-            matched_player = PlayersRegistry.get_player_by_ip(ip)
-            if matched_player is not None and matched_player.country_flag is not None:
-                output = matched_player.country_flag.icon
+                matched_player = PlayersRegistry.get_player_by_ip(ip)
+                if matched_player is not None and matched_player.country_flag is not None:
+                    output = matched_player.country_flag.icon
+            elif self.ip_column_index >= 0 and self.ip_column_index == column_index:
+                ip = self.get_ip_from_data_safely(self._data[row_index])
+                if SessionHost.is_host(ip):
+                    if self._crown_icon is None:
+                        self._crown_icon = QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'crown.svg'))
+                    output = self._crown_icon
         elif role == Qt.ItemDataRole.DisplayRole:
             # Return the cell's text
             output = self._data[row_index][column_index]
@@ -521,22 +516,18 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
             message = f'IP column index {self.ip_column_index} is out of bounds for row data with {len(row_data)} columns'
             raise IndexError(message)
 
-        ip_data = row_data[self.ip_column_index]
-
-        return self._remove_session_host_crown_from_ip(ip_data)
+        return row_data[self.ip_column_index]
 
     def get_display_text(self, index: QModelIndex) -> str | None:
         """Extract display text as a string from model data.
 
-        This method handles the case where model data might return `str`, `QBrush`, `QIcon` or `None` for decoration roles, but we only want the display text as a string.<br>
-        For 'IP Address' column, it automatically removes the session host crown suffix (👑) if present.
+        This method handles the case where model data might return `str`, `QBrush`, `QIcon` or `None` for decoration roles, but we only want the display text as a string.
 
         Args:
             index: The QModelIndex to get display text from.
 
         Returns:
             The display text as a string, or `None` if no valid display text is available.
-            For the 'IP Address' column, the crown suffix is automatically removed.
 
         Raises:
             TypeError: If the display data is not a string and is not `None`.
@@ -548,18 +539,14 @@ class SessionTableModel(QAbstractTableModel):  # pylint: disable=too-many-public
         if not isinstance(display_data, str):
             raise TypeError(format_type_error(display_data, str))
 
-        # If this is an IP Address column, remove the crown suffix
-        if index.column() == self.ip_column_index:
-            return self._remove_session_host_crown_from_ip(display_data)
-
         return display_data
 
     def has_session_host(self) -> bool:
-        """Return whether any row in the table contains the session host crown."""
+        """Return whether any row in the table contains the session host."""
         ip_column = self.ip_column_index
         if ip_column < 0:
             return False
-        return any(len(row_data) > ip_column and '👑' in row_data[ip_column] for row_data in self._data)
+        return any(len(row_data) > ip_column and SessionHost.is_host(row_data[ip_column]) for row_data in self._data)
 
     def has_multiple_ports(self) -> bool:
         """Return whether any row in the table contains multiple ports."""

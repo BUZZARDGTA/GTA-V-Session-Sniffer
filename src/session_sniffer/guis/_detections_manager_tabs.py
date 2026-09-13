@@ -81,21 +81,21 @@ class DetectionsManagerTabsMixin(QDialog):
         scroll_layout.setSpacing(20)
 
         join_group = self._create_detection_group(
-            '➕ Player Join',  # noqa: RUF001
+            'Player Join',
             'Triggers when a new player joins your session.',
             'player_join',
         )
         scroll_layout.addWidget(join_group)
 
         rejoin_group = self._create_detection_group(
-            '🔄 Player Rejoin',
+            'Player Rejoin',
             'Triggers when a player rejoins your session after disconnecting.',
             'player_rejoin',
         )
         scroll_layout.addWidget(rejoin_group)
 
         leave_group = self._create_detection_group(
-            '❌ Player Leave',
+            'Player Leave',
             'Triggers when a player leaves your session.',
             'player_leave',
         )
@@ -121,21 +121,21 @@ class DetectionsManagerTabsMixin(QDialog):
         scroll_layout.setSpacing(20)
 
         mobile_group = self._create_detection_group(
-            '📱 Mobile Connection',
+            'Mobile Connection',
             'Triggers when a player is on a mobile or cellular connection.',
             'mobile',
         )
         scroll_layout.addWidget(mobile_group)
 
         vpn_group = self._create_detection_group(
-            '🔒 VPN/Proxy/Tor',
+            'VPN/Proxy/Tor',
             'Triggers when a player is using a VPN, proxy, or Tor exit node.',
             'vpn',
         )
         scroll_layout.addWidget(vpn_group)
 
         hosting_group = self._create_detection_group(
-            '🏢 Hosting/Data Center',
+            'Hosting/Data Center',
             'Triggers when a player connects from a hosting provider or data center.',
             'hosting',
         )
@@ -161,21 +161,21 @@ class DetectionsManagerTabsMixin(QDialog):
         scroll_layout.setSpacing(20)
 
         country_group = self._create_list_detection_group(
-            '🌍 Country Detection',
+            'Country Detection',
             "Triggers when a player's country is in the detection list.",
             'country',
         )
         scroll_layout.addWidget(country_group)
 
         isp_group = self._create_list_detection_group(
-            '🌐 ISP/Company Detection',
+            'ISP/Company Detection',
             "Triggers when a player's ISP or company is in the detection list (e.g., Vodafone, Orange, Cloudflare).",
             'isp',
         )
         scroll_layout.addWidget(isp_group)
 
         asn_group = self._create_list_detection_group(
-            '🔢 ASN Number Detection',
+            'ASN Number Detection',
             "Triggers when a player's ASN is in the detection list (e.g., AS15169, AS13335, or just 15169, 13335).",
             'asn',
         )
@@ -200,7 +200,8 @@ class DetectionsManagerTabsMixin(QDialog):
         filter_warning_layout = QHBoxLayout(filter_warning)
         filter_warning_layout.setContentsMargins(8, 6, 8, 6)
         filter_warning_layout.setSpacing(10)
-        warning_icon_label = QLabel('⚠️')
+        warning_icon_label = QLabel()
+        warning_icon_label.setPixmap(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'warning.svg')).pixmap(20, 20))
         warning_icon_label.setStyleSheet(WARNING_ICON_LABEL_STYLESHEET)
         filter_warning_layout.addWidget(warning_icon_label)
         warning_text_label = QLabel(
@@ -229,7 +230,7 @@ class DetectionsManagerTabsMixin(QDialog):
         scroll_layout.setSpacing(20)
 
         relay_group = self._create_detection_group(
-            '🎮  GTA5 Relay',
+            'GTA5 Relay',
             'Triggers when a Take-Two Interactive relay IP exceeds the configured packet threshold.',
             'gta5_relay',
         )
@@ -347,7 +348,7 @@ class DetectionsManagerTabsMixin(QDialog):
         result = QMessageBox.question(
             self,
             TITLE,
-            '⚠️ The Take-Two Interactive Software, Inc. relay IP ranges are currently being blocked by the capture filter '
+            'The Take-Two Interactive Software, Inc. relay IP ranges are currently being blocked by the capture filter '
             '(<i>Block Third-Party Servers</i> setting).\n\n'
             'Relay IPs will be dropped before the capture engine sees them, '
             'so this detection will never trigger while that filter is active.\n\n'
@@ -375,7 +376,7 @@ class DetectionsManagerTabsMixin(QDialog):
     # ------------------------------------------------------------------
 
     def _update_combo_rule_buttons(self) -> None:
-        """Enable or disable combo rule action buttons based on list state."""
+        """Synchronize the enabled/disabled state of combo rule management buttons."""
         has_selection = self._combo_rules_list.currentRow() >= 0
         has_items = self._combo_rules_list.count() > 0
         self._combo_edit_button.setEnabled(has_selection)
@@ -398,8 +399,8 @@ class DetectionsManagerTabsMixin(QDialog):
         self._combo_rules_list.clear()
         for rule in ComboRulesManager.rules:
             conditions_summary = ', '.join(f'{key}={value}' if not isinstance(value, bool) else key for key, value in rule.conditions.items())
-            status = '✅' if rule.enabled else '❌'
-            item = QListWidgetItem(f'{status} {rule.name}  [{conditions_summary}]')
+            item = QListWidgetItem(f'{rule.name}  [{conditions_summary}]')
+            item.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / ('check.svg' if rule.enabled else 'close.svg'))))
             item.setData(Qt.ItemDataRole.UserRole, id(rule))
             self._combo_rules_list.addItem(item)
 

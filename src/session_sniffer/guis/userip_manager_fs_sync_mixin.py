@@ -102,7 +102,7 @@ class FileSyncMixin(QDialog):
 
         if self._dirty:
             self._update_file_info(self._current_path)
-            self._set_status(f'⚠ "{self._current_path.name}" changed on disk. Save to overwrite, or reselect it to discard your edits and reload.')
+            self._set_status(f'"{self._current_path.name}" changed on disk. Save to overwrite, or reselect it to discard your edits and reload.')
             return
 
         self._load_database(self._current_path)

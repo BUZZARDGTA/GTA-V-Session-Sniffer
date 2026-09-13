@@ -4,10 +4,11 @@ from threading import Event
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont, QFontMetrics
+from PySide6.QtGui import QAction, QFont, QFontMetrics, QIcon
 from PySide6.QtWidgets import QLabel, QMainWindow, QMenu, QMenuBar, QWidgetAction
 
 from session_sniffer import msgbox
+from session_sniffer.constants.local import RESOURCES_DIR_PATH
 from session_sniffer.constants.standalone import TITLE
 from session_sniffer.error_messages import (
     format_rdr2_solo_session_process_not_running_message,
@@ -86,7 +87,7 @@ class RDR2Mixin(QMainWindow):
         rdr2_menu.aboutToShow.connect(self._update_rdr2_status_label)
         self._rdr2_menu_status_separator = rdr2_menu.addSeparator()
 
-        player_resolver_action = QAction('🔎 Player Resolver', self)
+        player_resolver_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'search.svg')), 'Player Resolver', self)
         player_resolver_action.setToolTip('Find the exact IP of a player in your current RDR2 session.')
         player_resolver_action.triggered.connect(self._open_player_resolver)
         rdr2_menu.addAction(player_resolver_action)
@@ -94,7 +95,7 @@ class RDR2Mixin(QMainWindow):
 
         rdr2_menu.addSeparator()
 
-        session_host_submenu = rdr2_menu.addMenu('👑 Session Host')
+        session_host_submenu = rdr2_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'crown.svg')), 'Session Host')
         if not session_host_submenu:
             message = 'Failed to create RDR2 Session Host submenu'
             raise RuntimeError(message)
@@ -102,7 +103,7 @@ class RDR2Mixin(QMainWindow):
         session_host_submenu.menuAction().setToolTip('Session host detection controls for the current RDR2 lobby')
         self._rdr2_session_host_submenu = session_host_submenu
 
-        host_status_action = QAction('ℹ️ No host', self)  # noqa: RUF001
+        host_status_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'info.svg')), 'No host', self)
         host_status_action.setEnabled(False)
         host_status_action.setToolTip('Current session host detection state')
         session_host_submenu.addAction(host_status_action)
@@ -111,18 +112,18 @@ class RDR2Mixin(QMainWindow):
         def _update_rdr2_host_status_label() -> None:
             current_session_host = SessionHost.get_player()
             if current_session_host is not None:
-                self._rdr2_host_status_action.setText(f'ℹ️ Detected: {current_session_host.ip}')  # noqa: RUF001
+                self._rdr2_host_status_action.setText(f'Detected: {current_session_host.ip}')
             elif SessionHost.search_player:
-                self._rdr2_host_status_action.setText('ℹ️ Searching…')  # noqa: RUF001
+                self._rdr2_host_status_action.setText('Searching…')
             else:
-                self._rdr2_host_status_action.setText('ℹ️ No host')  # noqa: RUF001
+                self._rdr2_host_status_action.setText('No host')
 
         session_host_submenu.aboutToShow.connect(_update_rdr2_host_status_label)
         setup_session_host_actions(session_host_submenu, self._clear_session_host, self._redetect_session_host, self._highlight_ips, error_label='RDR2 Host History')
 
         self._rdr2_menu_process_separator = rdr2_menu.addSeparator()
 
-        rdr2_process_submenu = rdr2_menu.addMenu('🎮 RDR2 Process')
+        rdr2_process_submenu = rdr2_menu.addMenu(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')), 'RDR2 Process')
         if not rdr2_process_submenu:
             message = 'Failed to create RDR2 Process submenu'
             raise RuntimeError(message)
@@ -130,14 +131,14 @@ class RDR2Mixin(QMainWindow):
         rdr2_process_submenu.menuAction().setToolTip('RDR2 process controls — suspend/resume for solo and public session manipulation')
         self._rdr2_process_submenu = rdr2_process_submenu
 
-        rdr2_solo_menu_action = QAction('🎯 Solo Public Session (~8s)', self)
+        rdr2_solo_menu_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg')), 'Solo Public Session (~8s)', self)
         rdr2_solo_menu_action.setToolTip(RDR2_SOLO_TOOLTIP)
         rdr2_solo_menu_action.triggered.connect(self.rdr2_solo_session)
         rdr2_process_submenu.addAction(rdr2_solo_menu_action)
 
         rdr2_process_submenu.addSeparator()
 
-        rdr2_suspend_resume_action = QAction('⏸️ Suspend Process', self)
+        rdr2_suspend_resume_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')), 'Suspend Process', self)
         rdr2_suspend_resume_action.setToolTip('Manually suspend the RDR2 process — stays suspended until you click it again to resume')
         rdr2_suspend_resume_action.triggered.connect(self.toggle_manual_rdr2_suspend)
         rdr2_process_submenu.addAction(rdr2_suspend_resume_action)
@@ -253,8 +254,10 @@ class RDR2Mixin(QMainWindow):
                 self._rdr2_solo_active = False
             self._rdr2_process_suspended = False
             self._rdr2_externally_suspended = False
-            self._rdr2_process_submenu.setTitle('🎮 RDR2 Process')
-            self._rdr2_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')))
+            self._rdr2_suspend_resume_action.setText('Suspend Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             self._rdr2_suspend_resume_action.setEnabled(False)
             self._rdr2_solo_menu_action.setEnabled(False)
             self._rdr2_suspend_resume_action.setToolTip(
@@ -263,19 +266,25 @@ class RDR2Mixin(QMainWindow):
                 else 'RDR2 is not currently running — launch RDR2 to enable process control.',
             )
         elif self._manual_rdr2_suspend_active:
-            self._rdr2_process_submenu.setTitle('⏸️ RDR2 Process (Suspended)')
-            self._rdr2_suspend_resume_action.setText('▶️ Resume Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process (Suspended)')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._rdr2_suspend_resume_action.setText('Resume Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._rdr2_suspend_resume_action.setToolTip('Remove the manual suspend hold from the RDR2 process')
             self._rdr2_suspend_resume_action.setEnabled(True)
             self._rdr2_solo_menu_action.setEnabled(False)
         elif self._rdr2_solo_active:
-            self._rdr2_process_submenu.setTitle('🎯 RDR2 Process (Going Solo...)')
-            self._rdr2_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process (Going Solo...)')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg')))
+            self._rdr2_suspend_resume_action.setText('Suspend Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             self._rdr2_suspend_resume_action.setEnabled(False)
             self._rdr2_solo_menu_action.setEnabled(False)
         elif self._rdr2_process_suspended:
-            self._rdr2_process_submenu.setTitle('⏸️ RDR2 Process (Suspended)')
-            self._rdr2_suspend_resume_action.setText('▶️ Resume Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process (Suspended)')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._rdr2_suspend_resume_action.setText('Resume Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._rdr2_suspend_resume_action.setEnabled(False)
             self._rdr2_solo_menu_action.setEnabled(False)
             self._rdr2_suspend_resume_action.setToolTip(
@@ -283,15 +292,19 @@ class RDR2Mixin(QMainWindow):
             )
             self._rdr2_solo_menu_action.setToolTip('Process is already suspended')
         elif self._rdr2_externally_suspended:
-            self._rdr2_process_submenu.setTitle('⏸️ RDR2 Process (Suspended)')
-            self._rdr2_suspend_resume_action.setText('▶️ Resume Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process (Suspended)')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
+            self._rdr2_suspend_resume_action.setText('Resume Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'play.svg')))
             self._rdr2_suspend_resume_action.setEnabled(True)
             self._rdr2_solo_menu_action.setEnabled(False)
             self._rdr2_suspend_resume_action.setToolTip('RDR2 was left suspended outside this app — click to resume it')
             self._rdr2_solo_menu_action.setToolTip('Process is currently suspended — resume it first')
         else:
-            self._rdr2_process_submenu.setTitle('🎮 RDR2 Process')
-            self._rdr2_suspend_resume_action.setText('⏸️ Suspend Process')
+            self._rdr2_process_submenu.setTitle('RDR2 Process')
+            self._rdr2_process_submenu.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')))
+            self._rdr2_suspend_resume_action.setText('Suspend Process')
+            self._rdr2_suspend_resume_action.setIcon(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'pause.svg')))
             if self._rdr2_process_detected:
                 self._rdr2_suspend_resume_action.setEnabled(True)
                 self._rdr2_solo_menu_action.setEnabled(True)

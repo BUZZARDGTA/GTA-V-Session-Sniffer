@@ -130,19 +130,19 @@ class DetectionsManagerDialog(UnsavedChangesMixin, DetectionsManagerTabsMixin, Q
         layout.setSpacing(10)
 
         # Header
-        header = QLabel('🛡️  Advanced Detection & Security Manager')
+        header = QLabel('Advanced Detection & Security Manager')
         header.setStyleSheet(DETECTIONS_MANAGER_HEADER_STYLESHEET)
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
 
         # Tabs
         self._tabs = QTabWidget()
-        self._tabs.addTab(self.create_player_events_tab(), '👤 Player Events')
-        self._tabs.addTab(self.create_network_based_tab(), '🌐 Network-Based')
-        self._tabs.addTab(self.create_geo_based_tab(), '🌍 Geography-Based')
-        self._tabs.addTab(self.create_combo_rules_tab(), '🔗 Combo Rules')
+        self._tabs.addTab(self.create_player_events_tab(), QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'player.svg')), 'Player Events')
+        self._tabs.addTab(self.create_network_based_tab(), QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'ethernet.svg')), 'Network-Based')
+        self._tabs.addTab(self.create_geo_based_tab(), QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'globe.svg')), 'Geography-Based')
+        self._tabs.addTab(self.create_combo_rules_tab(), QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'link.svg')), 'Combo Rules')
         if Settings.is_gta5_feature_set():
-            self._tabs.addTab(self.create_gta5_relays_tab(), '🎮 GTA5 Relays')
+            self._tabs.addTab(self.create_gta5_relays_tab(), QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'controller.svg')), 'GTA5 Relays')
         layout.addWidget(self._tabs)
 
         # Bottom buttons

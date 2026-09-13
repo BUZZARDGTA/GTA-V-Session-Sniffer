@@ -443,27 +443,27 @@ class TargetProcessDialog(QDialog):
         menu.setToolTipsVisible(True)
 
         target_icon = QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'target.svg'))
-        sniff_action = QAction(target_icon, f"🎯 Sniff '{process_name}'", menu)
+        sniff_action = QAction(target_icon, f"Sniff '{process_name}'", menu)
         sniff_action.setToolTip(f'Select {process_name} (PID: {pid_str}) and filter network capture to it.')
         sniff_action.triggered.connect(self._on_sniff_selected_clicked)
         menu.addAction(sniff_action)
 
         menu.addSeparator()
 
-        copy_row_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), '📋 Copy Row', menu)
+        copy_row_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), 'Copy Row', menu)
         copy_row_action.setShortcut('Ctrl+C')
         copy_row_action.setToolTip('Copy selected row details to the clipboard.')
         copy_row_action.triggered.connect(self._copy_selected_row)
         menu.addAction(copy_row_action)
 
         if exe_path:
-            copy_path_action = QAction('📋 Copy Executable Path', menu)
+            copy_path_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), 'Copy Executable Path', menu)
             copy_path_action.setToolTip('Copy the full executable path to the clipboard.')
             copy_path_action.triggered.connect(lambda: set_clipboard_text(exe_path))
             menu.addAction(copy_path_action)
 
         if process_name:
-            copy_name_action = QAction('📋 Copy Process Name', menu)
+            copy_name_action = QAction(QIcon(str(RESOURCES_DIR_PATH / 'icons' / 'copy.svg')), 'Copy Process Name', menu)
             copy_name_action.setToolTip('Copy the process name to the clipboard.')
             copy_name_action.triggered.connect(lambda: set_clipboard_text(process_name))
             menu.addAction(copy_name_action)

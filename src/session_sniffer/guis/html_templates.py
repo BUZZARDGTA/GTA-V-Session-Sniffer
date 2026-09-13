@@ -16,7 +16,7 @@ CAPTURE_STOPPED_HTML = """
 <div style="background: linear-gradient(90deg, #bf616a, #d08770); padding: 10px;
             margin-top: 10px; border: 2px solid #bf616a; border-radius: 6px;
             box-shadow: 0px 3px 8px rgba(191, 97, 106, 0.4); text-align: center;">
-    <span style="font-size: 14pt; font-weight: bold; color: #ffeb3b;">⏸️ CAPTURE STOPPED</span>
+    <span style="font-size: 14pt; font-weight: bold; color: #ffeb3b;">CAPTURE STOPPED</span>
 </div>
 """
 
